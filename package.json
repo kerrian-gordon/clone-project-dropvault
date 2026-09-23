@@ -1,0 +1,12 @@
+{
+  "name": "dropvault",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start:api": "node apps/api/src/start.js",
+    "test": "node --test apps/api/test/*.test.js"
+  }
+}

@@ -19,6 +19,8 @@ build/
 /storage/originals/*
 /storage/previews/*
 /storage/tmp/*
+/storage/catalog.json
+/storage/catalog.json.*.tmp
 !/storage/originals/.gitkeep
 !/storage/previews/.gitkeep
 !/storage/tmp/.gitkeep
