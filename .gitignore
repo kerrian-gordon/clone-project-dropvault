@@ -14,3 +14,11 @@ build/
 .DS_Store
 .vscode/
 *.log
+
+# Local uploaded and generated files
+/storage/originals/*
+/storage/previews/*
+/storage/tmp/*
+!/storage/originals/.gitkeep
+!/storage/previews/.gitkeep
+!/storage/tmp/.gitkeep
