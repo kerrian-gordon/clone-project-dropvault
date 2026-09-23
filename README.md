@@ -59,3 +59,7 @@ Agree on the shared contract first, then the three feature tracks can move in pa
 | 5. Integration and checks | Across the project | Connect the UI to the API and check the full upload, browse, view, and download flow with several file types and multiple files at once. Verify that deleting a file removes it from the browser and the freed bytes are immediately reflected in the storage meter. Verify that a shareable link resolves correctly from a fresh browser session without navigating through the file browser. Verify that the cap block and upgrade prompt appear when the limit is reached and clear after files are deleted. | The complete flow works from a fresh local setup. |
 
 Tracks 2, 3, and 4 can be assigned to different people once track 1 is agreed. Track 5 follows their integration. This keeps the first milestone focused on reliable storage and access across many file types, while preview support can expand over time.
+
+## Next milestone
+
+The [multi-user freemium MVP plan](docs/multi-user-freemium-mvp.md) records the account, permissions, per-user quota, sharing, upload, and front-end flows proposed for the next milestone. It distinguishes the current local API from work that is still planned.
