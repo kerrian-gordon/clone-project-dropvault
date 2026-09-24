@@ -70,4 +70,6 @@ Tracks 2, 3, and 4 can be assigned to different people once track 1 is agreed. T
 
 ## Next milestone
 
-The [multi-user freemium MVP plan](docs/multi-user-freemium-mvp.md) records the account, permissions, per-user quota, sharing, upload, and front-end flows proposed for the next milestone. It distinguishes the current local API from work that is still planned.
+The [multi-user freemium MVP plan](docs/multi-user-freemium-mvp.md) records the account, permissions, per-user quota, sharing, upload, and front-end flows proposed for the next milestone. It distinguishes the current local API from work that is still planned. A separate [two-account mock fixture](apps/web/src/shared/data/mock-multi-user-drive.json) supports the blocked-upload, upgrade, and named-user sharing prototypes; see its [usage notes](apps/web/src/shared/data/README.md).
+
+Machine-learning file classification is outside this MVP. The `feat/improved-file-uploading-and-storage-with-machine-learning` branch contains no ML work and currently matches `feat/shared-contract-api`; see the [MVP scope note](docs/multi-user-freemium-mvp.md#follow-on-work).
