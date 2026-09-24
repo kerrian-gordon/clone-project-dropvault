@@ -1,17 +1,5 @@
-import { MAX_UPLOAD_BYTES, ROOT_FOLDER_ID, normalizeMimeType, validName } from '../../../../../packages/shared/index.js';
+import { MAX_UPLOAD_BYTES, ROOT_FOLDER_ID, SUPPORTED_UPLOAD_TYPES, normalizeMimeType, validName } from '../../../../../packages/shared/index.js';
 import { ApiError } from '../../routes/errors.js';
-
-const supportedTypes = new Map([
-  ['pdf', 'application/pdf'],
-  ['docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
-  ['pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
-  ['xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
-  ['txt', 'text/plain'], ['csv', 'text/csv'], ['json', 'application/json'],
-  ['png', 'image/png'], ['jpg', 'image/jpeg'], ['jpeg', 'image/jpeg'],
-  ['gif', 'image/gif'], ['webp', 'image/webp'],
-  ['mp3', 'audio/mpeg'], ['mp4', 'video/mp4'],
-  ['zip', 'application/zip'], ['gz', 'application/gzip'],
-]);
 
 const signatures = new Map([
   ['pdf', (bytes) => bytes.subarray(0, 5).equals(Buffer.from('%PDF-'))],
@@ -59,7 +47,7 @@ export function uploadDetails(request, url, catalog, userId, maxUploadBytes = MA
     throw new ApiError(413, 'FILE_TOO_LARGE', 'File exceeds the upload limit');
   }
   const extension = name.split('.').at(-1).toLowerCase();
-  const mimeType = supportedTypes.get(extension);
+  const mimeType = SUPPORTED_UPLOAD_TYPES[extension];
   if (!mimeType) throw new ApiError(415, 'UNSUPPORTED_FILE_TYPE', 'File type is not supported');
   const declaredType = normalizeMimeType(request.headers['content-type']);
   if (declaredType !== 'application/octet-stream' && declaredType !== mimeType) {

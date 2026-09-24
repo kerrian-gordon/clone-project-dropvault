@@ -1,28 +1,23 @@
 import { WARN_THRESHOLD } from '../lib/useStorage.js';
 
-function formatBytes(bytes) {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  if (bytes < 1024 ** 3) return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+export function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KiB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MiB`;
   return `${(bytes / 1024 ** 3).toFixed(2)} GiB`;
 }
 
-export function StorageMeter({ usage }) {
-  if (!usage) return null;
-  const ratio = usage.usedBytes / usage.limitBytes;
-  const pct = Math.min(ratio * 100, 100).toFixed(1);
-  const warn = ratio >= WARN_THRESHOLD;
-  const full = ratio >= 1;
-
-  return (
-    <div className={`storage-meter${warn ? ' warn' : ''}${full ? ' full' : ''}`}>
-      <div className="meter-bar" role="progressbar" aria-valuenow={Math.round(ratio * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Storage used">
-        <div className="meter-fill" style={{ width: `${pct}%` }} />
-      </div>
-      <p className="meter-label">
-        {formatBytes(usage.usedBytes)} of {formatBytes(usage.limitBytes)} used
-        {full && <strong> · Storage full — delete files to upload more</strong>}
-        {warn && !full && <strong> · Almost full</strong>}
-      </p>
+export function StorageMeter({ usage, error }) {
+  if (error) return <p className="error" role="status">Storage usage unavailable: {error}</p>;
+  if (!usage) return <p className="muted">Loading storage usage…</p>;
+  const ratio = usage.limitBytes > 0 ? usage.usedBytes / usage.limitBytes : 1;
+  const percent = Math.min(100, Math.max(0, ratio * 100));
+  return <div className={`storage-meter${ratio >= WARN_THRESHOLD ? ' warn' : ''}${ratio >= 1 ? ' full' : ''}`}>
+    <div className="meter-bar" role="progressbar" aria-label="Storage used" aria-valuenow={Math.round(percent)} aria-valuemin={0} aria-valuemax={100}>
+      <div className="meter-fill" style={{ width: `${percent}%` }} />
     </div>
-  );
+    <p className="meter-label">{formatBytes(usage.usedBytes)} of {formatBytes(usage.limitBytes)} used · {usage.tier} plan
+      {ratio >= 1 ? <strong> · Storage full — delete files to upload more</strong> : ratio >= WARN_THRESHOLD ? <strong> · Almost full</strong> : null}
+    </p>
+  </div>;
 }

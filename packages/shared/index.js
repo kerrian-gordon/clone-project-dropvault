@@ -7,6 +7,17 @@ export const ROOT_FOLDER_ID = 'root';
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 export const DEFAULT_STORAGE_LIMIT_BYTES = 1024 * 1024 * 1024;
 export const MAX_NAME_LENGTH = 255;
+export const SUPPORTED_UPLOAD_TYPES = Object.freeze({
+  pdf: 'application/pdf',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  txt: 'text/plain', csv: 'text/csv', json: 'application/json',
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+  gif: 'image/gif', webp: 'image/webp',
+  mp3: 'audio/mpeg', mp4: 'video/mp4',
+  zip: 'application/zip', gz: 'application/gzip',
+});
 
 export const routes = Object.freeze({
   health: '/v1/health',

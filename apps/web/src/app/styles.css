@@ -45,4 +45,24 @@ h1 { margin: 0.8rem 0; }
 .auth-card label { display: grid; gap: 0.35rem; }
 .auth-card input { padding: 0.7rem; border: 1px solid #bac7d8; border-radius: 7px; }
 .viewer-placeholder { margin-top: 2rem; padding: 2rem; background: white; border: 1px solid #dce3ed; border-radius: 12px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.upload-panel, .access-panel { margin: 1.5rem 0; }
+.drop-zone { padding: 1.5rem; border: 2px dashed #9db5d5; border-radius: 12px; background: #fff; text-align: center; }
+.drop-zone.dragging { border-color: #175cd3; background: #e8f0ff; }
+.drop-zone p:first-child { margin-top: 0; }
+.drop-zone p:last-child { margin-bottom: 0; }
+.upload-queue, .access-panel { padding: 1.25rem; border: 1px solid #dce3ed; border-radius: 12px; background: white; }
+.upload-queue h2, .access-panel h2 { margin-top: 0; }
+.upload-queue ul, .access-list { list-style: none; padding: 0; margin: 0; }
+.upload-queue li, .access-list li { padding: 0.85rem 0; border-top: 1px solid #edf1f6; }
+.upload-job-heading, .access-list li { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+.upload-job-heading strong { overflow-wrap: anywhere; }
+.upload-queue progress { width: 100%; margin-top: 0.5rem; }
+.upload-queue li p { margin: 0.4rem 0; }
+.row-main strong { overflow-wrap: anywhere; }
+.row-actions { justify-content: flex-end; flex-wrap: wrap; }
+.share-form { display: flex; align-items: end; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.25rem; }
+.share-form label { width: 100%; }
+.share-form input { padding: 0.65rem; border: 1px solid #bac7d8; border-radius: 7px; flex: 1; min-width: 12rem; }
+@media (max-width: 650px) { .row { align-items: flex-start; flex-wrap: wrap; } .row-main { width: 100%; } .row-actions { width: 100%; } }
 @media (max-width: 650px) { .topbar { align-items: flex-start; flex-wrap: wrap; padding: 1rem; gap: 0.75rem; } .account { width: 100%; margin-left: 0; justify-content: space-between; } .content { margin-top: 1.5rem; } }

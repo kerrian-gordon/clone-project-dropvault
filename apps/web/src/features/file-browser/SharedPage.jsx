@@ -15,16 +15,16 @@ export function SharedPage() {
     return () => { active = false; };
   }, []);
 
-  return (
-    <section>
-      <h1>Shared with me</h1>
-      <p className="muted">Files another account has granted you access to.</p>
-      {error && <p className="error" role="alert">{error}</p>}
-      {!files && !error && <p>Loading shared files…</p>}
-      {files && <div className="list">
-        {files.map((file) => <Link className="row" key={file.id} to={`/view/${encodeURIComponent(file.id)}`}><span className="item-icon" aria-hidden="true">📄</span><strong>{file.name}</strong><span className="muted">Shared file</span></Link>)}
-        {!files.length && <p className="empty">No files have been shared with you.</p>}
-      </div>}
-    </section>
-  );
+  return <section>
+    <h1>Shared with me</h1>
+    <p className="muted">Files another account has granted you access to. You can view and download them.</p>
+    {error && <p className="error" role="alert">{error}</p>}
+    {!files && !error && <p>Loading shared files…</p>}
+    {files && <div className="list" aria-label="Shared files">
+      {files.map((file) => <Link className="row" key={file.id} to={`/view/${encodeURIComponent(file.id)}`}>
+        <span className="item-icon" aria-hidden="true">📄</span><strong>{file.name}</strong><span className="muted">View and download</span>
+      </Link>)}
+      {!files.length && <p className="empty">No files have been shared with you.</p>}
+    </div>}
+  </section>;
 }
