@@ -1,6 +1,6 @@
 # Dropvault
 
-Starting point for a Dropbox-style document app. The shared contract and local API are implemented; the web app and preview generation are still folder scaffolds.
+Starting point for a Dropbox-style document app. The shared contract and local API are implemented. The web app now has a React Router navigation shell, account entry, basic file and shared listings, and a download-only viewer; upload UI, sharing controls, storage meter, and inline previews remain to be built.
 
 ```text
 apps/
@@ -36,7 +36,7 @@ docs/                          Product and architecture notes
 
 The upload feature is where both file selection and drag and drop will live. The API's upload module will validate incoming files, while the storage service will save their bytes. File metadata belongs in `files`; generated representations belong in `previews`. The viewer can choose a suitable display for images, PDFs, text, audio, video, and other supported formats, with download available for files that cannot be previewed.
 
-The directories contain `.gitkeep` files so the structure is visible in Git. The API uses Node.js 24 built-in modules, local disk for file bytes, and a JSON metadata catalog. It now has local account sessions, owner checks, per-account quotas, named-user access, and a defined upload-type list with a 100 MiB per-file limit. The web app and production storage remain future work.
+The directories contain `.gitkeep` files so the structure is visible in Git. The API uses Node.js 24 built-in modules, local disk for file bytes, and a JSON metadata catalog. It now has local account sessions, owner checks, per-account quotas, named-user access, and a defined upload-type list with a 100 MiB per-file limit. Production storage remains future work.
 
 ## Run the API
 
@@ -44,9 +44,15 @@ From the repository root, run `node apps/api/src/start.js`. It listens at `http:
 
 Set `DROPVAULT_STORAGE_LIMIT_BYTES` to change the storage cap (default 1 GiB). For example, in PowerShell run `$env:DROPVAULT_STORAGE_LIMIT_BYTES='104857600'` before starting the API to set a 100 MiB cap.
 
-The request and response shapes, file model, limits, and example upload command are in [docs/api.md](docs/api.md). The web app can use the route helpers and documented file shapes in `packages/shared/index.js`. When the web app gets a development server, proxy `/v1` requests to the API.
+The request and response shapes, file model, limits, and example upload command are in [docs/api.md](docs/api.md). The web app uses the route helpers and documented file shapes in `packages/shared/index.js` and proxies `/v1` requests to the API during development.
 
-The original tracks 1 and 2 have a local implementation, extended with the MVP account and quota backend. The browser and integration work remain to be built.
+## Run the web app
+
+From the repository root, run `npm --prefix apps/web install` once. Start the API with `npm run start:api`, then in another terminal run `npm run dev:web`. Open the URL Vite prints (normally `http://127.0.0.1:5173`). Vite proxies `/v1` to the local API so session cookies and API requests use the web origin. Run `npm run build:web` to check the production bundle.
+
+React Router uses browser history. `/` redirects to `/files`; `/files` lists the root, `/folders/:id` lists a folder, `/shared` lists files granted to the account, and `/view/:id` shows file details and a download action. `/login` and `/register` are public; the file routes require a session and return to the requested URL after sign-in. Unknown URLs show a not-found page. Upload belongs in the file browser, while share and upgrade prompts belong in dialogs over the current route. A production web server must serve `index.html` for direct visits and refreshes on SPA routes, while forwarding `/v1/*` to the API.
+
+The original tracks 1 and 2 have a local implementation, extended with the MVP account and quota backend. The browser feature flows and full integration remain to be built.
 
 ## Suggested work split
 
