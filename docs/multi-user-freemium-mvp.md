@@ -25,11 +25,13 @@ Update `packages/shared/` and `docs/api.md` before connecting the browser to new
 
 Extend the API so every file and folder operation derives the acting user from the authenticated session and checks that user's access. Recalculate quota on upload and delete; do not accept a client-supplied `usedBytes` or owner ID as authority. Add a way to grant, list, and revoke access for a named account. A shared file remains charged to its owner's quota. Bearer-link endpoints need a separate policy for creation, redemption, and revocation before they are presented alongside named-user sharing.
 
-The local JSON catalog is useful for development. The global `DROPVAULT_STORAGE_LIMIT_BYTES` setting and bearer-link endpoints are in-progress local edits at the time of this plan; they are not part of this documentation commit or per-user plan data. Any proposed request or response examples added to the contract should be marked as proposed until the API implements them.
+The local JSON catalog is useful for development. The implemented API now includes `DROPVAULT_STORAGE_LIMIT_BYTES`, per-account usage and plan tiers, and bearer-link endpoints. See [the API contract](api.md) for current behavior; mark any future request or response examples as proposed until implemented.
 
 ## Front-end work
 
 The web app uses React Router in declarative mode. `/files` is the root browser, `/folders/:id` is a folder, `/shared` lists named-user grants, and `/view/:id` is a linkable viewer. `/login` and `/register` are public, and signed-in routes redirect through login while preserving the requested URL. The upload area stays in the browser; sharing and upgrade prompts are dialogs on the current route so opening them does not discard selected files. Keep the upload queue above individual route pages if it must survive navigation within the current tab. Direct visits to SPA paths require an `index.html` fallback in deployment, with `/v1/*` still routed to the API.
+
+For prototyping the blocked-upload/upgrade and named-user sharing flows before full browser integration, use [`mock-multi-user-drive.json`](../apps/web/src/shared/data/mock-multi-user-drive.json) and its [usage notes](../apps/web/src/shared/data/README.md). The original `mock-drive.json` remains a single-user browsing fixture.
 
 1. **Account entry and file browser.** Show the signed-in account, owned files, and files shared with that account. Display owner and access status where useful. Hide management actions the user does not have, while relying on API checks for security.
 2. **Multiple-file upload.** Support both a picker and drag and drop. Queue each file separately, show progress and a result per file, and keep successful files visible when another file fails. The current API accepts one file per request, so a multi-file drop sends multiple requests.
@@ -60,3 +62,5 @@ The contract should be settled before API and browser work branch apart. Once it
 ## Follow-on work
 
 Document conversion and richer previews, a storage breakdown by file, polished plan comparison, delivery of warning notifications, persistent upload recovery across reloads, payment processing, and production storage are outside this MVP. A simple plan choice and an in-app near-cap warning are included above because they are needed to make the core journey understandable.
+
+Machine-learning file classification is also outside this MVP. Multiple-file upload does not require it: each upload is validated against the documented extension, MIME, size, and content checks, including uncommon types supported by the contract. The existing `feat/improved-file-uploading-and-storage-with-machine-learning` branch currently points to the same commit as `feat/shared-contract-api` and contains no ML implementation. Treat it as a stale historical branch, not an active dependency or an MVP deliverable. If classification is revisited, define its user benefit, training data, privacy behavior, confidence/fallback rules, and evaluation before starting new implementation work.

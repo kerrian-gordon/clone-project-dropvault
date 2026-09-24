@@ -1,0 +1,136 @@
+{
+  "users": [
+    {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+      "email": "alex@example.test",
+      "tier": "free",
+      "createdAt": "2026-09-01T09:00:00.000Z"
+    },
+    {
+      "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2",
+      "email": "blair@example.test",
+      "tier": "free",
+      "createdAt": "2026-09-02T09:00:00.000Z"
+    }
+  ],
+  "folders": [
+    {
+      "id": "33333333-3333-4333-8333-000000000001",
+      "name": "Projects",
+      "parentId": "root",
+      "ownerId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+      "createdAt": "2026-09-03T10:00:00.000Z"
+    },
+    {
+      "id": "33333333-3333-4333-8333-000000000002",
+      "name": "Personal",
+      "parentId": "root",
+      "ownerId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2",
+      "createdAt": "2026-09-03T11:00:00.000Z"
+    }
+  ],
+  "files": [
+    {
+      "id": "44444444-4444-4444-8444-000000000001",
+      "name": "Project-brief.pdf",
+      "folderId": "33333333-3333-4333-8333-000000000001",
+      "ownerId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+      "mimeType": "application/pdf",
+      "size": 10485760,
+      "createdAt": "2026-09-04T10:00:00.000Z"
+    },
+    {
+      "id": "44444444-4444-4444-8444-000000000002",
+      "name": "Demo-video.mp4",
+      "folderId": "33333333-3333-4333-8333-000000000001",
+      "ownerId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+      "mimeType": "video/mp4",
+      "size": 73400320,
+      "createdAt": "2026-09-05T10:00:00.000Z"
+    },
+    {
+      "id": "44444444-4444-4444-8444-000000000003",
+      "name": "Q4-deck.pptx",
+      "folderId": "33333333-3333-4333-8333-000000000001",
+      "ownerId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+      "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "size": 20971520,
+      "createdAt": "2026-09-06T10:00:00.000Z"
+    },
+    {
+      "id": "44444444-4444-4444-8444-000000000004",
+      "name": "Meeting-notes.txt",
+      "folderId": "33333333-3333-4333-8333-000000000002",
+      "ownerId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2",
+      "mimeType": "text/plain",
+      "size": 4096,
+      "createdAt": "2026-09-07T10:00:00.000Z"
+    }
+  ],
+  "accessGrants": [
+    {
+      "fileId": "44444444-4444-4444-8444-000000000001",
+      "userId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2",
+      "email": "blair@example.test",
+      "createdAt": "2026-09-08T10:00:00.000Z"
+    }
+  ],
+  "storageUsageByUser": {
+    "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1": {
+      "usedBytes": 104857600,
+      "limitBytes": 104857600,
+      "tier": "free"
+    },
+    "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2": {
+      "usedBytes": 4096,
+      "limitBytes": 104857600,
+      "tier": "free"
+    }
+  },
+  "prototypeScenarios": {
+    "blockedUpload": {
+      "actingUserId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+      "selectedFile": {
+        "name": "Final-budget.xlsx",
+        "folderId": "33333333-3333-4333-8333-000000000001",
+        "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "size": 1048576
+      },
+      "errorResponse": {
+        "error": {
+          "code": "STORAGE_CAP_EXCEEDED",
+          "message": "Storage limit would be exceeded"
+        }
+      },
+      "afterUpgrade": {
+        "account": {
+          "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+          "email": "alex@example.test",
+          "tier": "demo",
+          "createdAt": "2026-09-01T09:00:00.000Z"
+        },
+        "storageUsage": {
+          "usedBytes": 104857600,
+          "limitBytes": 1048576000,
+          "tier": "demo"
+        }
+      },
+      "afterRetry": {
+        "file": {
+          "id": "44444444-4444-4444-8444-000000000005",
+          "name": "Final-budget.xlsx",
+          "folderId": "33333333-3333-4333-8333-000000000001",
+          "ownerId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+          "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "size": 1048576,
+          "createdAt": "2026-09-09T10:00:00.000Z"
+        },
+        "storageUsage": {
+          "usedBytes": 105906176,
+          "limitBytes": 1048576000,
+          "tier": "demo"
+        }
+      }
+    }
+  }
+}
