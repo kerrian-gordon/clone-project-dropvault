@@ -60,6 +60,9 @@ export async function openCatalog(path) {
   }
 
   return {
+    referencedStorageKeys() {
+      return state.files.map((file) => file.storageKey);
+    },
     async createUser(email, passwordHash) {
       return write((next) => {
         if (next.users.some((user) => user.email === email)) {
@@ -67,13 +70,20 @@ export async function openCatalog(path) {
         }
         const user = { id: randomUUID(), email, passwordHash, tier: 'free',
           createdAt: new Date().toISOString() };
-        // A local pre-account catalog is claimed by its first registered account.
-        if (next.users.length === 0) {
-          for (const folder of next.folders) folder.ownerId ??= user.id;
-          for (const file of next.files) file.ownerId ??= user.id;
-        }
         next.users.push(user);
         return publicUser(user);
+      });
+    },
+    async claimLegacy(userId) {
+      return write((next) => {
+        const folders = next.folders.filter((folder) => !folder.ownerId);
+        const files = next.files.filter((file) => !file.ownerId);
+        if (folders.length === 0 && files.length === 0) {
+          throw new ApiError(409, 'NO_LEGACY_FILES', 'No unclaimed files or folders remain');
+        }
+        for (const folder of folders) folder.ownerId = userId;
+        for (const file of files) file.ownerId = userId;
+        return { foldersClaimed: folders.length, filesClaimed: files.length };
       });
     },
     findUser(email) {

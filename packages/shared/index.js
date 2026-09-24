@@ -14,6 +14,7 @@ export const routes = Object.freeze({
   login: '/v1/auth/login',
   logout: '/v1/auth/logout',
   account: '/v1/account',
+  claimLegacy: '/v1/account/claim-legacy',
   plan: '/v1/account/plan',
   folders: '/v1/folders',
   children: (folderId) => `/v1/folders/${encodeURIComponent(folderId)}/children`,

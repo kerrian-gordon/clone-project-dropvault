@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, open, rename, rm } from 'node:fs/promises';
+import { access, mkdir, open, readdir, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
 import { ApiError } from '../../routes/errors.js';
+import { zipEntryNames } from '../../modules/uploads/zip.js';
 
 export async function openLocalStorage(root) {
   const originals = join(root, 'originals');
@@ -12,6 +13,29 @@ export async function openLocalStorage(root) {
   await Promise.all([mkdir(originals, { recursive: true }), mkdir(tmp, { recursive: true })]);
 
   return {
+    async recoverDeletes(referencedKeys) {
+      const referenced = new Set(referencedKeys);
+      for (const name of await readdir(tmp)) {
+        if (!name.startsWith('delete-') || !name.endsWith('.pending')) continue;
+        const storageKey = name.slice('delete-'.length, -'.pending'.length);
+        if (!/^[A-Za-z0-9_-]{1,100}$/u.test(storageKey)) continue;
+        const stagedPath = join(tmp, name);
+        const originalPath = join(originals, storageKey);
+        if (referenced.has(storageKey)) {
+          let originalExists = true;
+          try {
+            await access(originalPath);
+          } catch (error) {
+            if (error.code !== 'ENOENT') throw error;
+            originalExists = false;
+          }
+          if (originalExists) await rm(stagedPath);
+          else await rename(stagedPath, originalPath);
+        } else {
+          await rm(stagedPath);
+        }
+      }
+    },
     async save(request, maxUploadBytes, availableBytes) {
       const tempPath = join(tmp, randomUUID());
       let size = 0;
@@ -50,12 +74,15 @@ export async function openLocalStorage(root) {
         await file.close();
       }
     },
+    zipEntries(storageKey) {
+      return zipEntryNames(join(originals, storageKey));
+    },
     async remove(storageKey) {
       await rm(join(originals, storageKey), { force: true });
     },
     async stageRemove(storageKey) {
       const originalPath = join(originals, storageKey);
-      const stagedPath = join(tmp, `delete-${randomUUID()}`);
+      const stagedPath = join(tmp, `delete-${storageKey}.pending`);
       await rename(originalPath, stagedPath);
       return {
         commit: () => rm(stagedPath, { force: true }),

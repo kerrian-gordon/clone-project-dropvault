@@ -24,16 +24,28 @@ const signatures = new Map([
     && bytes.subarray(8, 12).toString() === 'WEBP'],
   ['gz', (bytes) => bytes.subarray(0, 2).equals(Buffer.from('1f8b', 'hex'))],
 ]);
+const officeParts = new Map([
+  ['docx', 'word/document.xml'],
+  ['pptx', 'ppt/presentation.xml'],
+  ['xlsx', 'xl/workbook.xml'],
+]);
 
 function zipSignature(bytes) {
   return bytes.subarray(0, 4).equals(Buffer.from('504b0304', 'hex'));
 }
 
-export function validateStoredFile(name, bytes) {
+export async function validateStoredFile(name, bytes, readZipEntries) {
   const extension = name.split('.').at(-1).toLowerCase();
   const matches = signatures.get(extension);
   if (matches && !matches(bytes)) {
     throw new ApiError(415, 'INVALID_FILE_CONTENT', 'File content does not match its type');
+  }
+  if (officeParts.has(extension)) {
+    const entries = await readZipEntries();
+    if (!entries.has('[Content_Types].xml') || !entries.has('_rels/.rels')
+      || !entries.has(officeParts.get(extension))) {
+      throw new ApiError(415, 'INVALID_FILE_CONTENT', 'Office package is missing required parts');
+    }
   }
 }
 
