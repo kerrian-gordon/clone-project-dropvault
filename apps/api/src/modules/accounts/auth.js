@@ -4,6 +4,45 @@ import { ApiError } from '../../routes/errors.js';
 
 const scrypt = promisify(scryptCallback);
 const SESSION_DAYS = 7;
+const RATE_WINDOW_MS = 15 * 60_000;
+
+export function createAuthLimiter() {
+  const attempts = new Map();
+  function entry(key) {
+    const now = Date.now();
+    const current = attempts.get(key);
+    if (current && current.expiresAt > now) return current;
+    const fresh = { count: 0, expiresAt: now + RATE_WINDOW_MS };
+    attempts.set(key, fresh);
+    return fresh;
+  }
+  function check(key, limit) {
+    if (entry(key).count >= limit) {
+      throw new ApiError(429, 'RATE_LIMITED', 'Too many authentication attempts; try again later');
+    }
+  }
+  function record(key) {
+    entry(key).count += 1;
+  }
+  return {
+    registration(ip) {
+      const key = `register:${ip}`;
+      check(key, 10);
+      record(key);
+    },
+    checkLogin(ip, email) {
+      check(`login-ip:${ip}`, 30);
+      check(`login-account:${ip}:${email}`, 5);
+    },
+    failedLogin(ip, email) {
+      record(`login-ip:${ip}`);
+      record(`login-account:${ip}:${email}`);
+    },
+    successfulLogin(ip, email) {
+      attempts.delete(`login-account:${ip}:${email}`);
+    },
+  };
+}
 
 export function validEmail(value) {
   return typeof value === 'string' && value.length <= 254

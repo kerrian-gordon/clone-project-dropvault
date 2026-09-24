@@ -29,6 +29,8 @@ The local JSON catalog is useful for development. The global `DROPVAULT_STORAGE_
 
 ## Front-end work
 
+The web app uses React Router in declarative mode. `/files` is the root browser, `/folders/:id` is a folder, `/shared` lists named-user grants, and `/view/:id` is a linkable viewer. `/login` and `/register` are public, and signed-in routes redirect through login while preserving the requested URL. The upload area stays in the browser; sharing and upgrade prompts are dialogs on the current route so opening them does not discard selected files. Keep the upload queue above individual route pages if it must survive navigation within the current tab. Direct visits to SPA paths require an `index.html` fallback in deployment, with `/v1/*` still routed to the API.
+
 1. **Account entry and file browser.** Show the signed-in account, owned files, and files shared with that account. Display owner and access status where useful. Hide management actions the user does not have, while relying on API checks for security.
 2. **Multiple-file upload.** Support both a picker and drag and drop. Queue each file separately, show progress and a result per file, and keep successful files visible when another file fails. The current API accepts one file per request, so a multi-file drop sends multiple requests.
 3. **Storage meter and delete.** Show account usage against its limit, warn near the cap, confirm deletion, and refresh the meter and file list after successful deletion. The warning threshold should be a shared UI rule, not a different number on each screen.

@@ -1,7 +1,8 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
 import { MAX_UPLOAD_BYTES, ROOT_FOLDER_ID, validName } from '../../../../packages/shared/index.js';
 import { publicFile } from '../db/catalog.js';
-import { checkRequestOrigin, clearSessionCookie, createSession, hashPassword,
+import { checkRequestOrigin, clearSessionCookie, createAuthLimiter, createSession, hashPassword,
   requireUser, sessionCookie, sessionToken, validEmail, validPassword,
   verifyPassword } from '../modules/accounts/auth.js';
 import { contentHeaders } from '../modules/files/content.js';
@@ -35,8 +36,12 @@ async function readJson(request) {
   }
 }
 
-export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BYTES, storageLimitBytes }) {
+export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BYTES,
+  storageLimitBytes, legacyClaimToken, publicBaseUrl }) {
   let pendingMutation = Promise.resolve();
+  const authLimiter = createAuthLimiter();
+  const activeReads = new Map();
+  const deleting = new Set();
   function mutate(work) {
     const operation = pendingMutation.then(work);
     pendingMutation = operation.catch(() => {});
@@ -44,8 +49,26 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
   }
 
   async function sendContent(response, file, download) {
-    response.writeHead(200, contentHeaders(file, download));
-    await pipeline(storage.read(file.storageKey), response);
+    if (deleting.has(file.id)) throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
+    const current = activeReads.get(file.id) ?? { count: 0, waiters: [] };
+    current.count += 1;
+    activeReads.set(file.id, current);
+    try {
+      const stream = storage.read(file.storageKey);
+      response.writeHead(200, contentHeaders(file, download));
+      await pipeline(stream, response);
+    } finally {
+      current.count -= 1;
+      if (current.count === 0) {
+        activeReads.delete(file.id);
+        for (const resolve of current.waiters) resolve();
+      }
+    }
+  }
+
+  async function waitForReads(fileId) {
+    const current = activeReads.get(fileId);
+    if (current?.count) await new Promise((resolve) => current.waiters.push(resolve));
   }
 
   return async (request, response) => {
@@ -58,6 +81,7 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         return json(response, 200, { status: 'ok' });
       }
       if (request.method === 'POST' && path === '/v1/auth/register') {
+        authLimiter.registration(request.socket.remoteAddress);
         const input = await readJson(request);
         if (!validEmail(input?.email) || !validPassword(input?.password)) {
           throw new ApiError(400, 'INVALID_CREDENTIALS', 'Provide an email and password of at least 12 characters');
@@ -69,11 +93,16 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       }
       if (request.method === 'POST' && path === '/v1/auth/login') {
         const input = await readJson(request);
-        const user = validEmail(input?.email) ? catalog.findUser(input.email.trim().toLowerCase()) : null;
+        const email = validEmail(input?.email) ? input.email.trim().toLowerCase() : '';
+        const ip = request.socket.remoteAddress;
+        authLimiter.checkLogin(ip, email);
+        const user = email ? catalog.findUser(email) : null;
         if (!user || !validPassword(input?.password)
           || !await verifyPassword(input.password, user.passwordHash)) {
+          authLimiter.failedLogin(ip, email);
           throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
         }
+        authLimiter.successfulLogin(ip, email);
         const token = await createSession(catalog, user.id);
         return json(response, 200, catalog.getUser(user.id),
           { 'Set-Cookie': sessionCookie(token, !!request.socket.encrypted) });
@@ -92,6 +121,18 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       }
       if (request.method === 'GET' && path === '/v1/account') {
         return json(response, 200, catalog.getUser(user.id));
+      }
+      if (request.method === 'POST' && path === '/v1/account/claim-legacy') {
+        if (!legacyClaimToken) {
+          throw new ApiError(409, 'LEGACY_CLAIM_DISABLED', 'Legacy claiming is not configured');
+        }
+        const input = await readJson(request);
+        const supplied = createHash('sha256').update(String(input?.token ?? '')).digest();
+        const expected = createHash('sha256').update(legacyClaimToken).digest();
+        if (!timingSafeEqual(supplied, expected)) {
+          throw new ApiError(403, 'INVALID_CLAIM_TOKEN', 'Legacy claim token is invalid');
+        }
+        return json(response, 200, await mutate(() => catalog.claimLegacy(user.id)));
       }
       if (request.method === 'POST' && path === '/v1/account/plan') {
         const input = await readJson(request);
@@ -132,7 +173,8 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
           }
           const stored = await storage.save(request, maxUploadBytes, availableBytes);
           try {
-            validateStoredFile(details.name, await storage.sample(stored.storageKey));
+            await validateStoredFile(details.name, await storage.sample(stored.storageKey),
+              () => storage.zipEntries(stored.storageKey));
             return await catalog.addFile({ ...details, ...stored, ownerId: user.id });
           } catch (error) {
             await storage.remove(stored.storageKey);
@@ -151,7 +193,8 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       const sharesMatch = /^\/v1\/files\/([^/]+)\/shares$/u.exec(path);
       if (request.method === 'POST' && sharesMatch) {
         const share = await catalog.createShare(sharesMatch[1], user.id);
-        const shareUrl = `http://127.0.0.1:${request.socket.localPort}/v1/shares/${share.token}`;
+        const sharePath = `/v1/shares/${share.token}`;
+        const shareUrl = publicBaseUrl ? `${publicBaseUrl}${sharePath}` : sharePath;
         return json(response, 201, { ...share, url: shareUrl });
       }
       if (request.method === 'GET' && sharesMatch) {
@@ -190,14 +233,25 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       if (request.method === 'DELETE' && fileMatch) {
         await mutate(async () => {
           const file = catalog.getFile(fileMatch[1], user.id, 'manage');
-          const staged = await storage.stageRemove(file.storageKey);
+          deleting.add(file.id);
           try {
-            await catalog.deleteFile(file.id, user.id);
-          } catch (error) {
-            await staged.rollback();
-            throw error;
+            await waitForReads(file.id);
+            const staged = await storage.stageRemove(file.storageKey);
+            try {
+              await catalog.deleteFile(file.id, user.id);
+            } catch (error) {
+              await staged.rollback();
+              throw error;
+            }
+            // The catalog deletion is committed. Startup recovery retries file cleanup.
+            try {
+              await staged.commit();
+            } catch (error) {
+              console.error('Deferred cleanup of deleted file', error);
+            }
+          } finally {
+            deleting.delete(file.id);
           }
-          await staged.commit();
         });
         response.writeHead(204);
         return response.end();

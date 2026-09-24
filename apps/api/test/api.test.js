@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Transform } from 'node:stream';
 import test from 'node:test';
 import { createApiServer } from '../src/server.js';
+import { openLocalStorage } from '../src/services/storage/local.js';
 
 const nativeFetch = globalThis.fetch;
 let activeCookie;
@@ -24,8 +26,36 @@ async function register(base, email = 'owner@example.test') {
   return response.json();
 }
 
-async function start(storageRoot, maxUploadBytes, storageLimitBytes) {
-  const server = await createApiServer({ storageRoot, maxUploadBytes, storageLimitBytes });
+function emptyZip(entries) {
+  const local = [];
+  const central = [];
+  let offset = 0;
+  for (const name of entries) {
+    const nameBytes = Buffer.from(name);
+    const header = Buffer.alloc(30);
+    header.writeUInt32LE(0x04034b50, 0);
+    header.writeUInt16LE(nameBytes.length, 26);
+    local.push(header, nameBytes);
+    const directory = Buffer.alloc(46);
+    directory.writeUInt32LE(0x02014b50, 0);
+    directory.writeUInt16LE(nameBytes.length, 28);
+    directory.writeUInt32LE(offset, 42);
+    central.push(directory, nameBytes);
+    offset += header.length + nameBytes.length;
+  }
+  const localBytes = Buffer.concat(local);
+  const centralBytes = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(centralBytes.length, 12);
+  end.writeUInt32LE(localBytes.length, 16);
+  return Buffer.concat([localBytes, centralBytes, end]);
+}
+
+async function start(storageRoot, maxUploadBytes, storageLimitBytes, options = {}) {
+  const server = await createApiServer({ storageRoot, maxUploadBytes, storageLimitBytes, ...options });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   return { server, base: `http://127.0.0.1:${server.address().port}` };
@@ -134,12 +164,13 @@ test('cap concurrent uploads, persist shares, and reclaim usage on deletion', as
     const share = await shareResponse.json();
     assert.equal(share.token.length, 43);
     assert.ok(Date.parse(share.expiresAt) > Date.now());
-    assert.equal(share.url, `${running.base}/v1/shares/${share.token}`);
+    assert.equal(share.url, `/v1/shares/${share.token}`);
     const links = await (await fetch(`${running.base}/v1/files/${file.id}/shares`)).json();
     assert.equal(links.links[0].id, share.id);
     assert.equal('token' in links.links[0], false);
     assert.equal((await readFile(join(storageRoot, 'catalog.json'), 'utf8')).includes(share.token), false);
-    assert.deepEqual(Buffer.from(await (await fetch(share.url)).arrayBuffer()), Buffer.alloc(12, 'a'));
+    assert.deepEqual(Buffer.from(await (await fetch(new URL(share.url, running.base))).arrayBuffer()),
+      Buffer.alloc(12, 'a'));
 
     await stop(running.server);
     running = await start(storageRoot, 32, 20);
@@ -196,10 +227,10 @@ test('owner can revoke a bearer link while recipients cannot manage it', async (
     await register(running.base, 'recipient@example.test');
     assert.equal((await fetch(`${running.base}/v1/files/${file.id}/shares/${share.id}`,
       { method: 'DELETE' })).status, 404);
-    assert.equal((await nativeFetch(share.url)).status, 200);
+    assert.equal((await nativeFetch(new URL(share.url, running.base))).status, 200);
     assert.equal((await nativeFetch(`${running.base}/v1/files/${file.id}/shares/${share.id}`,
       { method: 'DELETE', headers: { Cookie: ownerCookie } })).status, 204);
-    assert.equal((await nativeFetch(share.url)).status, 404);
+    assert.equal((await nativeFetch(new URL(share.url, running.base))).status, 404);
   } finally {
     if (running) await stop(running.server);
     await rm(storageRoot, { recursive: true, force: true });
@@ -326,7 +357,7 @@ test('two accounts enforce file ownership, grants, and per-account quota', async
   }
 });
 
-test('login, logout, and pre-account catalog ownership survive migration', async () => {
+test('login, logout, and explicit legacy claim protect old files', async () => {
   const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-login-test-'));
   let running;
   try {
@@ -337,8 +368,21 @@ test('login, logout, and pre-account catalog ownership survive migration', async
         folderId: 'root', mimeType: 'text/plain', size: 3, createdAt: new Date().toISOString(),
         storageKey }],
     }));
-    running = await start(storageRoot, 32, 20);
+    running = await start(storageRoot, 32, 20,
+      { legacyClaimToken: 'local-migration-token-with-32-plus-characters' });
     const owner = await register(running.base);
+    assert.equal((await fetch(`${running.base}/v1/files/${fileId}`)).status, 404);
+    const badClaim = await fetch(`${running.base}/v1/account/claim-legacy`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'wrong token' }),
+    });
+    assert.equal(badClaim.status, 403);
+    const claim = await fetch(`${running.base}/v1/account/claim-legacy`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'local-migration-token-with-32-plus-characters' }),
+    });
+    assert.equal(claim.status, 200);
+    assert.deepEqual(await claim.json(), { filesClaimed: 1, foldersClaimed: 0 });
     assert.equal((await (await fetch(`${running.base}/v1/files/${fileId}`)).json()).ownerId, owner.id);
 
     const badLogin = await nativeFetch(`${running.base}/v1/auth/login`, {
@@ -358,6 +402,172 @@ test('login, logout, and pre-account catalog ownership survive migration', async
       { method: 'POST', headers: { Cookie: loginCookie } })).status, 204);
     assert.equal((await nativeFetch(`${running.base}/v1/account`,
       { headers: { Cookie: loginCookie } })).status, 401);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('startup restores interrupted deletion and removes committed staged bytes', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-recovery-test-'));
+  let running;
+  try {
+    running = await start(storageRoot, 100, 100);
+    await register(running.base);
+    const upload = await fetch(`${running.base}/v1/files?name=restore.txt`, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'keep me',
+    });
+    const file = await upload.json();
+    const catalogPath = join(storageRoot, 'catalog.json');
+    const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
+    const storageKey = catalog.files[0].storageKey;
+    const original = join(storageRoot, 'originals', storageKey);
+    const staged = join(storageRoot, 'tmp', `delete-${storageKey}.pending`);
+    await stop(running.server);
+    running = null;
+
+    await rename(original, staged); // Process stopped after staging, before catalog change.
+    running = await start(storageRoot, 100, 100);
+    assert.equal((await readFile(original, 'utf8')), 'keep me');
+    assert.equal((await fetch(`${running.base}/v1/files/${file.id}/content`)).status, 200);
+    assert.equal((await readdir(join(storageRoot, 'tmp'))).length, 0);
+    await stop(running.server);
+    running = null;
+
+    await rename(original, staged);
+    catalog.files = []; // Process stopped after catalog change, before byte cleanup.
+    await writeFile(catalogPath, JSON.stringify(catalog));
+    running = await start(storageRoot, 100, 100);
+    assert.equal((await fetch(`${running.base}/v1/files/${file.id}`)).status, 404);
+    assert.equal((await readdir(join(storageRoot, 'tmp'))).length, 0);
+    assert.equal((await readdir(join(storageRoot, 'originals'))).length, 0);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('cleanup failure returns committed deletion and recovers on restart', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-cleanup-test-'));
+  let running;
+  try {
+    running = await start(storageRoot, 100, 100, {
+      storageFactory: async (root) => {
+        const storage = await openLocalStorage(root);
+        return { ...storage, stageRemove: async (key) => {
+          const staged = await storage.stageRemove(key);
+          return { ...staged, commit: async () => { throw new Error('simulated cleanup failure'); } };
+        } };
+      },
+    });
+    await register(running.base);
+    const upload = await fetch(`${running.base}/v1/files?name=remove.txt`, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'remove me',
+    });
+    const file = await upload.json();
+    assert.equal((await fetch(`${running.base}/v1/files/${file.id}`, { method: 'DELETE' })).status, 204);
+    assert.equal((await fetch(`${running.base}/v1/files/${file.id}`)).status, 404);
+    assert.equal((await readdir(join(storageRoot, 'tmp'))).length, 1);
+    await stop(running.server);
+    running = await start(storageRoot, 100, 100);
+    assert.equal((await readdir(join(storageRoot, 'tmp'))).length, 0);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('deletion waits for an active download to finish', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-active-read-test-'));
+  let running;
+  try {
+    let signalRead;
+    const readStarted = new Promise((resolve) => { signalRead = resolve; });
+    running = await start(storageRoot, 100, 100, {
+      storageFactory: async (root) => {
+        const storage = await openLocalStorage(root);
+        return { ...storage, read: (key) => {
+          const slow = new Transform({
+            transform(chunk, encoding, callback) {
+              setTimeout(() => callback(null, chunk), 100);
+            },
+          });
+          signalRead();
+          return storage.read(key).pipe(slow);
+        } };
+      },
+    });
+    await register(running.base);
+    const upload = await fetch(`${running.base}/v1/files?name=active.txt`, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'complete download',
+    });
+    const file = await upload.json();
+    const download = fetch(`${running.base}/v1/files/${file.id}/content`);
+    await readStarted;
+    const deletion = fetch(`${running.base}/v1/files/${file.id}`, { method: 'DELETE' });
+    assert.equal(await (await download).text(), 'complete download');
+    assert.equal((await deletion).status, 204);
+    assert.equal((await fetch(`${running.base}/v1/files/${file.id}/content`)).status, 404);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('Office uploads require package parts and share URL can use public origin', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-office-test-'));
+  let running;
+  try {
+    running = await start(storageRoot, 2_000, 10_000,
+      { publicBaseUrl: 'https://dropvault.example' });
+    await register(running.base);
+    const arbitraryZip = emptyZip(['notes.txt']);
+    const invalid = await fetch(`${running.base}/v1/files?name=fake.docx`, {
+      method: 'POST', headers: { 'Content-Type':
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+      body: arbitraryZip,
+    });
+    assert.equal(invalid.status, 415);
+    for (const [extension, mimeType, part] of [
+      ['docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'word/document.xml'],
+      ['pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'ppt/presentation.xml'],
+      ['xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xl/workbook.xml'],
+    ]) {
+      const response = await fetch(`${running.base}/v1/files?name=example.${extension}`, {
+        method: 'POST', headers: { 'Content-Type': mimeType },
+        body: emptyZip(['[Content_Types].xml', '_rels/.rels', part]),
+      });
+      assert.equal(response.status, 201, extension);
+    }
+    const file = (await (await fetch(`${running.base}/v1/folders/root/children`)).json()).files[0];
+    const share = await (await fetch(`${running.base}/v1/files/${file.id}/shares`,
+      { method: 'POST' })).json();
+    assert.equal(share.url, `https://dropvault.example/v1/shares/${share.token}`);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('login attempts are throttled before a valid password is checked', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-rate-test-'));
+  let running;
+  try {
+    running = await start(storageRoot, 100, 100);
+    await register(running.base);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const response = await nativeFetch(`${running.base}/v1/auth/login`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'owner@example.test', password: 'wrong-password-long' }),
+      });
+      assert.equal(response.status, 401);
+    }
+    const blocked = await nativeFetch(`${running.base}/v1/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'owner@example.test', password: 'correct horse battery staple' }),
+    });
+    assert.equal(blocked.status, 429);
+    assert.equal((await blocked.json()).error.code, 'RATE_LIMITED');
   } finally {
     if (running) await stop(running.server);
     await rm(storageRoot, { recursive: true, force: true });
