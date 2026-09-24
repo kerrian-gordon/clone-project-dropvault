@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import { routes } from '../../../../packages/shared/index.js';
 import { api } from '../shared/lib/api.js';
 
 const AuthContext = createContext(null);
@@ -30,14 +31,17 @@ export function AuthProvider({ children }) {
     setUser(null);
   }
 
-  async function refreshUser() {
-    try {
-      const account = await api('/v1/account');
-      setUser(account);
-    } catch {}
+  async function changePlan(tier) {
+    const account = await api(routes.plan, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier }),
+    });
+    setUser(account);
+    return account;
   }
 
-  return <AuthContext.Provider value={{ user, loading, signIn, signOut, refreshUser }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading, signIn, signOut, changePlan }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

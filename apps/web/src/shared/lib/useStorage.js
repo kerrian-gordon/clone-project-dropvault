@@ -9,10 +9,13 @@ export function useStorage() {
   const [error, setError] = useState('');
   const refreshUsage = useCallback(async () => {
     try {
-      setUsage(await api(routes.usage));
+      const latest = await api(routes.usage);
+      setUsage(latest);
       setError('');
+      return latest;
     } catch (caught) {
       setError(caught.message);
+      return null;
     }
   }, []);
   useEffect(() => { refreshUsage(); }, [refreshUsage]);
