@@ -79,7 +79,7 @@ export function FilesPage() {
     {id && <Link to="/files">← My files</Link>}
     <h1>{title}</h1>
     <StorageMeter usage={usage} error={usageError} />
-    <UploadPanel folderId={folderId} />
+    <UploadPanel folderId={folderId} usage={usage} refreshUsage={refreshUsage} />
     {error && <p className="error" role="alert">{error}</p>}
     {!listing && !error && <p>Loading files…</p>}
     {listing && <div className="list" aria-label="Folder contents">
