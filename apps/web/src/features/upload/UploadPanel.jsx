@@ -15,6 +15,8 @@ export function UploadPanel({ folderId, usage, refreshUsage }) {
   const [upgradeError, setUpgradeError] = useState('');
   const accept = Object.keys(SUPPORTED_UPLOAD_TYPES).map((extension) => `.${extension}`).join(',');
   const blockedJob = jobs.find((job) => job.id === upgradeJobId);
+  const cappedJobs = jobs.filter((job) => job.folderId === folderId && job.status === 'failed'
+    && job.code === 'STORAGE_CAP_EXCEEDED');
   const freeLimit = usage?.tier === 'demo' ? usage.limitBytes / 10 : usage?.limitBytes;
   const demoHasSpace = !usage || !blockedJob || usage.usedBytes + blockedJob.size <= freeLimit * 10;
 
@@ -45,7 +47,13 @@ export function UploadPanel({ folderId, usage, refreshUsage }) {
         setUpgradeError('The demo plan still does not have enough space for this file. Delete files to free space, then retry.');
         return;
       }
-      retry(blockedJob.id);
+      let availableBytes = latest.limitBytes - latest.usedBytes;
+      for (const job of [blockedJob, ...cappedJobs.filter((item) => item.id !== blockedJob.id)]) {
+        if (job.size <= availableBytes) {
+          retry(job.id);
+          availableBytes -= job.size;
+        }
+      }
       closeUpgrade();
     } catch (caught) {
       setUpgradeError(caught.message);
@@ -89,7 +97,7 @@ export function UploadPanel({ folderId, usage, refreshUsage }) {
       onClose={() => setUpgradeJobId(null)} onCancel={(event) => { if (upgradePending) event.preventDefault(); }}>
       <h2 id="upgrade-title">Upgrade storage</h2>
       <p><strong>{blockedJob?.name}</strong> could not upload because it would exceed your storage limit.</p>
-      <p>The demo plan provides ten times the free storage limit. This prototype switch has no payment step.</p>
+      <p>The demo plan provides ten times the free storage limit. This prototype switch has no payment step. This file and other blocked files that fit will retry after the new limit is confirmed.</p>
       {freeLimit != null && <p className="muted">Free limit: {formatBytes(freeLimit)}. Demo limit: {formatBytes(freeLimit * 10)}.</p>}
       {!demoHasSpace && <p className="error" role="alert">Even the demo plan does not have enough space for this file. Delete files to free space.</p>}
       {upgradeError && <p className="error" role="alert">{upgradeError}</p>}
