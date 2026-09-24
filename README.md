@@ -1,6 +1,6 @@
 # Dropvault
 
-Starting point for a Dropbox-style document app. The shared contract and local API are implemented. The React web app has account entry, owned and shared file listings, a multi-file picker and drop area with per-file progress and errors, a storage meter, owner-only deletion, named-account access management, a demo-plan upgrade and retry prompt for storage-limit errors, and a download-only viewer. Inline previews and bearer-link sharing UI remain to be built.
+Starting point for a Dropbox-style document app. The shared contract and local API are implemented. The React web app has account entry, owned and shared file listings, a multi-file picker and drop area with per-file progress and errors, a storage meter, owner-only deletion, named-account access management, a demo-plan upgrade and retry prompt for storage-limit errors, and a viewer with previews for common browser-supported formats. Bearer-link sharing UI remains to be built.
 
 ```text
 apps/
