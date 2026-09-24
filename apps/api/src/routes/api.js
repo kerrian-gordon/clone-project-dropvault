@@ -168,7 +168,10 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
           const availableBytes = Math.max(0, catalog.usage(user.id, storageLimitBytes).limitBytes
             - catalog.usage(user.id, storageLimitBytes).usedBytes);
           const declaredLength = request.headers['content-length'];
-          if (declaredLength !== undefined && Number(declaredLength) > availableBytes) {
+          if (availableBytes === 0 || (declaredLength !== undefined && Number(declaredLength) > availableBytes)) {
+            // Drain the request body before responding so the connection stays open for the error response.
+            request.resume();
+            await new Promise((resolve) => { request.once('end', resolve); request.once('close', resolve); });
             throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Storage limit would be exceeded');
           }
           const stored = await storage.save(request, maxUploadBytes, availableBytes);
