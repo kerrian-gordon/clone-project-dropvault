@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './AuthContext.jsx';
 import { FilesPage } from '../features/file-browser/FilesPage.jsx';
 import { SharedPage } from '../features/file-browser/SharedPage.jsx';
 import { ViewerPage } from '../features/viewer/ViewerPage.jsx';
+import { UploadProvider } from '../features/upload/UploadContext.jsx';
 
 function ProtectedLayout() {
   const { user, loading, signOut } = useAuth();
@@ -23,7 +24,7 @@ function ProtectedLayout() {
   }
 
   return (
-    <div className="app-shell">
+    <UploadProvider><div className="app-shell">
       <header className="topbar">
         <Link className="brand" to="/files">Dropvault</Link>
         <nav aria-label="Main navigation">
@@ -33,7 +34,7 @@ function ProtectedLayout() {
         <div className="account"><span>{user.email}</span><button type="button" onClick={handleLogout}>Log out</button></div>
       </header>
       <main className="content"><Outlet /></main>
-    </div>
+    </div></UploadProvider>
   );
 }
 
