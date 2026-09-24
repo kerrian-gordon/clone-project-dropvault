@@ -1,6 +1,6 @@
 # Multi-user freemium MVP
 
-This document defines the next product milestone for Dropvault. It is a plan, not a description of finished behavior. The current API is local and unauthenticated; account ownership, per-user quotas, named-user sharing, an upgrade flow, and the web UI still need implementation.
+This document defines the next product milestone for Dropvault. The local API now includes sessions, ownership, per-user quotas, named-user access, and a demo tier switch; the browser flows and full integration remain to be built. See [the implemented API contract](api.md) for exact routes and current limits.
 
 ## Product goal
 
