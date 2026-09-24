@@ -30,7 +30,14 @@ export function AuthProvider({ children }) {
     setUser(null);
   }
 
-  return <AuthContext.Provider value={{ user, loading, signIn, signOut }}>{children}</AuthContext.Provider>;
+  async function refreshUser() {
+    try {
+      const account = await api('/v1/account');
+      setUser(account);
+    } catch {}
+  }
+
+  return <AuthContext.Provider value={{ user, loading, signIn, signOut, refreshUser }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

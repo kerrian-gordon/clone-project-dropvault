@@ -5,6 +5,67 @@ import { useAuth } from '../../app/AuthContext.jsx';
 import { formatBytes } from '../../shared/components/StorageMeter.jsx';
 import { api } from '../../shared/lib/api.js';
 
+const TEXT_MIME_TYPES = new Set(['text/plain', 'text/csv', 'application/json']);
+const TEXT_PREVIEW_MAX_BYTES = 50 * 1024;
+
+function TextPreview({ src }) {
+  const [text, setText] = useState(null);
+  const [truncated, setTruncated] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(src, { credentials: 'same-origin', signal: controller.signal })
+      .then(async (response) => {
+        const blob = await response.blob();
+        const sliced = blob.size > TEXT_PREVIEW_MAX_BYTES;
+        const slice = sliced ? blob.slice(0, TEXT_PREVIEW_MAX_BYTES) : blob;
+        setTruncated(sliced);
+        return slice.text();
+      })
+      .then(setText)
+      .catch((caught) => { if (caught.name !== 'AbortError') setError('Could not load text preview.'); });
+    return () => controller.abort();
+  }, [src]);
+
+  if (error) return <p className="error">{error}</p>;
+  if (text === null) return <p className="muted">Loading preview…</p>;
+  return <>
+    <pre className="preview-text">{text}</pre>
+    {truncated && <p className="muted preview-truncated">Showing first 50 KiB — download for the full file.</p>}
+  </>;
+}
+
+function canPreview(mimeType) {
+  return mimeType.startsWith('image/')
+    || mimeType === 'application/pdf'
+    || mimeType === 'audio/mpeg'
+    || mimeType === 'video/mp4'
+    || TEXT_MIME_TYPES.has(mimeType);
+}
+
+function FilePreview({ file }) {
+  const src = routes.content(file.id);
+  const { mimeType } = file;
+
+  if (mimeType.startsWith('image/')) {
+    return <img src={src} alt={file.name} className="preview-image" />;
+  }
+  if (mimeType === 'application/pdf') {
+    return <iframe src={src} title={file.name} className="preview-pdf" />;
+  }
+  if (mimeType === 'audio/mpeg') {
+    return <audio controls src={src} className="preview-audio" />;
+  }
+  if (mimeType === 'video/mp4') {
+    return <video controls src={src} className="preview-video" />;
+  }
+  if (TEXT_MIME_TYPES.has(mimeType)) {
+    return <TextPreview src={src} />;
+  }
+  return null;
+}
+
 export function ViewerPage() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -72,9 +133,10 @@ export function ViewerPage() {
       <p className="muted">{file.mimeType} · {formatBytes(file.size)} · {owned ? 'Owned by you' : 'Shared with you'}</p>
       <p><strong>Your permission:</strong> {owned ? 'Owner — view, download, share and delete' : 'View and download'}</p>
       <div className="viewer-placeholder">
-        <h2>Preview</h2>
-        <p>Inline preview is not available yet. Download the file to view it.</p>
-        <a className="button-link" href={`${routes.content(id)}?download=1`}>Download file</a>
+        {canPreview(file.mimeType)
+          ? <FilePreview file={file} />
+          : <p className="muted">Preview not available for this file type.</p>}
+        <a className="button-link" href={`${routes.content(id)}?download=1`} style={{ marginTop: '1.25rem', display: 'inline-block' }}>Download file</a>
       </div>
       {owned && <section className="access-panel" aria-label="File access">
         <h2>Who has access</h2>
