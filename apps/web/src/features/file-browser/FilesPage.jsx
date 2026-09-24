@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { ROOT_FOLDER_ID, routes } from '../../../../../packages/shared/index.js';
 import { api } from '../../shared/lib/api.js';
+import { useAuth } from '../../app/AuthContext.jsx';
 import { useStorage } from '../../shared/lib/useStorage.js';
 import { StorageMeter } from '../../shared/components/StorageMeter.jsx';
 
@@ -15,7 +16,9 @@ function folderPath(folderId) {
   return `/v1/folders/${encodeURIComponent(folderId)}`;
 }
 
-function RowActions({ item, type, confirmingId, setConfirmingId, deletingIds, deleteErrors, onDelete }) {
+function RowActions({ item, type, isOwner, confirmingId, setConfirmingId, deletingIds, deleteErrors, onDelete }) {
+  if (!isOwner) return null;
+
   const isDeleting = deletingIds.has(item.id);
   const isConfirming = confirmingId === item.id;
   const err = deleteErrors[item.id];
@@ -51,6 +54,7 @@ export function FilesPage() {
   const [deletingIds, setDeletingIds] = useState(new Set());
   const [deleteErrors, setDeleteErrors] = useState({});
 
+  const { user } = useAuth();
   const { usage, refreshUsage } = useStorage();
 
   const load = useCallback(() => {
@@ -107,7 +111,7 @@ export function FilesPage() {
                 <strong>{folder.name}</strong>
                 <span className="muted">Folder</span>
               </Link>
-              <RowActions item={folder} type="folder" {...sharedProps} />
+              <RowActions item={folder} type="folder" isOwner={folder.ownerId === user?.id} {...sharedProps} />
             </div>
           ))}
           {listing.files.map((file) => (
@@ -117,7 +121,7 @@ export function FilesPage() {
                 <strong>{file.name}</strong>
                 <span className="muted">{formatSize(file.size)}</span>
               </Link>
-              <RowActions item={file} type="file" {...sharedProps} />
+              <RowActions item={file} type="file" isOwner={file.ownerId === user?.id} {...sharedProps} />
             </div>
           ))}
           {!listing.folders.length && !listing.files.length && (
