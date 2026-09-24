@@ -1,14 +1,24 @@
 # Dropvault local API contract
 
-This contract is for tracks 1 and 2. The API uses Node.js 24 built-in modules and listens on `127.0.0.1:3000` by default. Requests and responses use JSON, except file uploads and downloads. There is no authentication yet, so the server is limited to the local machine.
+The API uses Node.js 24 built-in modules, local file storage, and a JSON metadata catalog. It listens on `127.0.0.1:3000` by default. This is a local prototype; the demo plan switch does not charge money, and the catalog is not designed for multiple server processes.
 
-## File model
+## Accounts and permissions
 
-- `Folder`: `{ id, name, parentId, createdAt }`. The built-in root folder has ID `root` and is not stored as a record.
-- `FileRecord`: `{ id, name, folderId, mimeType, size, createdAt }`. `size` is bytes. IDs are generated UUIDs. The internal `storageKey` is never returned by the API.
+- `POST /v1/auth/register` accepts JSON `{ "email": "person@example.com", "password": "at least 12 characters" }`, creates a free account, and returns `201 User` with a session cookie. The first registered account claims files and folders from a pre-account local catalog.
+- `POST /v1/auth/login` accepts the same JSON and returns `200 User` with a new session cookie. `POST /v1/auth/logout` revokes the current session and returns `204`. `GET /v1/account` returns the signed-in `User`.
+- Session cookies are `HttpOnly` and `SameSite=Strict`. They use `Secure` when the API itself receives HTTPS. Browser writes must come from the API origin; use a same-origin `/v1` proxy for local web development. Production deployment needs HTTPS and an explicit trusted-proxy/cookie configuration.
+- All routes except health, registration, login, and bearer-link redemption require a valid session. File and folder listings show only owned items. A named recipient may read and download a granted file, but only its owner may delete it, grant access, or create a bearer link. Private and forbidden IDs return `404`.
+- `User`: `{ id, email, tier, createdAt }`, where `tier` is `free` or `demo`. Password hashes and session tokens never appear in `User` responses.
+
+## File model and limits
+
+- `Folder`: `{ id, name, parentId, ownerId, createdAt }`. The built-in root folder has ID `root` and is scoped to the signed-in account; it is not stored as a record.
+- `FileRecord`: `{ id, name, folderId, ownerId, mimeType, size, createdAt }`. `size` is bytes. The internal `storageKey` is never returned by the API.
 - Names must be 1–255 characters and cannot contain `/`, `\`, control characters, or be `.` or `..`.
-- All file types can be uploaded. The limit is **100 MiB per file**. The browser should send one file per request; it can send multiple requests for a multi-file drop. The MIME type is supplied by the client and is not a security guarantee.
-- Uploaded bytes live in `storage/originals/`; temporary upload bytes live in `storage/tmp/`; metadata is persisted in `storage/catalog.json`. This catalog is suitable for local development, not a multi-server deployment.
+- Uploads use one raw-byte request per file. A browser sends several requests for a multi-file drop. The maximum is **100 MiB per file** by default.
+- Supported extensions are `.pdf`, `.docx`, `.pptx`, `.xlsx`, `.txt`, `.csv`, `.json`, `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.mp3`, `.mp4`, `.zip`, and `.gz`. The extension and declared MIME type must agree. PDF, Office/ZIP, PNG, JPEG, GIF, WebP, and GZIP uploads also receive a leading-byte signature check. A signature check does not prove that a full document is valid or safe; deeper parsing/scanning is future work.
+- The free account limit defaults to **1 GiB**, configurable through `DROPVAULT_STORAGE_LIMIT_BYTES`. The demo tier has ten times that limit. Only files owned by an account count toward its usage; sharing does not transfer storage cost. Uploads are serialized within one API process to prevent concurrent requests from jointly exceeding the limit. Downgrading while over the free limit keeps files accessible and blocks further uploads.
+- Uploaded bytes live in `storage/originals/`; temporary upload bytes live in `storage/tmp/`; metadata, hashed bearer-link tokens, account password hashes, and hashed session tokens are in `storage/catalog.json`. Keep this storage directory private and backed up if using real documents.
 
 ## Endpoints
 
@@ -16,26 +26,34 @@ This contract is for tracks 1 and 2. The API uses Node.js 24 built-in modules an
 | --- | --- | --- |
 | `GET /v1/health` | None | `200 { "status": "ok" }` |
 | `POST /v1/folders` | JSON `{ "name": "Projects", "parentId": "root" }`; `parentId` defaults to `root` | `201 Folder` |
-| `GET /v1/folders/:id/children` | Use `root` for top-level items | `200 { "folderId", "folders": Folder[], "files": FileRecord[] }` |
-| `DELETE /v1/folders/:id` | None | `204` No Content; fails with `FOLDER_NOT_EMPTY` if the folder has children |
-| `POST /v1/files?name=:name&folderId=:id` | Raw file bytes as the request body; `Content-Type` is the file MIME type; `folderId` defaults to `root`. Upload is rejected before bytes are streamed if it would exceed the storage cap. | `201 FileRecord` |
-| `GET /v1/files/:id` | None | `200 FileRecord` |
-| `DELETE /v1/files/:id` | None | `204` No Content; removes bytes from disk and the catalog entry |
-| `GET /v1/files/:id/content` | None | `200` file bytes. Known safe preview MIME types use `inline`; others download as an attachment. |
-| `GET /v1/files/:id/content?download=1` | None | `200` file bytes as an attachment. |
-| `POST /v1/files/:id/shares` | None | `201 { "token": "...", "url": "..." }` — creates an opaque token stored in the catalog; no auth required to redeem it |
-| `GET /v1/shares/:token` | None | `200` file bytes inline, same disposition rules as `/content`; `404` if the token is unknown |
-| `GET /v1/storage/usage` | None | `200 { "usedBytes": number, "limitBytes": number }` — `usedBytes` is the sum of all stored `FileRecord.size` values; `limitBytes` comes from `DROPVAULT_STORAGE_LIMIT_BYTES` (default 1 GiB) |
+| `GET /v1/folders/:id/children` | Use `root` for top-level owned items | `200 { "folderId", "folders": Folder[], "files": FileRecord[] }` |
+| `DELETE /v1/folders/:id` | Owner only; folder must be empty | `204` |
+| `POST /v1/files?name=:name&folderId=:id` | Raw file bytes; `Content-Type` should match extension; `folderId` defaults to `root` | `201 FileRecord` |
+| `GET /v1/files/shared` | None | `200 { "files": FileRecord[] }` granted to the signed-in account |
+| `GET /v1/files/:id` | Owner or recipient | `200 FileRecord` |
+| `DELETE /v1/files/:id` | Owner only | `204`; removes bytes, grants, and bearer links |
+| `GET /v1/files/:id/content` | Owner or recipient; add `?download=1` for attachment | `200` file bytes |
+| `GET /v1/storage/usage` | None | `200 { "usedBytes", "limitBytes", "tier" }` for the signed-in account |
+| `POST /v1/account/plan` | JSON `{ "tier": "free" }` or `{ "tier": "demo" }` | `200 User`; local demo switch without payment |
+| `GET /v1/files/:id/access` | Owner only | `200 { "users": [{ "userId", "email", "createdAt" }] }` |
+| `POST /v1/files/:id/access` | Owner only; JSON `{ "email": "recipient@example.com" }` | `201 { "userId", "email" }` |
+| `DELETE /v1/files/:id/access/:userId` | Owner only | `204` |
+| `POST /v1/files/:id/shares` | Owner only | `201 { "id", "token", "expiresAt", "url" }` |
+| `GET /v1/files/:id/shares` | Owner only | `200 { "links": [{ "id", "createdAt", "expiresAt" }] }`; tokens are never listed again |
+| `DELETE /v1/files/:id/shares/:shareId` | Owner only | `204` |
+| `GET /v1/shares/:token` | Anyone holding an unexpired token | `200` file bytes; add `?download=1` for attachment |
 
-The upload name belongs in the URL query, encoded with `encodeURIComponent(file.name)` in the web app. A drag-and-drop batch makes one request for each file. Each response gives that file's result, so the UI can show individual progress and errors.
+Bearer links expire seven days after creation and can be revoked by their owner. Anyone holding a valid link can download its file, so use named-account access when the recipient must be identified. Content is rendered inline only for a small set of browser-safe MIME types; other types download as attachments. Responses include `X-Content-Type-Options: nosniff`.
 
-For example, from PowerShell with `curl.exe`:
+## Errors and local use
+
+Errors use `{ "error": { "code": "...", "message": "..." } }`. Common codes include `UNAUTHENTICATED` (401), `INVALID_CREDENTIALS` (401 or 400), `INVALID_ORIGIN` (403), `FILE_NOT_FOUND` (404), `FOLDER_NOT_FOUND` (404), `ACCOUNT_NOT_FOUND` (404), `SHARE_NOT_FOUND` (404), `NAME_CONFLICT` (409), `FOLDER_NOT_EMPTY` (409), `ACCOUNT_EXISTS` (409), `FILE_TOO_LARGE` (413), `UNSUPPORTED_FILE_TYPE` (415), `INVALID_FILE_CONTENT` (415), and `STORAGE_CAP_EXCEEDED` (507). The storage-cap code lets the web app keep the selected file in its current-session queue and offer the demo upgrade flow.
+
+From PowerShell, start with `node apps/api/src/start.js`. `curl.exe` can register and save a session cookie, then upload using that cookie:
 
 ```powershell
-curl.exe -X POST "http://127.0.0.1:3000/v1/files?name=report.pdf" -H "Content-Type: application/pdf" --data-binary "@report.pdf"
-curl.exe "http://127.0.0.1:3000/v1/folders/root/children"
+curl.exe -c cookies.txt -X POST "http://127.0.0.1:3000/v1/auth/register" -H "Content-Type: application/json" --data '{"email":"person@example.com","password":"correct horse battery staple"}'
+curl.exe -b cookies.txt -X POST "http://127.0.0.1:3000/v1/files?name=report.pdf" -H "Content-Type: application/pdf" --data-binary "@report.pdf"
 ```
 
-Errors use `{ "error": { "code": "...", "message": "..." } }` with an appropriate HTTP status. Common codes include `INVALID_NAME` (400), `INVALID_JSON` (400), `FILE_TOO_LARGE` (413), `FOLDER_NOT_FOUND` (404), `FILE_NOT_FOUND` (404), `NAME_CONFLICT` (409), `FOLDER_NOT_EMPTY` (409), and `STORAGE_CAP_EXCEEDED` (507). `STORAGE_CAP_EXCEEDED` is returned by `POST /v1/files` when `usedBytes + Content-Length > limitBytes`; the check happens before any bytes are written to disk.
-
-The content endpoint only renders a small set of declared image, PDF, plain text, audio, and video MIME types inline. It returns `X-Content-Type-Options: nosniff`. The future viewer should still handle unsupported formats by offering download.
+Treat `cookies.txt` as a secret and remove it when finished. On PowerShell, quoting for `curl.exe` JSON varies by shell/version; a REST client can send the same requests if needed.

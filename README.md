@@ -36,15 +36,17 @@ docs/                          Product and architecture notes
 
 The upload feature is where both file selection and drag and drop will live. The API's upload module will validate incoming files, while the storage service will save their bytes. File metadata belongs in `files`; generated representations belong in `previews`. The viewer can choose a suitable display for images, PDFs, text, audio, video, and other supported formats, with download available for files that cannot be previewed.
 
-The directories contain `.gitkeep` files so the structure is visible in Git. The API uses Node.js 24 built-in modules, local disk for file bytes, and a JSON metadata catalog. Uploads accept any file type up to 100 MiB. This is a local development setup; authentication and production storage are future work.
+The directories contain `.gitkeep` files so the structure is visible in Git. The API uses Node.js 24 built-in modules, local disk for file bytes, and a JSON metadata catalog. It now has local account sessions, owner checks, per-account quotas, named-user access, and a defined upload-type list with a 100 MiB per-file limit. The web app and production storage remain future work.
 
 ## Run the API
 
 From the repository root, run `node apps/api/src/start.js`. It listens at `http://127.0.0.1:3000` and stores files in `storage/`. Set `PORT` or `DROPVAULT_STORAGE_DIR` to override those defaults. Run `node --test apps/api/test/*.test.js` to check the API.
 
+Set `DROPVAULT_STORAGE_LIMIT_BYTES` to change the storage cap (default 1 GiB). For example, in PowerShell run `$env:DROPVAULT_STORAGE_LIMIT_BYTES='104857600'` before starting the API to set a 100 MiB cap.
+
 The request and response shapes, file model, limits, and example upload command are in [docs/api.md](docs/api.md). The web app can use the route helpers and documented file shapes in `packages/shared/index.js`. When the web app gets a development server, proxy `/v1` requests to the API.
 
-Tracks 1 and 2 now have a local implementation. Tracks 3–5 remain to be built.
+The original tracks 1 and 2 have a local implementation, extended with the MVP account and quota backend. The browser and integration work remain to be built.
 
 ## Suggested work split
 
