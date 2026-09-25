@@ -33,9 +33,9 @@ export function createAuthLimiter() {
     checkLogin(ip, email) {
       check(`login-ip:${ip}`, 30);
       check(`login-account:${ip}:${email}`, 5);
+      record(`login-ip:${ip}`);
     },
     failedLogin(ip, email) {
-      record(`login-ip:${ip}`);
       record(`login-account:${ip}:${email}`);
     },
     successfulLogin(ip, email) {

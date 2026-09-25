@@ -26,7 +26,9 @@ export async function createApiServer({ storageRoot, maxUploadBytes = MAX_UPLOAD
   }
   const catalog = await openCatalog(join(storageRoot, 'catalog.json'));
   const storage = await storageFactory(storageRoot);
-  await storage.recoverDeletes(catalog.referencedStorageKeys());
+  const referencedStorageKeys = catalog.referencedStorageKeys();
+  await storage.recoverDeletes(referencedStorageKeys);
+  if (catalog.loadedFromDisk) await storage.recoverOrphanUploads?.(referencedStorageKeys);
   return createServer(createHandler({ catalog, storage, maxUploadBytes, storageLimitBytes,
     legacyClaimToken, publicBaseUrl }));
 }

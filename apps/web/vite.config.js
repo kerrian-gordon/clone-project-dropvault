@@ -9,10 +9,7 @@ export default defineConfig({
     proxy: {
       '/v1': {
         target: 'http://127.0.0.1:3000',
-        changeOrigin: true,
-        headers: {
-          Origin: 'http://127.0.0.1:3000',
-        },
+        changeOrigin: false,
       },
     },
   },
