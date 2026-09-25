@@ -163,14 +163,33 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       }
 
       if (request.method === 'POST' && path === '/v1/files') {
+        // Validate name/folder/type before touching the catalog lock.
+        const details = uploadDetails(request, url, catalog, user.id, maxUploadBytes);
+
+        // Pre-check quota outside the lock (read-only, no catalog write).
+        // If the request is already over-cap we drain and reject here so the
+        // mutation queue is never held during I/O.  A TOCTOU re-check happens
+        // inside mutate() before the actual write.
+        const preAvailable = Math.max(0, catalog.usage(user.id, storageLimitBytes).limitBytes
+          - catalog.usage(user.id, storageLimitBytes).usedBytes);
+        const declaredLength = request.headers['content-length'];
+        if (preAvailable === 0 || (declaredLength !== undefined && Number(declaredLength) > preAvailable)) {
+          // Drain the request body outside the lock so the connection stays
+          // open for the 507 response.  Cap at maxUploadBytes to bound I/O.
+          let drained = 0;
+          request.on('data', (chunk) => {
+            drained += chunk.length;
+            if (drained >= maxUploadBytes) request.destroy();
+          });
+          await new Promise((resolve) => { request.once('end', resolve); request.once('close', resolve); request.once('error', resolve); });
+          throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Storage limit would be exceeded');
+        }
+
         const file = await mutate(async () => {
-          const details = uploadDetails(request, url, catalog, user.id, maxUploadBytes);
+          // Re-check inside the lock (TOCTOU guard): another upload may have
+          // consumed the remaining space between the pre-check and here.
           const availableBytes = Math.max(0, catalog.usage(user.id, storageLimitBytes).limitBytes
             - catalog.usage(user.id, storageLimitBytes).usedBytes);
-          const declaredLength = request.headers['content-length'];
-          if (declaredLength !== undefined && Number(declaredLength) > availableBytes) {
-            throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Storage limit would be exceeded');
-          }
           const stored = await storage.save(request, maxUploadBytes, availableBytes);
           try {
             await validateStoredFile(details.name, await storage.sample(stored.storageKey),
