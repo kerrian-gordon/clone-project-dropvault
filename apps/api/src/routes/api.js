@@ -170,8 +170,13 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
           const declaredLength = request.headers['content-length'];
           if (availableBytes === 0 || (declaredLength !== undefined && Number(declaredLength) > availableBytes)) {
             // Drain the request body before responding so the connection stays open for the error response.
-            request.resume();
-            await new Promise((resolve) => { request.once('end', resolve); request.once('close', resolve); });
+            // Cap drain at maxUploadBytes so an at-quota user cannot hold the mutation lock indefinitely.
+            let drained = 0;
+            request.on('data', (chunk) => {
+              drained += chunk.length;
+              if (drained >= maxUploadBytes) request.destroy();
+            });
+            await new Promise((resolve) => { request.once('end', resolve); request.once('close', resolve); request.once('error', resolve); });
             throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Storage limit would be exceeded');
           }
           const stored = await storage.save(request, maxUploadBytes, availableBytes);
