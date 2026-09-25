@@ -10,8 +10,10 @@ import { uploadDetails, validateStoredFile } from '../modules/uploads/validate.j
 import { ApiError } from './errors.js';
 
 const MAX_ACTIVE_MUTATIONS = 32;
+const MAX_ACTIVE_UPLOADS = 8;
 const MAX_ACTIVE_REJECTION_DRAINS = 8;
 const MAX_REJECT_DRAIN_BYTES = 16_384;
+const REJECTION_DRAIN_TIMEOUT_MS = 10_000;
 
 function json(response, status, value, headers = {}) {
   const body = JSON.stringify(value);
@@ -44,6 +46,7 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
   storageLimitBytes, legacyClaimToken, publicBaseUrl }) {
   let pendingMutation = Promise.resolve();
   let activeMutations = 0;
+  let activeUploads = 0;
   let activeRejectionDrains = 0;
   const authLimiter = createAuthLimiter();
   const activeReads = new Map();
@@ -60,22 +63,21 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
     }
   }
 
-  function rejectBusy(request, response) {
-    const path = new URL(request.url, 'http://localhost').pathname;
-    const drainLimit = request.method === 'POST' && path === '/v1/files'
-      ? maxUploadBytes : MAX_REJECT_DRAIN_BYTES;
+  function rejectAndDrain(request, response, status, code, message, drainLimit) {
     if (activeRejectionDrains >= MAX_ACTIVE_REJECTION_DRAINS) {
       response.setHeader('Connection', 'close');
       response.once('finish', () => request.destroy());
-      json(response, 503, { error: { code: 'SERVER_BUSY',
-        message: 'Too many changes are pending; try again later' } });
+      json(response, status, { error: { code, message } });
       return;
     }
     activeRejectionDrains += 1;
     let finished = false;
+    const timeout = setTimeout(() => request.destroy(), REJECTION_DRAIN_TIMEOUT_MS);
+    timeout.unref();
     const finishDrain = () => {
       if (finished) return;
       finished = true;
+      clearTimeout(timeout);
       activeRejectionDrains -= 1;
     };
     request.once('end', finishDrain);
@@ -86,8 +88,13 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       if (drained > drainLimit) request.destroy();
     });
     request.resume();
-    json(response, 503, { error: { code: 'SERVER_BUSY',
-      message: 'Too many changes are pending; try again later' } });
+    json(response, status, { error: { code, message } });
+  }
+
+  function rejectBusy(request, response, upload) {
+    rejectAndDrain(request, response, 503, 'SERVER_BUSY',
+      'Too many changes are pending; try again later',
+      upload ? maxUploadBytes : MAX_REJECT_DRAIN_BYTES);
   }
 
   async function sendContent(response, file, download) {
@@ -115,11 +122,15 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
 
   return async (request, response) => {
     const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(request.method);
-    if (mutation && activeMutations >= MAX_ACTIVE_MUTATIONS) {
-      rejectBusy(request, response);
+    const upload = request.method === 'POST'
+      && new URL(request.url, 'http://localhost').pathname === '/v1/files';
+    if (upload ? activeUploads >= MAX_ACTIVE_UPLOADS
+      : mutation && activeMutations >= MAX_ACTIVE_MUTATIONS) {
+      rejectBusy(request, response, upload);
       return;
     }
-    if (mutation) activeMutations += 1;
+    if (upload) activeUploads += 1;
+    else if (mutation) activeMutations += 1;
     try {
       const url = new URL(request.url, 'http://localhost');
       const path = url.pathname;
@@ -214,47 +225,31 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         // Validate name/folder/type before touching the catalog lock.
         const details = uploadDetails(request, url, catalog, user.id, maxUploadBytes);
 
-        // Pre-check quota outside the lock (read-only, no catalog write).
-        // If the request is already over-cap we drain and reject here so the
-        // mutation queue is never held during I/O.  A TOCTOU re-check happens
-        // inside mutate() before the actual write.
-        const preAvailable = Math.max(0, catalog.usage(user.id, storageLimitBytes).limitBytes
-          - catalog.usage(user.id, storageLimitBytes).usedBytes);
+        const usage = catalog.usage(user.id, storageLimitBytes);
+        const preAvailable = Math.max(0, usage.limitBytes - usage.usedBytes);
         const declaredLength = request.headers['content-length'];
         if (preAvailable === 0 || (declaredLength !== undefined && Number(declaredLength) > preAvailable)) {
-          // Drain the request body outside the lock so the connection stays
-          // open for the 507 response.  Cap at maxUploadBytes to bound I/O.
-          let drained = 0;
-          request.on('data', (chunk) => {
-            drained += chunk.length;
-            if (drained > maxUploadBytes) request.destroy();
-          });
-          request.resume();
-          await new Promise((resolve) => { request.once('end', resolve); request.once('close', resolve); request.once('error', resolve); });
-          throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Storage limit would be exceeded');
+          rejectAndDrain(request, response, 507, 'STORAGE_CAP_EXCEEDED',
+            'Storage limit would be exceeded', maxUploadBytes);
+          return;
         }
 
-        const file = await mutate(async () => {
-          // Re-check inside the lock (TOCTOU guard): another upload may have
-          // consumed the remaining space between the pre-check and here.
-          const availableBytes = Math.max(0, catalog.usage(user.id, storageLimitBytes).limitBytes
-            - catalog.usage(user.id, storageLimitBytes).usedBytes);
-          const declaredLength = request.headers['content-length'];
-          if (declaredLength !== undefined && Number(declaredLength) > availableBytes) {
-            // Keep reading the bounded body so the client can receive the 507 response.
-            request.resume();
-            throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Storage limit would be exceeded');
-          }
-          const stored = await storage.save(request, maxUploadBytes, availableBytes);
-          try {
-            await validateStoredFile(details.name, await storage.sample(stored.storageKey),
-              () => storage.zipEntries(stored.storageKey));
-            return await catalog.addFile({ ...details, ...stored, ownerId: user.id });
-          } catch (error) {
-            await storage.remove(stored.storageKey);
-            throw error;
-          }
-        });
+        const stored = await storage.save(request, maxUploadBytes, preAvailable);
+        let file;
+        try {
+          await validateStoredFile(details.name, await storage.sample(stored.storageKey),
+            () => storage.zipEntries(stored.storageKey));
+          file = await mutate(async () => {
+            const current = catalog.usage(user.id, storageLimitBytes);
+            if (stored.size > Math.max(0, current.limitBytes - current.usedBytes)) {
+              throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Storage limit would be exceeded');
+            }
+            return catalog.addFile({ ...details, ...stored, ownerId: user.id });
+          });
+        } catch (error) {
+          await storage.remove(stored.storageKey);
+          throw error;
+        }
         return json(response, 201, file);
       }
 
@@ -342,7 +337,8 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       if (status === 500) console.error(error);
       json(response, status, { error: { code, message } });
     } finally {
-      if (mutation) activeMutations -= 1;
+      if (upload) activeUploads -= 1;
+      else if (mutation) activeMutations -= 1;
     }
   };
 }

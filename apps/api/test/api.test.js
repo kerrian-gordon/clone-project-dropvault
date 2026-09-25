@@ -610,40 +610,48 @@ test('successful logins also count toward the per-IP attempt limit', async () =>
   }
 });
 
-test('mutation queue rejects excess work and recovers after a stalled upload', async () => {
+test('a stalled upload does not block another account and excess uploads are rejected', async () => {
   const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-queue-test-'));
   let running;
   let releaseUpload;
-  let markUploadStarted;
-  const uploadStarted = new Promise((resolve) => { markUploadStarted = resolve; });
+  let markUploadsStarted;
+  const uploadsStarted = new Promise((resolve) => { markUploadsStarted = resolve; });
   const uploadGate = new Promise((resolve) => { releaseUpload = resolve; });
-  const attempts = [];
+  const uploads = [];
+  let started = 0;
   try {
     running = await start(storageRoot, 32_768, 1000, {
       storageFactory: async (root) => {
         const local = await openLocalStorage(root);
         return { ...local, async save(...args) {
-          markUploadStarted();
+          started += 1;
+          if (started === 8) markUploadsStarted();
           await uploadGate;
           return local.save(...args);
         } };
       },
     });
-    await register(running.base);
-    const upload = fetch(`${running.base}/v1/files?name=hold.txt`, {
-      method: 'POST', body: 'hold',
-    });
-    attempts.push(upload);
-    await uploadStarted;
-    for (let index = 0; index < 40; index += 1) {
-      attempts.push(fetch(`${running.base}/v1/folders`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: `folder-${index}` }),
+    await register(running.base, 'uploader@example.test');
+    const uploaderCookie = activeCookie;
+    await register(running.base, 'other@example.test');
+    const otherCookie = activeCookie;
+    for (let index = 0; index < 8; index += 1) {
+      uploads.push(nativeFetch(`${running.base}/v1/files?name=hold-${index}.txt`, {
+        method: 'POST', headers: { Cookie: uploaderCookie }, body: 'hold',
       }));
     }
-    const firstResponse = await Promise.race(attempts.slice(1));
-    assert.equal(firstResponse.status, 503);
-    assert.equal((await firstResponse.json()).error.code, 'SERVER_BUSY');
+    await uploadsStarted;
+    const plan = await nativeFetch(`${running.base}/v1/account/plan`, {
+      method: 'POST', headers: { Cookie: otherCookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier: 'demo' }),
+    });
+    assert.equal(plan.status, 200);
+    assert.equal((await plan.json()).tier, 'demo');
+    const rejected = await nativeFetch(`${running.base}/v1/files?name=extra.txt`, {
+      method: 'POST', headers: { Cookie: uploaderCookie }, body: 'extra',
+    });
+    assert.equal(rejected.status, 503);
+    assert.equal((await rejected.json()).error.code, 'SERVER_BUSY');
     let markRejectedUploadDrained;
     const rejectedUploadDrained = new Promise((resolve) => { markRejectedUploadDrained = resolve; });
     running.server.on('request', (request) => {
@@ -651,23 +659,55 @@ test('mutation queue rejects excess work and recovers after a stalled upload', a
         request.on('end', markRejectedUploadDrained);
       }
     });
-    const rejectedUpload = await fetch(`${running.base}/v1/files?name=blocked.txt`, {
-      method: 'POST', body: Buffer.alloc(20_000),
+    const rejectedUpload = await nativeFetch(`${running.base}/v1/files?name=blocked.txt`, {
+      method: 'POST', headers: { Cookie: uploaderCookie }, body: Buffer.alloc(20_000),
     });
     assert.equal(rejectedUpload.status, 503);
     await rejectedUploadDrained;
     releaseUpload();
-    assert.equal((await upload).status, 201);
-    const results = await Promise.all(attempts.slice(1));
-    assert.ok(results.some((response) => response.status === 201));
-    assert.ok(results.some((response) => response.status === 503));
+    const results = await Promise.all(uploads);
+    assert.ok(results.every((response) => response.status === 201));
     assert.equal((await fetch(`${running.base}/v1/folders`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'after-queue' }),
     })).status, 201);
   } finally {
     releaseUpload();
-    await Promise.allSettled(attempts);
+    await Promise.allSettled(uploads);
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('a slow quota rejection responds without occupying a write slot', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-slow-reject-test-'));
+  let running;
+  let slowRequest;
+  try {
+    running = await start(storageRoot, 32_768, 0);
+    await register(running.base, 'full@example.test');
+    const fullCookie = activeCookie;
+    await register(running.base, 'other@example.test');
+    const otherCookie = activeCookie;
+    const rejected = new Promise((resolve, reject) => {
+      slowRequest = httpRequest(`${running.base}/v1/files?name=slow.txt`, {
+        method: 'POST', headers: { Cookie: fullCookie, 'Content-Length': 16_384 },
+      }, (response) => {
+        response.resume();
+        response.on('end', () => resolve(response.statusCode));
+      });
+      slowRequest.on('error', reject);
+      slowRequest.write('x');
+    });
+    assert.equal(await rejected, 507);
+    const plan = await nativeFetch(`${running.base}/v1/account/plan`, {
+      method: 'POST', headers: { Cookie: otherCookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier: 'demo' }),
+    });
+    assert.equal(plan.status, 200);
+    slowRequest.destroy();
+  } finally {
+    slowRequest?.destroy();
     if (running) await stop(running.server);
     await rm(storageRoot, { recursive: true, force: true });
   }
