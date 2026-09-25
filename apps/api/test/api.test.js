@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
+import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Transform } from 'node:stream';
@@ -186,6 +187,10 @@ test('cap concurrent uploads, persist shares, and reclaim usage on deletion', as
     const overCap = await fetch(`${running.base}/v1/files?name=over.txt`, { method: 'POST', body: 'x' });
     assert.equal(overCap.status, 507);
     assert.equal((await overCap.json()).error.code, 'STORAGE_CAP_EXCEEDED');
+    const exactUploadLimit = await fetch(`${running.base}/v1/files?name=exact-limit.txt`, {
+      method: 'POST', body: Buffer.alloc(32),
+    });
+    assert.equal(exactUploadLimit.status, 507);
     const chunkedOverCap = await fetch(`${running.base}/v1/files?name=chunked.txt`, {
       method: 'POST', duplex: 'half',
       body: new ReadableStream({
@@ -412,7 +417,11 @@ test('startup restores interrupted deletion and removes committed staged bytes',
   const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-recovery-test-'));
   let running;
   try {
+    const preexisting = join(storageRoot, 'originals', '22222222-2222-4222-8222-222222222222');
+    await mkdir(join(storageRoot, 'originals'));
+    await writeFile(preexisting, 'preserve without a catalog');
     running = await start(storageRoot, 100, 100);
+    assert.equal(await readFile(preexisting, 'utf8'), 'preserve without a catalog');
     await register(running.base);
     const upload = await fetch(`${running.base}/v1/files?name=restore.txt`, {
       method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'keep me',
@@ -427,8 +436,11 @@ test('startup restores interrupted deletion and removes committed staged bytes',
     running = null;
 
     await rename(original, staged); // Process stopped after staging, before catalog change.
+    const orphan = join(storageRoot, 'originals', '11111111-1111-4111-8111-111111111111');
+    await writeFile(orphan, 'saved before catalog commit');
     running = await start(storageRoot, 100, 100);
     assert.equal((await readFile(original, 'utf8')), 'keep me');
+    assert.deepEqual(await readdir(join(storageRoot, 'originals')), [storageKey]);
     assert.equal((await fetch(`${running.base}/v1/files/${file.id}/content`)).status, 200);
     assert.equal((await readdir(join(storageRoot, 'tmp'))).length, 0);
     await stop(running.server);
@@ -568,6 +580,125 @@ test('login attempts are throttled before a valid password is checked', async ()
     });
     assert.equal(blocked.status, 429);
     assert.equal((await blocked.json()).error.code, 'RATE_LIMITED');
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('successful logins also count toward the per-IP attempt limit', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-login-volume-test-'));
+  let running;
+  try {
+    running = await start(storageRoot, 100, 100);
+    await register(running.base);
+    const credentials = JSON.stringify({ email: 'owner@example.test',
+      password: 'correct horse battery staple' });
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const response = await nativeFetch(`${running.base}/v1/auth/login`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: credentials,
+      });
+      assert.equal(response.status, 200);
+    }
+    const blocked = await nativeFetch(`${running.base}/v1/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: credentials,
+    });
+    assert.equal(blocked.status, 429);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('mutation queue rejects excess work and recovers after a stalled upload', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-queue-test-'));
+  let running;
+  let releaseUpload;
+  let markUploadStarted;
+  const uploadStarted = new Promise((resolve) => { markUploadStarted = resolve; });
+  const uploadGate = new Promise((resolve) => { releaseUpload = resolve; });
+  const attempts = [];
+  try {
+    running = await start(storageRoot, 32_768, 1000, {
+      storageFactory: async (root) => {
+        const local = await openLocalStorage(root);
+        return { ...local, async save(...args) {
+          markUploadStarted();
+          await uploadGate;
+          return local.save(...args);
+        } };
+      },
+    });
+    await register(running.base);
+    const upload = fetch(`${running.base}/v1/files?name=hold.txt`, {
+      method: 'POST', body: 'hold',
+    });
+    attempts.push(upload);
+    await uploadStarted;
+    for (let index = 0; index < 40; index += 1) {
+      attempts.push(fetch(`${running.base}/v1/folders`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: `folder-${index}` }),
+      }));
+    }
+    const firstResponse = await Promise.race(attempts.slice(1));
+    assert.equal(firstResponse.status, 503);
+    assert.equal((await firstResponse.json()).error.code, 'SERVER_BUSY');
+    let markRejectedUploadDrained;
+    const rejectedUploadDrained = new Promise((resolve) => { markRejectedUploadDrained = resolve; });
+    running.server.on('request', (request) => {
+      if (request.url === '/v1/files?name=blocked.txt') {
+        request.on('end', markRejectedUploadDrained);
+      }
+    });
+    const rejectedUpload = await fetch(`${running.base}/v1/files?name=blocked.txt`, {
+      method: 'POST', body: Buffer.alloc(20_000),
+    });
+    assert.equal(rejectedUpload.status, 503);
+    await rejectedUploadDrained;
+    releaseUpload();
+    assert.equal((await upload).status, 201);
+    const results = await Promise.all(attempts.slice(1));
+    assert.ok(results.some((response) => response.status === 201));
+    assert.ok(results.some((response) => response.status === 503));
+    assert.equal((await fetch(`${running.base}/v1/folders`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'after-queue' }),
+    })).status, 201);
+  } finally {
+    releaseUpload();
+    await Promise.allSettled(attempts);
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('quota rejection drains a declared upload body', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-drain-test-'));
+  let running;
+  try {
+    running = await start(storageRoot, 32_768, 0);
+    await register(running.base);
+    let markDrained;
+    const drained = new Promise((resolve) => { markDrained = resolve; });
+    running.server.on('request', (request) => {
+      if (request.url === '/v1/files?name=blocked.txt') request.on('end', markDrained);
+    });
+    const status = await new Promise((resolve, reject) => {
+      const request = httpRequest(`${running.base}/v1/files?name=blocked.txt`, {
+        method: 'POST', headers: { Cookie: activeCookie, 'Content-Length': 16_384 },
+      }, (response) => {
+        response.resume();
+        response.on('end', () => resolve(response.statusCode));
+      });
+      request.on('error', reject);
+      request.end(Buffer.alloc(16_384));
+    });
+    assert.equal(status, 507);
+    await Promise.race([
+      drained,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Upload body was not drained')), 1000)),
+    ]);
   } finally {
     if (running) await stop(running.server);
     await rm(storageRoot, { recursive: true, force: true });

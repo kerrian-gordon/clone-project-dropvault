@@ -36,6 +36,14 @@ export async function openLocalStorage(root) {
         }
       }
     },
+    async recoverOrphanUploads(referencedKeys) {
+      const referenced = new Set(referencedKeys);
+      for (const name of await readdir(originals)) {
+        if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(name)
+          || referenced.has(name)) continue;
+        await rm(join(originals, name), { force: true });
+      }
+    },
     async save(request, maxUploadBytes, availableBytes) {
       const tempPath = join(tmp, randomUUID());
       let size = 0;

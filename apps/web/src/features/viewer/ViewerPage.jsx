@@ -4,11 +4,11 @@ import { routes } from '../../../../../packages/shared/index.js';
 import { useAuth } from '../../app/AuthContext.jsx';
 import { formatBytes } from '../../shared/components/StorageMeter.jsx';
 import { api } from '../../shared/lib/api.js';
+import { readTextPreview, TEXT_PREVIEW_MAX_BYTES } from './readTextPreview.js';
 
 const TEXT_MIME_TYPES = new Set(['text/plain', 'text/csv', 'application/json']);
-const TEXT_PREVIEW_MAX_BYTES = 50 * 1024;
 
-function TextPreview({ src }) {
+function TextPreview({ src, size }) {
   const [text, setText] = useState(null);
   const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState('');
@@ -16,17 +16,20 @@ function TextPreview({ src }) {
   useEffect(() => {
     const controller = new AbortController();
     fetch(src, { credentials: 'same-origin', signal: controller.signal })
-      .then(async (response) => {
-        const blob = await response.blob();
-        const sliced = blob.size > TEXT_PREVIEW_MAX_BYTES;
-        const slice = sliced ? blob.slice(0, TEXT_PREVIEW_MAX_BYTES) : blob;
-        setTruncated(sliced);
-        return slice.text();
+      .then(readTextPreview)
+      .then((preview) => {
+        if (!controller.signal.aborted) {
+          setText(preview);
+          setTruncated(size > TEXT_PREVIEW_MAX_BYTES);
+        }
       })
-      .then(setText)
-      .catch((caught) => { if (caught.name !== 'AbortError') setError('Could not load text preview.'); });
+      .catch((caught) => {
+        if (!controller.signal.aborted && caught.name !== 'AbortError') {
+          setError('Could not load text preview.');
+        }
+      });
     return () => controller.abort();
-  }, [src]);
+  }, [src, size]);
 
   if (error) return <p className="error">{error}</p>;
   if (text === null) return <p className="muted">Loading preview…</p>;
@@ -61,7 +64,7 @@ function FilePreview({ file }) {
     return <video controls src={src} className="preview-video" />;
   }
   if (TEXT_MIME_TYPES.has(mimeType)) {
-    return <TextPreview src={src} />;
+    return <TextPreview src={src} size={file.size} />;
   }
   return null;
 }

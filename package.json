@@ -9,6 +9,6 @@
     "start:api": "node apps/api/src/start.js",
     "dev:web": "npm --prefix apps/web run dev",
     "build:web": "npm --prefix apps/web run build",
-    "test": "node --test apps/api/test/*.test.js"
+    "test": "node --test apps/api/test/*.test.js && npm --prefix apps/web test"
   }
 }

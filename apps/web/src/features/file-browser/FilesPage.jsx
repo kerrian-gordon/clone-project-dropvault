@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { ROOT_FOLDER_ID, routes } from '../../../../../packages/shared/index.js';
 import { useAuth } from '../../app/AuthContext.jsx';
@@ -47,17 +47,25 @@ export function FilesPage() {
   const { usage, error: usageError, refreshUsage } = useStorage();
   const [listing, setListing] = useState(null);
   const [error, setError] = useState('');
+  const refreshVersion = useRef(0);
 
   const refresh = useCallback(async () => {
+    const version = ++refreshVersion.current;
     try {
-      setListing(await api(routes.children(folderId)));
-      setError('');
-    } catch (caught) { setError(caught.message); }
+      const latest = await api(routes.children(folderId));
+      if (version === refreshVersion.current) {
+        setListing(latest);
+        setError('');
+      }
+    } catch (caught) {
+      if (version === refreshVersion.current) setError(caught.message);
+    }
   }, [folderId]);
 
   useEffect(() => {
     setListing(null);
     void refresh();
+    return () => { refreshVersion.current += 1; };
   }, [refresh]);
   useEffect(() => {
     if (!completedVersion) return;
@@ -66,6 +74,7 @@ export function FilesPage() {
   }, [completedVersion, refresh, refreshUsage]);
 
   function onDeleted(itemId) {
+    refreshVersion.current += 1;
     setListing((previous) => previous && {
       ...previous,
       files: previous.files.filter((item) => item.id !== itemId),

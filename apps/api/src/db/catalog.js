@@ -7,10 +7,12 @@ import { ApiError } from '../routes/errors.js';
 export async function openCatalog(path) {
   await mkdir(dirname(path), { recursive: true });
   let state;
+  let loadedFromDisk = true;
   try {
     state = JSON.parse(await readFile(path, 'utf8'));
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
+    loadedFromDisk = false;
     state = { schemaVersion: 1, folders: [], files: [], shares: [] };
   }
   if (state.schemaVersion !== 1 || !Array.isArray(state.folders) || !Array.isArray(state.files)) {
@@ -60,6 +62,7 @@ export async function openCatalog(path) {
   }
 
   return {
+    loadedFromDisk,
     referencedStorageKeys() {
       return state.files.map((file) => file.storageKey);
     },
