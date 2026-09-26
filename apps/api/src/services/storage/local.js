@@ -4,7 +4,7 @@ import { access, mkdir, open, readdir, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
-import { ApiError } from '../../routes/errors.js';
+import { ApiError, unwrapApiError } from '../../routes/errors.js';
 import { zipEntryNames } from '../../modules/uploads/zip.js';
 
 export async function openLocalStorage(root) {
@@ -66,7 +66,7 @@ export async function openLocalStorage(root) {
         return { storageKey, size };
       } catch (error) {
         await rm(tempPath, { force: true });
-        throw error;
+        throw unwrapApiError(error) ?? error;
       }
     },
     read(storageKey) {

@@ -7,7 +7,7 @@ import { checkRequestOrigin, clearSessionCookie, createAuthLimiter, createSessio
   verifyPassword } from '../modules/accounts/auth.js';
 import { contentHeaders } from '../modules/files/content.js';
 import { uploadDetails, validateStoredFile } from '../modules/uploads/validate.js';
-import { ApiError } from './errors.js';
+import { ApiError, unwrapApiError } from './errors.js';
 
 const MAX_ACTIVE_MUTATIONS = 32;
 const MAX_ACTIVE_UPLOADS = 8;
@@ -61,6 +61,27 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
     } finally {
       release();
     }
+  }
+
+  function drainRequest(request, drainLimit) {
+    if (request.readableEnded || request.destroyed) return Promise.resolve();
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => request.destroy(), REJECTION_DRAIN_TIMEOUT_MS);
+      timeout.unref();
+      const done = () => {
+        clearTimeout(timeout);
+        resolve();
+      };
+      request.once('end', done);
+      request.once('close', done);
+      request.once('error', done);
+      let drained = 0;
+      request.on('data', (chunk) => {
+        drained += chunk.length;
+        if (drained > drainLimit) request.destroy();
+      });
+      request.resume();
+    });
   }
 
   function rejectAndDrain(request, response, status, code, message, drainLimit) {
@@ -129,6 +150,7 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       rejectBusy(request, response, upload);
       return;
     }
+    let countedUpload = upload;
     if (upload) activeUploads += 1;
     else if (mutation) activeMutations += 1;
     try {
@@ -229,9 +251,15 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         const preAvailable = Math.max(0, usage.limitBytes - usage.usedBytes);
         const declaredLength = request.headers['content-length'];
         if (preAvailable === 0 || (declaredLength !== undefined && Number(declaredLength) > preAvailable)) {
-          rejectAndDrain(request, response, 507, 'STORAGE_CAP_EXCEEDED',
-            'Storage limit would be exceeded', maxUploadBytes);
-          return;
+          // Release the upload slot before draining so other accounts can still
+          // write. Drain the body before responding — Vite's proxy + Safari XHR
+          // turn an early 507 into a bare 500, which hides the upgrade prompt.
+          if (countedUpload) {
+            activeUploads -= 1;
+            countedUpload = false;
+          }
+          await drainRequest(request, maxUploadBytes);
+          throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Storage limit would be exceeded');
         }
 
         const stored = await storage.save(request, maxUploadBytes, preAvailable);
@@ -331,14 +359,15 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         response.destroy(error);
         return;
       }
-      const status = error instanceof ApiError ? error.status : 500;
-      const code = error instanceof ApiError ? error.code : 'INTERNAL_ERROR';
-      const message = error instanceof ApiError ? error.message : 'Unexpected server error';
+      const apiError = unwrapApiError(error);
+      const status = apiError ? apiError.status : 500;
+      const code = apiError ? apiError.code : 'INTERNAL_ERROR';
+      const message = apiError ? apiError.message : 'Unexpected server error';
       if (status === 500) console.error(error);
       json(response, status, { error: { code, message } });
     } finally {
-      if (upload) activeUploads -= 1;
-      else if (mutation) activeMutations -= 1;
+      if (countedUpload) activeUploads -= 1;
+      else if (mutation && !upload) activeMutations -= 1;
     }
   };
 }

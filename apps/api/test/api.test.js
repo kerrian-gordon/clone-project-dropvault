@@ -699,13 +699,13 @@ test('a slow quota rejection responds without occupying a write slot', async () 
       slowRequest.on('error', reject);
       slowRequest.write('x');
     });
-    assert.equal(await rejected, 507);
     const plan = await nativeFetch(`${running.base}/v1/account/plan`, {
       method: 'POST', headers: { Cookie: otherCookie, 'Content-Type': 'application/json' },
       body: JSON.stringify({ tier: 'demo' }),
     });
     assert.equal(plan.status, 200);
-    slowRequest.destroy();
+    slowRequest.end(Buffer.alloc(16_383));
+    assert.equal(await rejected, 507);
   } finally {
     slowRequest?.destroy();
     if (running) await stop(running.server);
