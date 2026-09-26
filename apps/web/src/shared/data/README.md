@@ -1,6 +1,6 @@
 # Mock drive data
 
-These are static metadata fixtures for front-end work. Neither file contains document bytes or usable sessions. Keep both fixtures separate from the live API catalog.
+These are static metadata fixtures for front-end work. Neither JSON file contains document bytes, passwords, or usable sessions. The local development seed command described in the root README reads the two-account fixture and creates a separate live API catalog with generated sample file contents and hashed demo passwords.
 
 ## Single-user browsing fixture
 
