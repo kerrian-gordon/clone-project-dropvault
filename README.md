@@ -40,7 +40,7 @@ The directories contain `.gitkeep` files so the structure is visible in Git. The
 
 ## Run the API
 
-From the repository root, run `node apps/api/src/start.js`. It listens at `http://127.0.0.1:3000` and stores files in `storage/`. Set `PORT` or `DROPVAULT_STORAGE_DIR` to override those defaults. After installing the web dependencies, run `npm test` to check the API and Vite proxy.
+From the repository root, run `npm run dev:api` while developing. Node watches the API source files and restarts the process when they change. Keep this terminal open while using the web app. Use `npm run start:api` to run without file watching. The API listens at `http://127.0.0.1:3000` and stores files in `storage/`. Set `PORT` or `DROPVAULT_STORAGE_DIR` to override those defaults. After installing the web dependencies, run `npm test` to check the API and Vite proxy. If the API exits while no source files are changing, read the error in its terminal; file watching does not fix a crash.
 
 Set `DROPVAULT_STORAGE_LIMIT_BYTES` to change the storage cap (default 1 GiB). For example, in PowerShell run `$env:DROPVAULT_STORAGE_LIMIT_BYTES='104857600'` before starting the API to set a 100 MiB cap.
 
@@ -48,7 +48,7 @@ The request and response shapes, file model, limits, and example upload command 
 
 ## Run the web app
 
-From the repository root, run `npm --prefix apps/web install` once. Start the API with `npm run start:api`, then in another terminal run `npm run dev:web`. Open the URL Vite prints (normally `http://127.0.0.1:5173`). Vite proxies `/v1` to the local API so session cookies and API requests use the web origin. Run `npm run build:web` to check the production bundle.
+From the repository root, run `npm --prefix apps/web install` once. Start the API with `npm run dev:api`, then in another terminal run `npm run dev:web`. Open the URL Vite prints (normally `http://127.0.0.1:5173`). Vite proxies `/v1` to the local API so session cookies and API requests use the web origin. Run `npm run build:web` to check the production bundle.
 
 React Router uses browser history. `/` redirects to `/files`; `/files` lists the root, `/folders/:id` lists a folder, `/shared` lists files granted to the account, and `/view/:id` shows file details, download, ownership, and owner-only access controls. `/login` and `/register` are public; the file routes require a session and return to the requested URL after sign-in. Unknown URLs show a not-found page. The upload queue lives above the file routes so transfers continue while navigating within a signed-in session. The browser sends one raw request per queued file. On a storage-cap error, the user can switch to the local demo tier and retry the same selected file after the new allowance is confirmed. Selected files remain in memory only until the tab reloads or the user logs out. A production web server must serve `index.html` for direct visits and refreshes on SPA routes, while forwarding `/v1/*` to the API.
 
