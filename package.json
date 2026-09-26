@@ -8,6 +8,7 @@
   "scripts": {
     "start:api": "node apps/api/src/start.js",
     "seed:demo": "node apps/api/src/seed-demo.js",
+    "dev:api": "node --watch apps/api/src/start.js",
     "dev:web": "npm --prefix apps/web run dev",
     "build:web": "npm --prefix apps/web run build",
     "test": "node --test apps/api/test/*.test.js && npm --prefix apps/web test"
