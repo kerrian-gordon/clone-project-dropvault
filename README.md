@@ -44,6 +44,22 @@ From the repository root, run `node apps/api/src/start.js`. It listens at `http:
 
 Set `DROPVAULT_STORAGE_LIMIT_BYTES` to change the storage cap (default 1 GiB). For example, in PowerShell run `$env:DROPVAULT_STORAGE_LIMIT_BYTES='104857600'` before starting the API to set a 100 MiB cap.
 
+### Seed a local demo
+
+From a fresh checkout, before starting the API, run `npm run seed:demo`. This imports the two-account fixture into the local `storage/catalog.json` and creates actual sample file bytes in `storage/originals/`. It prints a generated password for both `alex@example.test` and `blair@example.test`; save that password for local testing. Passwords are hashed in the catalog, and the fixture JSON does not contain a password or session.
+
+Set `DROPVAULT_STORAGE_LIMIT_BYTES=104857600` when starting the API to reproduce Alex's full 100 MiB free tier and the blocked-upload upgrade flow. For PowerShell:
+
+```powershell
+npm run seed:demo
+$env:DROPVAULT_STORAGE_LIMIT_BYTES='104857600'
+npm run start:api
+```
+
+Run the web app in a second terminal with `npm run dev:web`. Sign in as either demo account using the printed password. Alex owns three files and has granted Blair access to `Project-brief.pdf`. The seeded PDF, MP4, PPTX, and TXT contain sample content and can be downloaded; the PDF, video, and text can be previewed in the browser. The sample files are exactly the sizes listed in the JSON fixture, so Alex's usage begins at 100 MiB.
+
+The seed command refuses to run if `catalog.json` or stored files already exist. To keep existing data, set `DROPVAULT_STORAGE_DIR` to a **new empty directory** for both the seed command and the API. The seed is disabled when `NODE_ENV=production`; never use these public demo accounts for real user data.
+
 The request and response shapes, file model, limits, and example upload command are in [docs/api.md](docs/api.md). The web app uses the route helpers and documented file shapes in `packages/shared/index.js` and proxies `/v1` requests to the API during development.
 
 ## Run the web app
