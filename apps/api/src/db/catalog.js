@@ -133,8 +133,13 @@ export async function openCatalog(path) {
         return publicUser(user);
       });
     },
-    listThemes(offset = 0, limit = 20) {
-      const sorted = [...state.themes].sort((left, right) =>
+    listThemes(offset = 0, limit = 20, query = '') {
+      const needle = query.trim().toLowerCase();
+      const matched = needle
+        ? state.themes.filter((theme) => theme.name.toLowerCase().includes(needle)
+          || theme.creatorName.toLowerCase().includes(needle))
+        : state.themes;
+      const sorted = [...matched].sort((left, right) =>
         right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id));
       return { themes: sorted.slice(offset, offset + limit), total: sorted.length,
         nextOffset: offset + limit < sorted.length ? offset + limit : null };

@@ -62,6 +62,13 @@ test('community theme installation and personal edits survive restart without ch
     assert.deepEqual(gallery.themes.map((item) => item.id), [theme.id]);
     assert.equal(gallery.total, 1);
     assert.equal(gallery.nextOffset, null);
+    const searchHit = await (await request(blair, '/v1/themes?q=night')).json();
+    assert.equal(searchHit.total, 1);
+    assert.equal(searchHit.themes[0].id, theme.id);
+    const searchMiss = await (await request(blair, '/v1/themes?q=ocean')).json();
+    assert.equal(searchMiss.total, 0);
+    const creatorHit = await (await request(blair, '/v1/themes?q=Alex')).json();
+    assert.equal(creatorHit.total, 1);
 
     const installed = await request(blair, '/v1/account/appearance', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },

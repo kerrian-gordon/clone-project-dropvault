@@ -7,6 +7,7 @@ import { SharedPage } from '../features/file-browser/SharedPage.jsx';
 import { ViewerPage } from '../features/viewer/ViewerPage.jsx';
 import { UploadProvider } from '../features/upload/UploadContext.jsx';
 import { ThemesPage } from '../features/themes/ThemesPage.jsx';
+import { ThemeDetailPage } from '../features/themes/ThemeDetailPage.jsx';
 
 function ProtectedLayout() {
   const { user, loading, signOut } = useAuth();
@@ -103,6 +104,7 @@ export function App() {
           <Route path="/shared" element={<SharedPage />} />
           <Route path="/view/:id" element={<ViewerPage />} />
           <Route path="/themes" element={<ThemesPage />} />
+          <Route path="/themes/:id" element={<ThemeDetailPage />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes></AppearanceProvider>

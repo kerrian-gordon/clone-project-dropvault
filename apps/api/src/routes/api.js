@@ -223,11 +223,15 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       if (request.method === 'GET' && path === '/v1/themes') {
         const offset = url.searchParams.has('offset') ? Number(url.searchParams.get('offset')) : 0;
         const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 20;
+        const query = url.searchParams.get('q') ?? '';
         if (!Number.isSafeInteger(offset) || offset < 0
           || !Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
           throw new ApiError(400, 'INVALID_PAGE', 'Choose a non-negative offset and a limit from 1 to 50');
         }
-        return json(response, 200, catalog.listThemes(offset, limit));
+        if (typeof query !== 'string' || query.length > 80) {
+          throw new ApiError(400, 'INVALID_SEARCH', 'Search must be 80 characters or fewer');
+        }
+        return json(response, 200, catalog.listThemes(offset, limit, query));
       }
       if (request.method === 'POST' && path === '/v1/themes') {
         const input = await readJson(request);

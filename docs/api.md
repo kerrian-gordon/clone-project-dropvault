@@ -37,7 +37,7 @@ The API uses Node.js 24 built-in modules, local file storage, and a JSON metadat
 | Method and path | Request | Success response |
 | --- | --- | --- |
 | `GET /v1/health` | None | `200 { "status": "ok" }` |
-| `GET /v1/themes?offset=0&limit=20` | Signed-in gallery; `offset` is non-negative and `limit` is 1–50 | `200 { "themes": Theme[], "total", "nextOffset" }` |
+| `GET /v1/themes?offset=0&limit=20&q=` | Signed-in gallery; `offset` is non-negative and `limit` is 1–50; optional `q` (max 80 chars) matches theme name or creator name | `200 { "themes": Theme[], "total", "nextOffset" }` |
 | `GET /v1/themes/:id` | Signed-in account | `200 Theme` |
 | `POST /v1/themes` | JSON `{ "name": "Night study", "creatorName": "Alex", "settings": ThemeSettings }` | `201 Theme`; publishes an immutable theme. Omitted `creatorName` uses "Community member" for older clients. |
 | `DELETE /v1/themes/:id` | Creator only | `204`; removes gallery listing. Personal copies remain saved. |

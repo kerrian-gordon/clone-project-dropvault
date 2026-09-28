@@ -225,6 +225,15 @@ h1 { margin: 0.4rem 0 0.75rem; font-size: 1.45rem; letter-spacing: -0.03em; font
 .theme-remove-confirm { display: grid; gap: 0.4rem; margin-top: 0.5rem; font-size: 0.8rem; }
 .theme-preview-banner { position: sticky; top: 0; z-index: 2; display: grid; gap: 0.2rem; padding: 0.9rem 1rem; margin: 1rem 0; border: 2px solid var(--accent); border-radius: 8px; background: var(--card); box-shadow: 0 8px 24px #0002; }
 .theme-preview-banner .theme-actions { margin-top: 0.5rem; }
+.theme-search { display: grid; gap: 0.3rem; margin: 0.75rem 0 0; max-width: 22rem; }
+.theme-search input { min-height: 36px; padding: 0.35rem 0.55rem; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--ink); }
+.theme-surface-list { margin: 0 0 0.75rem; padding-left: 1.15rem; }
+.theme-surface-list li { margin: 0.35rem 0; }
+.theme-token-list { display: grid; gap: 0.45rem; margin: 0.75rem 0 0; }
+.theme-token-list > div { display: grid; grid-template-columns: 7rem 1fr; gap: 0.5rem; align-items: center; font-size: 0.9rem; }
+.theme-token-list dt { margin: 0; color: var(--muted); }
+.theme-token-list dd { margin: 0; display: flex; align-items: center; gap: 0.45rem; }
+.theme-swatch { width: 1rem; height: 1rem; border-radius: 4px; border: 1px solid var(--line); display: inline-block; }
 :root[data-theme-spacing="compact"] .content { margin-top: 1rem; }
 :root[data-theme-spacing="compact"] .row-main { padding: 0.4rem 0.7rem; }
 :root[data-theme-spacing="compact"] .theme-section { padding: 0.7rem; margin: 0.7rem 0; }

@@ -45,7 +45,9 @@ export function AppearanceProvider({ children }) {
     setPreview(null);
   }, [user?.id]);
 
-  useEffect(() => { setPreview(null); }, [location.pathname]);
+  useEffect(() => {
+    if (!location.pathname.startsWith('/themes')) setPreview(null);
+  }, [location.pathname]);
 
   useEffect(() => {
     const root = document.documentElement;
