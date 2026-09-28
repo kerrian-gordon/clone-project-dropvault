@@ -2,6 +2,8 @@
 
 Starting point for a Dropbox-style document app. The shared contract and local API are implemented. The React web app has account entry, owned and shared file listings, a multi-file picker and drop area with per-file progress and errors, a storage meter, owner-only deletion, named-account access management, a demo-plan upgrade and retry prompt for storage-limit errors, and a viewer with previews for common browser-supported formats. Bearer-link sharing UI remains to be built.
 
+The Themes page lets signed-in users preview and install community themes, customize their own saved appearance, and publish a snapshot with a public creator name. Creators can remove gallery entries without removing anyone's installed copy. The API checks color contrast when saving or publishing. The web app loads each account's appearance after sign-in and applies its colors, font, and spacing on later visits. See [the theme contract](docs/api.md#themes-and-saved-appearance).
+
 ```text
 apps/
   web/

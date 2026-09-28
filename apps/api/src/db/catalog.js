@@ -1,8 +1,16 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { ROOT_FOLDER_ID } from '../../../../packages/shared/index.js';
+import { DEFAULT_THEME_SETTINGS, ROOT_FOLDER_ID, themeContrastIssues, validCreatorName, validThemeName,
+  validThemeSettings } from '../../../../packages/shared/index.js';
 import { ApiError } from '../routes/errors.js';
+
+const MAX_THEMES_PER_ACCOUNT = 20;
+
+function defaultAppearance() {
+  return { sourceThemeId: null, name: 'Default',
+    settings: structuredClone(DEFAULT_THEME_SETTINGS), selectedAt: null, updatedAt: null };
+}
 
 export async function openCatalog(path) {
   await mkdir(dirname(path), { recursive: true });
@@ -28,9 +36,13 @@ export async function openCatalog(path) {
   state.users ??= [];
   state.sessions ??= [];
   state.grants ??= [];
-  if (![state.users, state.sessions, state.grants].every(Array.isArray)) {
+  state.themes ??= [];
+  state.appearances ??= [];
+  if (![state.users, state.sessions, state.grants, state.themes,
+    state.appearances].every(Array.isArray)) {
     throw new Error('Invalid account catalog');
   }
+  for (const theme of state.themes) theme.creatorName ??= 'Community member';
 
   let pending = Promise.resolve();
   function write(change) {
@@ -120,6 +132,92 @@ export async function openCatalog(path) {
         user.tier = tier;
         return publicUser(user);
       });
+    },
+    listThemes(offset = 0, limit = 20) {
+      const sorted = [...state.themes].sort((left, right) =>
+        right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id));
+      return { themes: sorted.slice(offset, offset + limit), total: sorted.length,
+        nextOffset: offset + limit < sorted.length ? offset + limit : null };
+    },
+    getTheme(themeId) {
+      const theme = state.themes.find((item) => item.id === themeId);
+      if (!theme) throw new ApiError(404, 'THEME_NOT_FOUND', 'Theme was not found');
+      return theme;
+    },
+    async createTheme(creatorId, name, settings, creatorName = 'Community member') {
+      if (!validThemeName(name)) throw new ApiError(400, 'INVALID_THEME_NAME', 'Provide a valid theme name');
+      if (!validCreatorName(creatorName)) {
+        throw new ApiError(400, 'INVALID_CREATOR_NAME', 'Provide a valid creator name');
+      }
+      if (!validThemeSettings(settings)) {
+        throw new ApiError(400, 'INVALID_THEME_SETTINGS', 'Provide supported theme settings');
+      }
+      if (themeContrastIssues(settings).length) {
+        throw new ApiError(400, 'INVALID_THEME_CONTRAST', themeContrastIssues(settings).join('; '));
+      }
+      return write((next) => {
+        if (next.themes.filter((theme) => theme.creatorId === creatorId).length
+          >= MAX_THEMES_PER_ACCOUNT) {
+          throw new ApiError(409, 'THEME_LIMIT_REACHED', 'Theme publishing limit reached');
+        }
+        const theme = { id: randomUUID(), creatorId, creatorName: creatorName.trim(), name: name.trim(),
+          settings: structuredClone(settings), createdAt: new Date().toISOString() };
+        next.themes.push(theme);
+        return theme;
+      });
+    },
+    async deleteTheme(themeId, creatorId) {
+      return write((next) => {
+        const index = next.themes.findIndex((item) => item.id === themeId && item.creatorId === creatorId);
+        if (index === -1) throw new ApiError(404, 'THEME_NOT_FOUND', 'Theme was not found');
+        next.themes.splice(index, 1);
+      });
+    },
+    getAppearance(userId) {
+      this.getUser(userId);
+      const appearance = state.appearances.find((item) => item.userId === userId);
+      if (!appearance) return defaultAppearance();
+      const { userId: _userId, ...publicAppearance } = appearance;
+      return publicAppearance;
+    },
+    async installTheme(userId, themeId) {
+      return write((next) => {
+        const theme = next.themes.find((item) => item.id === themeId);
+        if (!theme) throw new ApiError(404, 'THEME_NOT_FOUND', 'Theme was not found');
+        const selectedAt = new Date().toISOString();
+        const appearance = { userId, sourceThemeId: theme.id, name: theme.name,
+          settings: structuredClone(theme.settings), selectedAt, updatedAt: selectedAt };
+        next.appearances = next.appearances.filter((item) => item.userId !== userId);
+        next.appearances.push(appearance);
+        const { userId: _userId, ...publicAppearance } = appearance;
+        return publicAppearance;
+      });
+    },
+    async saveAppearanceSettings(userId, settings) {
+      if (!validThemeSettings(settings)) {
+        throw new ApiError(400, 'INVALID_THEME_SETTINGS', 'Provide supported theme settings');
+      }
+      if (themeContrastIssues(settings).length) {
+        throw new ApiError(400, 'INVALID_THEME_CONTRAST', themeContrastIssues(settings).join('; '));
+      }
+      return write((next) => {
+        let appearance = next.appearances.find((item) => item.userId === userId);
+        if (!appearance) {
+          appearance = { userId, sourceThemeId: null, name: 'Default',
+            selectedAt: new Date().toISOString() };
+          next.appearances.push(appearance);
+        }
+        appearance.settings = structuredClone(settings);
+        appearance.updatedAt = new Date().toISOString();
+        const { userId: _userId, ...publicAppearance } = appearance;
+        return publicAppearance;
+      });
+    },
+    async resetAppearance(userId) {
+      await write((next) => {
+        next.appearances = next.appearances.filter((item) => item.userId !== userId);
+      });
+      return defaultAppearance();
     },
     async createFolder(name, parentId, ownerId) {
       return write((next) => {

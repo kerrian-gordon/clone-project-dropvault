@@ -2,7 +2,9 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { access, link, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { MAX_UPLOAD_BYTES, ROOT_FOLDER_ID, SUPPORTED_UPLOAD_TYPES } from '../../../packages/shared/index.js';
+import { MAX_UPLOAD_BYTES, ROOT_FOLDER_ID, SUPPORTED_UPLOAD_TYPES,
+  themeContrastIssues, validCreatorName, validThemeName,
+  validThemeSettings } from '../../../packages/shared/index.js';
 import { hashPassword, validPassword } from './modules/accounts/auth.js';
 import { validateStoredFile } from './modules/uploads/validate.js';
 import { zipEntryNames } from './modules/uploads/zip.js';
@@ -165,6 +167,25 @@ export async function seedDemoData({ storageRoot = defaultStorageRoot, password 
   for (const grant of fixture.accessGrants) {
     if (!fileIds.has(grant.fileId) || !ids.has(grant.userId)) throw new Error('Fixture access grant is invalid');
   }
+  const themeIds = new Set();
+  for (const theme of fixture.themes ?? []) {
+    if (themeIds.has(theme.id) || !ids.has(theme.creatorId)
+      || !validThemeName(theme.name) || !validCreatorName(theme.creatorName)
+      || !validThemeSettings(theme.settings) || themeContrastIssues(theme.settings).length) {
+      throw new Error('Fixture theme is invalid');
+    }
+    themeIds.add(theme.id);
+  }
+  const appearanceOwners = new Set();
+  for (const appearance of fixture.appearances ?? []) {
+    if (appearanceOwners.has(appearance.userId) || !ids.has(appearance.userId)
+      || (appearance.sourceThemeId !== null && !themeIds.has(appearance.sourceThemeId))
+      || !validThemeSettings(appearance.settings)
+      || themeContrastIssues(appearance.settings).length) {
+      throw new Error('Fixture appearance is invalid');
+    }
+    appearanceOwners.add(appearance.userId);
+  }
   for (const user of fixture.users) {
     const usedBytes = fixture.files.filter((file) => file.ownerId === user.id)
       .reduce((sum, file) => sum + file.size, 0);
@@ -180,7 +201,7 @@ export async function seedDemoData({ storageRoot = defaultStorageRoot, password 
     folders: fixture.folders,
     files: [],
     grants: fixture.accessGrants.map(({ fileId, userId, createdAt }) => ({ fileId, userId, createdAt })),
-    shares: [], sessions: [],
+    shares: [], sessions: [], themes: fixture.themes ?? [], appearances: fixture.appearances ?? [],
   };
   await mkdir(originalsPath, { recursive: true });
   await mkdir(tmpPath, { recursive: true });
