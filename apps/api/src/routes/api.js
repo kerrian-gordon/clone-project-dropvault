@@ -203,6 +203,46 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       if (request.method === 'GET' && path === '/v1/account') {
         return json(response, 200, catalog.getUser(user.id));
       }
+      if (request.method === 'GET' && path === '/v1/account/appearance') {
+        return json(response, 200, catalog.getAppearance(user.id));
+      }
+      if (request.method === 'PUT' && path === '/v1/account/appearance') {
+        const input = await readJson(request);
+        if (typeof input?.themeId !== 'string') {
+          throw new ApiError(400, 'INVALID_THEME_ID', 'Choose a theme to install');
+        }
+        return json(response, 200, await catalog.installTheme(user.id, input.themeId));
+      }
+      if (request.method === 'PUT' && path === '/v1/account/appearance/settings') {
+        const input = await readJson(request);
+        return json(response, 200, await catalog.saveAppearanceSettings(user.id, input?.settings));
+      }
+      if (request.method === 'DELETE' && path === '/v1/account/appearance') {
+        return json(response, 200, await catalog.resetAppearance(user.id));
+      }
+      if (request.method === 'GET' && path === '/v1/themes') {
+        const offset = url.searchParams.has('offset') ? Number(url.searchParams.get('offset')) : 0;
+        const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 20;
+        if (!Number.isSafeInteger(offset) || offset < 0
+          || !Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
+          throw new ApiError(400, 'INVALID_PAGE', 'Choose a non-negative offset and a limit from 1 to 50');
+        }
+        return json(response, 200, catalog.listThemes(offset, limit));
+      }
+      if (request.method === 'POST' && path === '/v1/themes') {
+        const input = await readJson(request);
+        return json(response, 201, await catalog.createTheme(user.id, input?.name,
+          input?.settings, input?.creatorName));
+      }
+      const themeMatch = /^\/v1\/themes\/([^/]+)$/u.exec(path);
+      if (request.method === 'GET' && themeMatch) {
+        return json(response, 200, catalog.getTheme(themeMatch[1]));
+      }
+      if (request.method === 'DELETE' && themeMatch) {
+        await catalog.deleteTheme(themeMatch[1], user.id);
+        response.writeHead(204);
+        return response.end();
+      }
       if (request.method === 'POST' && path === '/v1/account/claim-legacy') {
         if (!legacyClaimToken) {
           throw new ApiError(409, 'LEGACY_CLAIM_DISABLED', 'Legacy claiming is not configured');

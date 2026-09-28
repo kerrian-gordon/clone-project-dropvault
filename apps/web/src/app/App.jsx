@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
+import { AppearanceProvider } from './AppearanceContext.jsx';
 import { FilesPage } from '../features/file-browser/FilesPage.jsx';
 import { SharedPage } from '../features/file-browser/SharedPage.jsx';
 import { ViewerPage } from '../features/viewer/ViewerPage.jsx';
 import { UploadProvider } from '../features/upload/UploadContext.jsx';
+import { ThemesPage } from '../features/themes/ThemesPage.jsx';
 
 function ProtectedLayout() {
   const { user, loading, signOut } = useAuth();
@@ -30,6 +32,7 @@ function ProtectedLayout() {
         <nav aria-label="Main navigation">
           <NavLink to="/files">My files</NavLink>
           <NavLink to="/shared">Shared with me</NavLink>
+          <NavLink to="/themes">Themes</NavLink>
         </nav>
         <div className="account"><span>{user.email}</span><button type="button" onClick={handleLogout}>Log out</button></div>
       </header>
@@ -90,7 +93,7 @@ function NotFoundPage() {
 export function App() {
   return (
     <AuthProvider>
-      <Routes>
+      <AppearanceProvider><Routes>
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/register" element={<AuthPage mode="register" />} />
         <Route element={<ProtectedLayout />}>
@@ -99,9 +102,10 @@ export function App() {
           <Route path="/folders/:id" element={<FilesPage />} />
           <Route path="/shared" element={<SharedPage />} />
           <Route path="/view/:id" element={<ViewerPage />} />
+          <Route path="/themes" element={<ThemesPage />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+      </Routes></AppearanceProvider>
     </AuthProvider>
   );
 }

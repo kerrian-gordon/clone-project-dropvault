@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { createApiServer } from '../src/server.js';
 import { seedDemoData } from '../src/seed-demo.js';
+import { DEFAULT_THEME_SETTINGS } from '../../../packages/shared/index.js';
 
 test('demo seed creates usable accounts, downloads, grants, and quota flow', async () => {
   const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-seed-test-'));
@@ -38,6 +39,27 @@ test('demo seed creates usable accounts, downloads, grants, and quota flow', asy
     const request = (cookie, path, options = {}) => fetch(`${base}${path}`, {
       ...options, headers: { ...options.headers, Cookie: cookie },
     });
+
+    const themeResponse = await request(alexCookie, '/v1/themes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Alex blue', settings: DEFAULT_THEME_SETTINGS }),
+    });
+    assert.equal(themeResponse.status, 201);
+    const gallery = await (await request(alexCookie, '/v1/themes')).json();
+    assert.equal(gallery.total, 3);
+    assert.ok(gallery.themes.some((item) => item.name === 'Midnight'));
+    const blairStartingAppearance = await (await request(blairCookie, '/v1/account/appearance')).json();
+    assert.equal(blairStartingAppearance.name, 'Ocean blue');
+    assert.equal(blairStartingAppearance.settings.colors.accent, '#b34739');
+    const theme = await themeResponse.json();
+    const installResponse = await request(blairCookie, '/v1/account/appearance', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ themeId: theme.id }),
+    });
+    assert.equal(installResponse.status, 200);
+    assert.equal((await installResponse.json()).sourceThemeId, theme.id);
+    assert.equal((await (await request(blairCookie, '/v1/account/appearance')).json()).name,
+      'Alex blue');
 
     const alexRoot = await (await request(alexCookie, '/v1/folders/root/children')).json();
     assert.deepEqual(alexRoot.folders.map((folder) => folder.name), ['Projects']);

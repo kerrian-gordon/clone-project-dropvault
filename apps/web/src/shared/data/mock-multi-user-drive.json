@@ -87,6 +87,46 @@
       "tier": "free"
     }
   },
+  "themes": [
+    {
+      "id": "55555555-5555-4555-8555-000000000001",
+      "creatorId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+      "creatorName": "Alex",
+      "name": "Ocean blue",
+      "settings": {
+        "colors": { "background": "#eaf4ff", "surface": "#ffffff", "text": "#17324d", "accent": "#1764c0" },
+        "font": "Inter",
+        "spacing": "comfortable"
+      },
+      "createdAt": "2026-09-10T10:00:00.000Z"
+    },
+    {
+      "id": "55555555-5555-4555-8555-000000000002",
+      "creatorId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2",
+      "creatorName": "Blair",
+      "name": "Midnight",
+      "settings": {
+        "colors": { "background": "#141c2b", "surface": "#233148", "text": "#f2f6ff", "accent": "#5ee2c5" },
+        "font": "Georgia",
+        "spacing": "compact"
+      },
+      "createdAt": "2026-09-11T10:00:00.000Z"
+    }
+  ],
+  "appearances": [
+    {
+      "userId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2",
+      "sourceThemeId": "55555555-5555-4555-8555-000000000001",
+      "name": "Ocean blue",
+      "settings": {
+        "colors": { "background": "#eaf4ff", "surface": "#ffffff", "text": "#17324d", "accent": "#b34739" },
+        "font": "Inter",
+        "spacing": "comfortable"
+      },
+      "selectedAt": "2026-09-12T10:00:00.000Z",
+      "updatedAt": "2026-09-12T11:00:00.000Z"
+    }
+  ],
   "prototypeScenarios": {
     "blockedUpload": {
       "actingUserId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
