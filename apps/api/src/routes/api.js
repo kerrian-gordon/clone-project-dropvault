@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
-import { MAX_UPLOAD_BYTES, ROOT_FOLDER_ID, SUPPORTED_UPLOAD_TYPES, validName } from '../../../../packages/shared/index.js';
+import { MAX_UPLOAD_BYTES, ROOT_FOLDER_ID, SUPPORTED_UPLOAD_TYPES, normalizeMimeType, validName } from '../../../../packages/shared/index.js';
 import { publicFile } from '../db/catalog.js';
 import { checkRequestOrigin, clearSessionCookie, createAuthLimiter, createSession, hashPassword,
   requireUser, sessionCookie, sessionToken, validEmail, validPassword,
@@ -143,8 +143,9 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
 
   return async (request, response) => {
     const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(request.method);
+    const uploadPath = new URL(request.url, 'http://localhost').pathname;
     const upload = request.method === 'POST'
-      && new URL(request.url, 'http://localhost').pathname === '/v1/files';
+      && (uploadPath === '/v1/files' || /^\/v1\/files\/[^/]+\/versions$/u.test(uploadPath));
     if (upload ? activeUploads >= MAX_ACTIVE_UPLOADS
       : mutation && activeMutations >= MAX_ACTIVE_MUTATIONS) {
       rejectBusy(request, response, upload);
@@ -190,7 +191,7 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       }
       const shareMatch = /^\/v1\/shares\/([^/]+)$/u.exec(path);
       if (request.method === 'GET' && shareMatch) {
-        return sendContent(response, catalog.getSharedFile(shareMatch[1]),
+        return await sendContent(response, catalog.getSharedFile(shareMatch[1]),
           url.searchParams.get('download') === '1');
       }
 
@@ -363,10 +364,87 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         return json(response, 201, file);
       }
 
+      const versionsMatch = /^\/v1\/files\/([^/]+)\/versions$/u.exec(path);
+      if (request.method === 'GET' && versionsMatch) {
+        return json(response, 200, catalog.listVersions(versionsMatch[1], user.id));
+      }
+      if (request.method === 'POST' && versionsMatch) {
+        const file = catalog.getFile(versionsMatch[1], user.id, 'manage');
+        const extension = file.name.split('.').at(-1).toLowerCase();
+        const mimeType = SUPPORTED_UPLOAD_TYPES[extension];
+        if (!mimeType || (normalizeMimeType(request.headers['content-type']) !== 'application/octet-stream'
+          && normalizeMimeType(request.headers['content-type']) !== mimeType)) {
+          throw new ApiError(415, 'UNSUPPORTED_FILE_TYPE', 'Replacement must match the file type');
+        }
+        const declaredLength = request.headers['content-length'];
+        if (declaredLength !== undefined && Number(declaredLength) > maxUploadBytes) {
+          throw new ApiError(413, 'FILE_TOO_LARGE', 'File exceeds the upload limit');
+        }
+        const usage = catalog.usage(user.id, storageLimitBytes);
+        const available = Math.max(0, usage.limitBytes - usage.usedBytes);
+        if (available === 0 || (declaredLength !== undefined && Number(declaredLength) > available)) {
+          if (countedUpload) { activeUploads -= 1; countedUpload = false; }
+          await drainRequest(request, maxUploadBytes);
+          throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Storage limit would be exceeded');
+        }
+        const stored = await storage.save(request, maxUploadBytes, available);
+        try {
+          await validateStoredFile(file.name, await storage.sample(stored.storageKey),
+            () => storage.zipEntries(stored.storageKey));
+          const updated = await mutate(() => {
+            const current = catalog.usage(user.id, storageLimitBytes);
+            if (stored.size > Math.max(0, current.limitBytes - current.usedBytes)) {
+              throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Storage limit would be exceeded');
+            }
+            return catalog.replaceFile(file.id, user.id, stored);
+          });
+          return json(response, 201, updated);
+        } catch (error) {
+          await storage.remove(stored.storageKey);
+          throw error;
+        }
+      }
+
+      const versionContentMatch = /^\/v1\/files\/([^/]+)\/versions\/([^/]+)\/content$/u.exec(path);
+      if (request.method === 'GET' && versionContentMatch) {
+        const version = catalog.getVersion(versionContentMatch[1], user.id, versionContentMatch[2]);
+        return await sendContent(response, { ...version, id: version.fileId },
+          url.searchParams.get('download') === '1');
+      }
+      const versionRestoreMatch = /^\/v1\/files\/([^/]+)\/versions\/([^/]+)\/restore$/u.exec(path);
+      if (request.method === 'POST' && versionRestoreMatch) {
+        const [fileId, versionId] = versionRestoreMatch.slice(1);
+        const updated = await mutate(async () => {
+          const file = catalog.getFile(fileId, user.id, 'manage');
+          const version = catalog.getVersion(fileId, user.id, versionId);
+          if (file.currentVersionId === versionId) {
+            throw new ApiError(409, 'VERSION_ALREADY_CURRENT', 'This version is already current');
+          }
+          const usage = catalog.usage(user.id, storageLimitBytes);
+          if (version.size > Math.max(0, usage.limitBytes - usage.usedBytes)) {
+            throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Storage limit would be exceeded');
+          }
+          const stored = await storage.copy(version.storageKey);
+          try { return await catalog.restoreVersion(fileId, user.id, versionId, stored); }
+          catch (error) { await storage.remove(stored.storageKey); throw error; }
+        });
+        return json(response, 201, updated);
+      }
+      const versionMatch = /^\/v1\/files\/([^/]+)\/versions\/([^/]+)$/u.exec(path);
+      if (request.method === 'PATCH' && versionMatch) {
+        const input = await readJson(request);
+        if (typeof input?.label !== 'string' || input.label.length > 80
+          || /[\u0000-\u001f\u007f]/u.test(input.label)) {
+          throw new ApiError(400, 'INVALID_VERSION_LABEL', 'Use a label of at most 80 characters');
+        }
+        return json(response, 200, await mutate(() => catalog.labelVersion(
+          versionMatch[1], user.id, versionMatch[2], input.label.trim())));
+      }
+
       const contentMatch = /^\/v1\/files\/([^/]+)\/content$/u.exec(path);
       if (request.method === 'GET' && contentMatch) {
         const file = catalog.getFile(contentMatch[1], user.id);
-        return sendContent(response, file, url.searchParams.get('download') === '1');
+        return await sendContent(response, file, url.searchParams.get('download') === '1');
       }
 
       const sharesMatch = /^\/v1\/files\/([^/]+)\/shares$/u.exec(path);
@@ -429,18 +507,20 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
           deleting.add(file.id);
           try {
             await waitForReads(file.id);
-            const staged = await storage.stageRemove(file.storageKey);
+            const staged = [];
             try {
+              for (const key of catalog.versionStorageKeys(file.id, user.id)) {
+                staged.push(await storage.stageRemove(key));
+              }
               await catalog.deleteFile(file.id, user.id);
             } catch (error) {
-              await staged.rollback();
+              for (const item of staged.reverse()) await item.rollback();
               throw error;
             }
             // The catalog deletion is committed. Startup recovery retries file cleanup.
-            try {
-              await staged.commit();
-            } catch (error) {
-              console.error('Deferred cleanup of deleted file', error);
+            for (const item of staged) {
+              try { await item.commit(); }
+              catch (error) { console.error('Deferred cleanup of deleted file', error); }
             }
           } finally {
             deleting.delete(file.id);
@@ -451,7 +531,8 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       }
       throw new ApiError(404, 'NOT_FOUND', 'Endpoint was not found');
     } catch (error) {
-      if (response.headersSent || response.destroyed) {
+      if (response.destroyed) return;
+      if (response.headersSent) {
         response.destroy(error);
         return;
       }

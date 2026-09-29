@@ -39,11 +39,22 @@ export async function openCatalog(path) {
   state.grants ??= [];
   state.themes ??= [];
   state.appearances ??= [];
+  state.versions ??= [];
   state.organizationSuggestions ??= [];
   state.organizationStats ??= [];
   if (![state.users, state.sessions, state.grants, state.themes,
-    state.appearances, state.organizationSuggestions, state.organizationStats].every(Array.isArray)) {
+    state.appearances, state.versions, state.organizationSuggestions, state.organizationStats].every(Array.isArray)) {
     throw new Error('Invalid account catalog');
+  }
+  // Older catalogs stored only the current file. Give that content a stable
+  // first revision without rewriting the catalog until the next mutation.
+  for (const file of state.files) {
+    file.currentVersionId ??= file.id;
+    if (!state.versions.some((version) => version.id === file.currentVersionId && version.fileId === file.id)) {
+      state.versions.push({ id: file.currentVersionId, fileId: file.id, name: file.name,
+        storageKey: file.storageKey, mimeType: file.mimeType, size: file.size,
+        createdAt: file.createdAt, kind: 'uploaded', label: '' });
+    }
   }
   for (const theme of state.themes) theme.creatorName ??= 'Community member';
 
@@ -79,7 +90,8 @@ export async function openCatalog(path) {
   return {
     loadedFromDisk,
     referencedStorageKeys() {
-      return state.files.map((file) => file.storageKey);
+      return [...new Set([...state.files.map((file) => file.storageKey),
+        ...state.versions.map((version) => version.storageKey)])];
     },
     async createUser(email, passwordHash) {
       return write((next) => {
@@ -324,12 +336,74 @@ export async function openCatalog(path) {
         if (!folderExists(details.folderId, details.ownerId, next)) {
           throw new ApiError(404, 'FOLDER_NOT_FOUND', 'Folder was not found');
         }
+        const createdAt = new Date().toISOString();
         const file = { id: randomUUID(), name: details.name, folderId: details.folderId,
           ownerId: details.ownerId, mimeType: details.mimeType, size: details.size,
-          createdAt: new Date().toISOString(),
-          storageKey: details.storageKey };
+          createdAt, storageKey: details.storageKey, currentVersionId: randomUUID() };
         next.files.push(file);
+        next.versions.push({ id: file.currentVersionId, fileId: file.id, name: file.name,
+          storageKey: file.storageKey, mimeType: file.mimeType, size: file.size,
+          createdAt, kind: 'uploaded', label: '' });
         return publicFile(file);
+      });
+    },
+    listVersions(fileId, ownerId) {
+      const file = this.getFile(fileId, ownerId, 'manage');
+      return { currentVersionId: file.currentVersionId,
+        versions: state.versions.filter((version) => version.fileId === fileId)
+          .reverse().map(publicVersion) };
+    },
+    getVersion(fileId, ownerId, versionId) {
+      this.getFile(fileId, ownerId, 'manage');
+      const version = state.versions.find((item) => item.fileId === fileId && item.id === versionId);
+      if (!version) throw new ApiError(404, 'VERSION_NOT_FOUND', 'File version was not found');
+      return version;
+    },
+    versionStorageKeys(fileId, ownerId) {
+      this.getFile(fileId, ownerId, 'manage');
+      return [...new Set(state.versions.filter((version) => version.fileId === fileId)
+        .map((version) => version.storageKey))];
+    },
+    async replaceFile(fileId, ownerId, stored) {
+      return write((next) => {
+        const file = next.files.find((item) => item.id === fileId && item.ownerId === ownerId);
+        if (!file) throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
+        const version = { id: randomUUID(), fileId, name: file.name,
+          storageKey: stored.storageKey, mimeType: file.mimeType, size: stored.size,
+          createdAt: new Date().toISOString(), kind: 'replaced', label: '' };
+        next.versions.push(version);
+        file.storageKey = version.storageKey;
+        file.size = version.size;
+        file.currentVersionId = version.id;
+        return publicFile(file);
+      });
+    },
+    async restoreVersion(fileId, ownerId, versionId, stored) {
+      return write((next) => {
+        const file = next.files.find((item) => item.id === fileId && item.ownerId === ownerId);
+        if (!file) throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
+        const source = next.versions.find((item) => item.fileId === fileId && item.id === versionId);
+        if (!source) throw new ApiError(404, 'VERSION_NOT_FOUND', 'File version was not found');
+        const version = { id: randomUUID(), fileId, name: file.name,
+          storageKey: stored.storageKey, mimeType: source.mimeType, size: source.size,
+          createdAt: new Date().toISOString(), kind: 'restored', restoredFrom: versionId, label: '' };
+        next.versions.push(version);
+        file.storageKey = version.storageKey;
+        file.mimeType = version.mimeType;
+        file.size = version.size;
+        file.currentVersionId = version.id;
+        return publicFile(file);
+      });
+    },
+    async labelVersion(fileId, ownerId, versionId, label) {
+      return write((next) => {
+        if (!next.files.some((file) => file.id === fileId && file.ownerId === ownerId)) {
+          throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
+        }
+        const version = next.versions.find((item) => item.fileId === fileId && item.id === versionId);
+        if (!version) throw new ApiError(404, 'VERSION_NOT_FOUND', 'File version was not found');
+        version.label = label;
+        return publicVersion(version);
       });
     },
     async updateFile(fileId, ownerId, changes) {
@@ -366,6 +440,7 @@ export async function openCatalog(path) {
         const index = next.files.findIndex((file) => file.id === fileId && file.ownerId === userId);
         if (index === -1) throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
         next.files.splice(index, 1);
+        next.versions = next.versions.filter((version) => version.fileId !== fileId);
         next.shares = next.shares.filter((share) => share.fileId !== fileId);
         next.grants = next.grants.filter((grant) => grant.fileId !== fileId);
       });
@@ -373,8 +448,9 @@ export async function openCatalog(path) {
     usage(userId, freeLimitBytes) {
       const user = this.getUser(userId);
       const limitBytes = user.tier === 'demo' ? freeLimitBytes * 10 : freeLimitBytes;
-      return { usedBytes: state.files.filter((file) => file.ownerId === userId)
-        .reduce((total, file) => total + file.size, 0), limitBytes, tier: user.tier };
+      const owned = new Set(state.files.filter((file) => file.ownerId === userId).map((file) => file.id));
+      return { usedBytes: state.versions.filter((version) => owned.has(version.fileId))
+        .reduce((total, version) => total + version.size, 0), limitBytes, tier: user.tier };
     },
     async createShare(fileId, userId) {
       const token = randomBytes(32).toString('base64url');
@@ -473,6 +549,11 @@ export async function openCatalog(path) {
 
 export function publicFile(file) {
   const { storageKey, ...metadata } = file;
+  return metadata;
+}
+
+function publicVersion(version) {
+  const { storageKey, ...metadata } = version;
   return metadata;
 }
 

@@ -192,6 +192,23 @@ h1 { margin: 0.4rem 0 0.75rem; font-size: 1.45rem; letter-spacing: -0.03em; font
 .preview-pdf { width: 100%; height: 600px; border: 0; border-radius: 6px; display: block; margin-bottom: 1rem; }
 .preview-audio { width: 100%; display: block; margin-bottom: 1rem; }
 .preview-video { width: 100%; max-height: 480px; border-radius: 6px; display: block; margin-bottom: 1rem; }
+.version-history { margin: 1.25rem 0; }
+.version-history > progress { display: block; width: 100%; margin-top: 0.7rem; }
+.version-list { list-style: none; margin: 1rem 0 0; padding: 0; }
+.version-list li { padding: 0.85rem 0; border-top: 1px solid var(--line); }
+.version-list li p { margin: 0.35rem 0; }
+.version-heading, .version-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.version-heading strong { overflow-wrap: anywhere; }
+.version-preview { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.version-preview h3 { margin-top: 0; }
+.version-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin-top: 0.8rem; }
+.version-comparison > div { min-width: 0; }
+.version-comparison h4 { margin: 0 0 0.4rem; }
+.version-comparison pre { max-height: 25rem; overflow: auto; margin: 0; padding: 0.65rem; border: 1px solid var(--line); background: var(--paper); }
+.version-comparison pre span { display: block; min-height: 1em; }
+.version-comparison .changed-line { background: color-mix(in srgb, var(--accent) 14%, var(--card)); }
+.version-comparison > p { grid-column: 1 / -1; }
+@media (max-width: 650px) { .version-comparison { grid-template-columns: 1fr; } }
 .preview-text {
   background: var(--paper);
   border: 1px solid var(--line);
