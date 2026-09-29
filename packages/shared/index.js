@@ -1,6 +1,10 @@
 /** @typedef {{ id: string, name: string, parentId: string, ownerId: string, createdAt: string }} Folder */
 /** @typedef {{ id: string, name: string, folderId: string, ownerId: string, mimeType: string, size: number, createdAt: string }} FileRecord */
-/** @typedef {{ id: string, fileId: string, name: string, mimeType: string, size: number, createdAt: string, kind: 'uploaded' | 'replaced' | 'restored', restoredFrom?: string, label: string }} FileVersion */
+/** @typedef {{ id: string, fileId: string, name: string, mimeType: string, size: number, createdAt: string, kind: 'uploaded' | 'replaced' | 'restored' | 'copied', restoredFrom?: string, copiedFromVersionId?: string, copiedFromSnapshotId?: string, label: string }} FileVersion */
+/** @typedef {{ archiveFileId: string, archiveVersionId: string, commitSha: string, verification: 'zip-comment' }} GitArchiveLink */
+/** @typedef {{ id: string, ownerId: string, name: string, description: string, fileIds: string[], git?: GitArchiveLink, createdAt: string }} Workspace */
+/** @typedef {{ fileId: string, versionId: string, name: string, folderId: string, folderPath: string[], mimeType: string, size: number }} SnapshotItem */
+/** @typedef {{ id: string, workspaceId: string, ownerId: string, name: string, note: string, items: SnapshotItem[], git: GitArchiveLink | null, createdAt: string }} Snapshot */
 /** @typedef {{ id: string, email: string, tier: 'free' | 'demo', createdAt: string }} User */
 /** @typedef {{ usedBytes: number, limitBytes: number, tier: 'free' | 'demo' }} StorageUsage */
 /** @typedef {{ colors: { background: string, surface: string, text: string, accent: string }, font: 'Inter' | 'Arial' | 'Georgia', spacing: 'compact' | 'comfortable' }} ThemeSettings */
@@ -45,6 +49,7 @@ export const routes = Object.freeze({
   folder: (folderId) => `/v1/folders/${encodeURIComponent(folderId)}`,
   children: (folderId) => `/v1/folders/${encodeURIComponent(folderId)}/children`,
   files: '/v1/files',
+  ownedFiles: '/v1/files/owned',
   sharedFiles: '/v1/files/shared',
   file: (fileId) => `/v1/files/${encodeURIComponent(fileId)}`,
   content: (fileId) => `/v1/files/${encodeURIComponent(fileId)}/content`,
@@ -52,6 +57,24 @@ export const routes = Object.freeze({
   version: (fileId, versionId) => `/v1/files/${encodeURIComponent(fileId)}/versions/${encodeURIComponent(versionId)}`,
   versionContent: (fileId, versionId) => `/v1/files/${encodeURIComponent(fileId)}/versions/${encodeURIComponent(versionId)}/content`,
   restoreVersion: (fileId, versionId) => `/v1/files/${encodeURIComponent(fileId)}/versions/${encodeURIComponent(versionId)}/restore`,
+  workspaces: '/v1/workspaces',
+  workspace: (workspaceId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}`,
+  workspaceFiles: (workspaceId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/files`,
+  workspaceFile: (workspaceId, fileId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/files/${encodeURIComponent(fileId)}`,
+  workspaceContent: (workspaceId, fileId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/files/${encodeURIComponent(fileId)}/content`,
+  workspaceUpload: (workspaceId, name) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/uploads?name=${encodeURIComponent(name)}`,
+  workspaceVersion: (workspaceId, fileId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/files/${encodeURIComponent(fileId)}/versions`,
+  workspaceAccess: (workspaceId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/access`,
+  workspaceGit: (workspaceId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/git`,
+  workspaceRecipient: (workspaceId, userId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/access/${encodeURIComponent(userId)}`,
+  snapshots: (workspaceId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/snapshots`,
+  sharedSnapshots: '/v1/snapshots/shared',
+  snapshot: (snapshotId) => `/v1/snapshots/${encodeURIComponent(snapshotId)}`,
+  snapshotAccess: (snapshotId) => `/v1/snapshots/${encodeURIComponent(snapshotId)}/access`,
+  snapshotRecipient: (snapshotId, userId) => `/v1/snapshots/${encodeURIComponent(snapshotId)}/access/${encodeURIComponent(userId)}`,
+  snapshotContent: (snapshotId, fileId) => `/v1/snapshots/${encodeURIComponent(snapshotId)}/files/${encodeURIComponent(fileId)}/content`,
+  snapshotArchive: (snapshotId) => `/v1/snapshots/${encodeURIComponent(snapshotId)}/archive`,
+  snapshotCopy: (snapshotId) => `/v1/snapshots/${encodeURIComponent(snapshotId)}/copy`,
   usage: '/v1/storage/usage',
   shares: (fileId) => `/v1/files/${encodeURIComponent(fileId)}/shares`,
   revokeShare: (fileId, shareId) => `/v1/files/${encodeURIComponent(fileId)}/shares/${encodeURIComponent(shareId)}`,

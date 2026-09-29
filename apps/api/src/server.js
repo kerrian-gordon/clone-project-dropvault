@@ -2,12 +2,14 @@ import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { DEFAULT_STORAGE_LIMIT_BYTES, MAX_UPLOAD_BYTES } from '../../../packages/shared/index.js';
 import { openCatalog } from './db/catalog.js';
+import { openPostgresCatalog } from './db/postgres.js';
 import { createHandler } from './routes/api.js';
 import { openLocalStorage } from './services/storage/local.js';
+import { openS3Storage } from './services/storage/s3.js';
 
 export async function createApiServer({ storageRoot, maxUploadBytes = MAX_UPLOAD_BYTES,
   storageLimitBytes = DEFAULT_STORAGE_LIMIT_BYTES, legacyClaimToken,
-  publicBaseUrl, storageFactory = openLocalStorage }) {
+  publicBaseUrl, storageFactory = openLocalStorage, productionStorage }) {
   if (!Number.isSafeInteger(storageLimitBytes) || storageLimitBytes < 0
     || storageLimitBytes > Math.floor(Number.MAX_SAFE_INTEGER / 10)) {
     throw new Error('storageLimitBytes must be a non-negative safe integer that supports the demo tier');
@@ -24,11 +26,23 @@ export async function createApiServer({ storageRoot, maxUploadBytes = MAX_UPLOAD
     }
     publicBaseUrl = url.origin;
   }
-  const catalog = await openCatalog(join(storageRoot, 'catalog.json'));
-  const storage = await storageFactory(storageRoot);
-  const referencedStorageKeys = catalog.referencedStorageKeys();
-  await storage.recoverDeletes(referencedStorageKeys);
-  if (catalog.loadedFromDisk) await storage.recoverOrphanUploads?.(referencedStorageKeys);
-  return createServer(createHandler({ catalog, storage, maxUploadBytes, storageLimitBytes,
-    legacyClaimToken, publicBaseUrl }));
+  if (productionStorage && (!productionStorage.databaseUrl || !productionStorage.bucket
+    || !productionStorage.region)) throw new Error('PostgreSQL URL, S3 bucket, and S3 region are required');
+  const persistence = productionStorage
+    ? await openPostgresCatalog(productionStorage.databaseUrl) : undefined;
+  try {
+    const catalog = await openCatalog(join(storageRoot, 'catalog.json'), persistence);
+    const storage = productionStorage
+      ? await openS3Storage(productionStorage) : await storageFactory(storageRoot);
+    const referencedStorageKeys = catalog.referencedStorageKeys();
+    await storage.recoverDeletes(referencedStorageKeys);
+    if (catalog.loadedFromDisk) await storage.recoverOrphanUploads?.(referencedStorageKeys);
+    const server = createServer(createHandler({ catalog, storage, maxUploadBytes, storageLimitBytes,
+      legacyClaimToken, publicBaseUrl }));
+    server.on('close', () => { void catalog.close?.(); });
+    return server;
+  } catch (error) {
+    await persistence?.close();
+    throw error;
+  }
 }

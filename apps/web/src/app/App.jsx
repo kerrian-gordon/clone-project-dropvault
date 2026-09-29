@@ -7,6 +7,7 @@ import { SharedPage } from '../features/file-browser/SharedPage.jsx';
 import { ViewerPage } from '../features/viewer/ViewerPage.jsx';
 import { UploadProvider } from '../features/upload/UploadContext.jsx';
 import { ThemesPage } from '../features/themes/ThemesPage.jsx';
+import { WorkspacesPage, WorkspacePage, SnapshotPage } from '../features/workspaces/WorkspacesPage.jsx';
 
 function ProtectedLayout() {
   const { user, loading, signOut } = useAuth();
@@ -33,6 +34,7 @@ function ProtectedLayout() {
           <NavLink to="/files">My files</NavLink>
           <NavLink to="/shared">Shared with me</NavLink>
           <NavLink to="/themes">Themes</NavLink>
+          <NavLink to="/workspaces">Workspaces</NavLink>
         </nav>
         <div className="account"><span>{user.email}</span><button type="button" onClick={handleLogout}>Log out</button></div>
       </header>
@@ -103,6 +105,9 @@ export function App() {
           <Route path="/shared" element={<SharedPage />} />
           <Route path="/view/:id" element={<ViewerPage />} />
           <Route path="/themes" element={<ThemesPage />} />
+          <Route path="/workspaces" element={<WorkspacesPage />} />
+          <Route path="/workspaces/:id" element={<WorkspacePage />} />
+          <Route path="/snapshots/:id" element={<SnapshotPage />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes></AppearanceProvider>

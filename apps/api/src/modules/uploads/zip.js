@@ -55,3 +55,23 @@ export async function zipEntryNames(path) {
     await file.close();
   }
 }
+
+export async function gitArchiveCommit(path) {
+  await zipEntryNames(path);
+  const file = await open(path, 'r');
+  try {
+    const { size } = await file.stat();
+    const length = Math.min(size, 65_557);
+    const tail = Buffer.alloc(length);
+    await file.read(tail, 0, length, size - length);
+    for (let at = length - 22; at >= 0; at -= 1) {
+      if (tail.readUInt32LE(at) !== 0x06054b50
+        || at + 22 + tail.readUInt16LE(at + 20) !== length) continue;
+      const commit = tail.subarray(at + 22).toString('ascii').trim().toLowerCase();
+      return /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(commit) ? commit : null;
+    }
+    return null;
+  } finally {
+    await file.close();
+  }
+}

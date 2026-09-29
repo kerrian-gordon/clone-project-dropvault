@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
+import { snapshotArchive } from '../modules/files/archive.js';
 import { MAX_UPLOAD_BYTES, ROOT_FOLDER_ID, SUPPORTED_UPLOAD_TYPES, normalizeMimeType, validName } from '../../../../packages/shared/index.js';
 import { publicFile } from '../db/catalog.js';
 import { checkRequestOrigin, clearSessionCookie, createAuthLimiter, createSession, hashPassword,
@@ -120,20 +121,28 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
 
   async function sendContent(response, file, download) {
     if (deleting.has(file.id)) throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
-    const current = activeReads.get(file.id) ?? { count: 0, waiters: [] };
-    current.count += 1;
-    activeReads.set(file.id, current);
+    const releaseRead = beginRead(file.id);
     try {
       const stream = storage.read(file.storageKey);
       response.writeHead(200, contentHeaders(file, download));
       await pipeline(stream, response);
     } finally {
+      releaseRead();
+    }
+  }
+
+  function beginRead(fileId) {
+    if (deleting.has(fileId)) throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
+    const current = activeReads.get(fileId) ?? { count: 0, waiters: [] };
+    current.count += 1;
+    activeReads.set(fileId, current);
+    return () => {
       current.count -= 1;
       if (current.count === 0) {
-        activeReads.delete(file.id);
+        activeReads.delete(fileId);
         for (const resolve of current.waiters) resolve();
       }
-    }
+    };
   }
 
   async function waitForReads(fileId) {
@@ -145,7 +154,9 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
     const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(request.method);
     const uploadPath = new URL(request.url, 'http://localhost').pathname;
     const upload = request.method === 'POST'
-      && (uploadPath === '/v1/files' || /^\/v1\/files\/[^/]+\/versions$/u.test(uploadPath));
+      && (uploadPath === '/v1/files' || /^\/v1\/files\/[^/]+\/versions$/u.test(uploadPath)
+        || /^\/v1\/workspaces\/[^/]+\/uploads$/u.test(uploadPath)
+        || /^\/v1\/workspaces\/[^/]+\/files\/[^/]+\/versions$/u.test(uploadPath));
     if (upload ? activeUploads >= MAX_ACTIVE_UPLOADS
       : mutation && activeMutations >= MAX_ACTIVE_MUTATIONS) {
       rejectBusy(request, response, upload);
@@ -265,6 +276,280 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       }
       if (request.method === 'GET' && path === '/v1/storage/usage') {
         return json(response, 200, catalog.usage(user.id, storageLimitBytes));
+      }
+      if (request.method === 'GET' && path === '/v1/files/owned') {
+        return json(response, 200, { files: catalog.listOwnedFiles(user.id) });
+      }
+      if (path === '/v1/workspaces') {
+        if (request.method === 'GET') {
+          return json(response, 200, { workspaces: catalog.listWorkspaces(user.id).map((workspace) =>
+            ({ ...workspace, role: catalog.workspaceRole(workspace.id, user.id) })) });
+        }
+        if (request.method === 'POST') {
+          const input = await readJson(request);
+          if (!validName(input?.name) || typeof input?.description !== 'string'
+            || input.description.length > 1000) {
+            throw new ApiError(400, 'INVALID_WORKSPACE', 'Provide a name and description up to 1000 characters');
+          }
+          return json(response, 201, await mutate(() => catalog.createWorkspace(
+            user.id, input.name.trim(), input.description.trim())));
+        }
+      }
+      const workspaceAccessMatch = /^\/v1\/workspaces\/([^/]+)\/access$/u.exec(path);
+      if (workspaceAccessMatch) {
+        if (request.method === 'GET') {
+          return json(response, 200, { users: catalog.listWorkspaceGrants(workspaceAccessMatch[1], user.id) });
+        }
+        if (request.method === 'POST') {
+          const input = await readJson(request);
+          if (!validEmail(input?.email) || !['viewer', 'contributor'].includes(input?.role)) {
+            throw new ApiError(400, 'INVALID_WORKSPACE_GRANT', 'Provide an account and viewer or contributor role');
+          }
+          return json(response, 201, await mutate(() => catalog.grantWorkspace(
+            workspaceAccessMatch[1], user.id, input.email.trim().toLowerCase(), input.role)));
+        }
+      }
+      const workspaceRecipientMatch = /^\/v1\/workspaces\/([^/]+)\/access\/([^/]+)$/u.exec(path);
+      if (request.method === 'DELETE' && workspaceRecipientMatch) {
+        await mutate(() => catalog.revokeWorkspaceGrant(
+          workspaceRecipientMatch[1], user.id, workspaceRecipientMatch[2]));
+        response.writeHead(204);
+        return response.end();
+      }
+      const workspaceGitMatch = /^\/v1\/workspaces\/([^/]+)\/git$/u.exec(path);
+      if (request.method === 'PUT' && workspaceGitMatch) {
+        const input = await readJson(request);
+        if (typeof input?.fileId !== 'string') {
+          throw new ApiError(400, 'INVALID_GIT_ARCHIVE', 'Choose a code archive file');
+        }
+        const workspace = catalog.getWorkspace(workspaceGitMatch[1], user.id, 'manage');
+        if (!workspace.fileIds.includes(input.fileId)) {
+          throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found in this workspace');
+        }
+        const file = catalog.getFile(input.fileId, user.id, 'manage');
+        if (!file.name.toLowerCase().endsWith('.zip')) {
+          throw new ApiError(400, 'INVALID_GIT_ARCHIVE', 'Choose a ZIP archive');
+        }
+        const commit = await storage.gitArchiveCommit(file.storageKey);
+        if (!commit) {
+          throw new ApiError(422, 'GIT_COMMIT_MISSING',
+            'ZIP comment has no Git commit. Create it with git archive --format=zip HEAD');
+        }
+        return json(response, 200, await mutate(() => catalog.setWorkspaceGitArchive(
+          workspace.id, user.id, file.id, file.currentVersionId, commit)));
+      }
+      const workspaceUploadMatch = /^\/v1\/workspaces\/([^/]+)\/uploads$/u.exec(path);
+      if (request.method === 'POST' && workspaceUploadMatch) {
+        const workspace = catalog.getWorkspace(workspaceUploadMatch[1], user.id, 'contribute');
+        const details = uploadDetails(request, url, catalog, workspace.ownerId, maxUploadBytes);
+        const usage = catalog.usage(workspace.ownerId, storageLimitBytes);
+        const available = Math.max(0, usage.limitBytes - usage.usedBytes);
+        const declaredLength = request.headers['content-length'];
+        if (available === 0 || (declaredLength !== undefined && Number(declaredLength) > available)) {
+          if (countedUpload) { activeUploads -= 1; countedUpload = false; }
+          await drainRequest(request, maxUploadBytes);
+          throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Workspace owner storage limit would be exceeded');
+        }
+        const stored = await storage.save(request, maxUploadBytes, available);
+        try {
+          await validateStoredFile(details.name, await storage.sample(stored.storageKey),
+            () => storage.zipEntries(stored.storageKey));
+          const file = await mutate(() => {
+            catalog.getWorkspace(workspace.id, user.id, 'contribute');
+            const current = catalog.usage(workspace.ownerId, storageLimitBytes);
+            if (stored.size > Math.max(0, current.limitBytes - current.usedBytes)) {
+              throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Workspace owner storage limit would be exceeded');
+            }
+            return catalog.addWorkspaceUploadedFile(workspace.id, user.id, { ...details, ...stored });
+          });
+          return json(response, 201, file);
+        } catch (error) {
+          await storage.remove(stored.storageKey);
+          throw error;
+        }
+      }
+      const workspaceContentMatch = /^\/v1\/workspaces\/([^/]+)\/files\/([^/]+)\/content$/u.exec(path);
+      if (request.method === 'GET' && workspaceContentMatch) {
+        const workspace = catalog.getWorkspace(workspaceContentMatch[1], user.id);
+        if (!workspace.fileIds.includes(workspaceContentMatch[2])) {
+          throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found in this workspace');
+        }
+        const file = catalog.getFile(workspaceContentMatch[2], workspace.ownerId, 'manage');
+        return await sendContent(response, file, url.searchParams.get('download') === '1');
+      }
+      const workspaceVersionMatch = /^\/v1\/workspaces\/([^/]+)\/files\/([^/]+)\/versions$/u.exec(path);
+      if (request.method === 'POST' && workspaceVersionMatch) {
+        const workspace = catalog.getWorkspace(workspaceVersionMatch[1], user.id, 'contribute');
+        if (!workspace.fileIds.includes(workspaceVersionMatch[2])) {
+          throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found in this workspace');
+        }
+        const file = catalog.getFile(workspaceVersionMatch[2], workspace.ownerId, 'manage');
+        const extension = file.name.split('.').at(-1).toLowerCase();
+        const mimeType = SUPPORTED_UPLOAD_TYPES[extension];
+        if (!mimeType || (normalizeMimeType(request.headers['content-type']) !== 'application/octet-stream'
+          && normalizeMimeType(request.headers['content-type']) !== mimeType)) {
+          throw new ApiError(415, 'UNSUPPORTED_FILE_TYPE', 'Replacement must match the file type');
+        }
+        const declaredLength = request.headers['content-length'];
+        if (declaredLength !== undefined && Number(declaredLength) > maxUploadBytes) {
+          throw new ApiError(413, 'FILE_TOO_LARGE', 'File exceeds the upload limit');
+        }
+        const usage = catalog.usage(workspace.ownerId, storageLimitBytes);
+        const available = Math.max(0, usage.limitBytes - usage.usedBytes);
+        if (available === 0 || (declaredLength !== undefined && Number(declaredLength) > available)) {
+          if (countedUpload) { activeUploads -= 1; countedUpload = false; }
+          await drainRequest(request, maxUploadBytes);
+          throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Workspace owner storage limit would be exceeded');
+        }
+        const stored = await storage.save(request, maxUploadBytes, available);
+        try {
+          await validateStoredFile(file.name, await storage.sample(stored.storageKey),
+            () => storage.zipEntries(stored.storageKey));
+          const updated = await mutate(() => {
+            const currentWorkspace = catalog.getWorkspace(workspace.id, user.id, 'contribute');
+            if (!currentWorkspace.fileIds.includes(file.id)) {
+              throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found in this workspace');
+            }
+            const current = catalog.usage(workspace.ownerId, storageLimitBytes);
+            if (stored.size > Math.max(0, current.limitBytes - current.usedBytes)) {
+              throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Workspace owner storage limit would be exceeded');
+            }
+            return catalog.replaceFile(file.id, workspace.ownerId, stored, user.id);
+          });
+          return json(response, 201, updated);
+        } catch (error) {
+          await storage.remove(stored.storageKey);
+          throw error;
+        }
+      }
+      if (request.method === 'GET' && path === '/v1/snapshots/shared') {
+        return json(response, 200, { snapshots: catalog.listSharedSnapshots(user.id) });
+      }
+      const workspaceFilesMatch = /^\/v1\/workspaces\/([^/]+)\/files$/u.exec(path);
+      if (workspaceFilesMatch) {
+        if (request.method === 'GET') {
+          return json(response, 200, { files: catalog.listWorkspaceFiles(workspaceFilesMatch[1], user.id) });
+        }
+        if (request.method === 'POST') {
+          const input = await readJson(request);
+          if (typeof input?.fileId !== 'string') {
+            throw new ApiError(400, 'INVALID_FILE', 'Choose a file to add');
+          }
+          return json(response, 200, await mutate(() => catalog.addWorkspaceFile(
+            workspaceFilesMatch[1], user.id, input.fileId)));
+        }
+      }
+      const workspaceFileMatch = /^\/v1\/workspaces\/([^/]+)\/files\/([^/]+)$/u.exec(path);
+      if (request.method === 'DELETE' && workspaceFileMatch) {
+        await mutate(() => catalog.removeWorkspaceFile(workspaceFileMatch[1], user.id, workspaceFileMatch[2]));
+        response.writeHead(204);
+        return response.end();
+      }
+      const snapshotsMatch = /^\/v1\/workspaces\/([^/]+)\/snapshots$/u.exec(path);
+      if (snapshotsMatch) {
+        if (request.method === 'GET') {
+          return json(response, 200, { snapshots: catalog.listSnapshots(snapshotsMatch[1], user.id) });
+        }
+        if (request.method === 'POST') {
+          const input = await readJson(request);
+          if (!validName(input?.name) || typeof input?.note !== 'string' || input.note.length > 1000
+            || !Array.isArray(input?.fileIds) || input.fileIds.length > 200
+            || input.fileIds.some((id) => typeof id !== 'string')) {
+            throw new ApiError(400, 'INVALID_SNAPSHOT',
+              'Provide a name, note up to 1000 characters, and up to 200 selected files');
+          }
+          return json(response, 201, await mutate(() => catalog.createSnapshot(
+            snapshotsMatch[1], user.id, input.name.trim(), input.note.trim(), input.fileIds)));
+        }
+      }
+      const workspaceMatch = /^\/v1\/workspaces\/([^/]+)$/u.exec(path);
+      if (workspaceMatch) {
+        if (request.method === 'GET') {
+          return json(response, 200, { ...catalog.getWorkspace(workspaceMatch[1], user.id),
+            role: catalog.workspaceRole(workspaceMatch[1], user.id) });
+        }
+        if (request.method === 'DELETE') {
+          await mutate(() => catalog.deleteWorkspace(workspaceMatch[1], user.id));
+          response.writeHead(204);
+          return response.end();
+        }
+      }
+      const snapshotContentMatch = /^\/v1\/snapshots\/([^/]+)\/files\/([^/]+)\/content$/u.exec(path);
+      if (request.method === 'GET' && snapshotContentMatch) {
+        const snapshot = catalog.getSnapshot(snapshotContentMatch[1], user.id);
+        const item = snapshot.items.find((entry) => entry.fileId === snapshotContentMatch[2]);
+        const version = catalog.getSnapshotVersion(snapshot.id, snapshotContentMatch[2], user.id);
+        return await sendContent(response, { ...version, id: version.fileId, name: item.name },
+          url.searchParams.get('download') === '1');
+      }
+      const snapshotArchiveMatch = /^\/v1\/snapshots\/([^/]+)\/archive$/u.exec(path);
+      if (request.method === 'GET' && snapshotArchiveMatch) {
+        const snapshot = catalog.getSnapshot(snapshotArchiveMatch[1], user.id);
+        const versions = catalog.snapshotVersions(snapshot.id, user.id);
+        const releases = [];
+        try {
+          for (const item of snapshot.items) releases.push(beginRead(item.fileId));
+          response.writeHead(200, {
+            'Content-Type': 'application/x-tar',
+            'Content-Disposition': `attachment; filename="snapshot-${snapshot.id}.tar"`,
+            'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store',
+          });
+          await pipeline(snapshotArchive(snapshot, versions, storage), response);
+        } finally {
+          for (const release of releases) release();
+        }
+        return;
+      }
+      const snapshotCopyMatch = /^\/v1\/snapshots\/([^/]+)\/copy$/u.exec(path);
+      if (request.method === 'POST' && snapshotCopyMatch) {
+        const workspace = await mutate(async () => {
+          const snapshot = catalog.getSnapshot(snapshotCopyMatch[1], user.id);
+          const total = snapshot.items.reduce((sum, item) => sum + item.size, 0);
+          const usage = catalog.usage(user.id, storageLimitBytes);
+          if (total > Math.max(0, usage.limitBytes - usage.usedBytes)) {
+            throw new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Not enough storage to copy this snapshot');
+          }
+          const versions = catalog.snapshotVersions(snapshot.id, user.id);
+          const stored = [];
+          try {
+            for (const version of versions) stored.push(await storage.copy(version.storageKey));
+            return await catalog.copySnapshot(snapshot.id, user.id, stored);
+          } catch (error) {
+            for (const item of stored) await storage.remove(item.storageKey);
+            throw error;
+          }
+        });
+        return json(response, 201, workspace);
+      }
+      const snapshotAccessMatch = /^\/v1\/snapshots\/([^/]+)\/access$/u.exec(path);
+      if (snapshotAccessMatch) {
+        if (request.method === 'GET') {
+          return json(response, 200, { users: catalog.listSnapshotGrants(snapshotAccessMatch[1], user.id) });
+        }
+        if (request.method === 'POST') {
+          const input = await readJson(request);
+          if (!validEmail(input?.email)) throw new ApiError(400, 'INVALID_EMAIL', 'Provide a valid email');
+          return json(response, 201, await mutate(() => catalog.grantSnapshot(
+            snapshotAccessMatch[1], user.id, input.email.trim().toLowerCase())));
+        }
+      }
+      const snapshotRecipientMatch = /^\/v1\/snapshots\/([^/]+)\/access\/([^/]+)$/u.exec(path);
+      if (request.method === 'DELETE' && snapshotRecipientMatch) {
+        await mutate(() => catalog.revokeSnapshotGrant(
+          snapshotRecipientMatch[1], user.id, snapshotRecipientMatch[2]));
+        response.writeHead(204);
+        return response.end();
+      }
+      const snapshotMatch = /^\/v1\/snapshots\/([^/]+)$/u.exec(path);
+      if (snapshotMatch) {
+        if (request.method === 'GET') {
+          return json(response, 200, catalog.getSnapshot(snapshotMatch[1], user.id));
+        }
+        if (request.method === 'DELETE') {
+          await mutate(() => catalog.deleteSnapshot(snapshotMatch[1], user.id));
+          response.writeHead(204);
+          return response.end();
+        }
       }
       if (request.method === 'POST' && path === '/v1/organization/suggestions') {
         const input = await readJson(request);
@@ -504,6 +789,7 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       if (request.method === 'DELETE' && fileMatch) {
         await mutate(async () => {
           const file = catalog.getFile(fileMatch[1], user.id, 'manage');
+          catalog.assertFileDeletable(file.id, user.id);
           deleting.add(file.id);
           try {
             await waitForReads(file.id);

@@ -23,7 +23,7 @@ test('multi-file drop and version history preserve recoverable content',
       const apiOrigin = `http://127.0.0.1:${api.address().port}`;
       vite = await createViteServer({
         configFile: false, root: webRoot, esbuild: { jsx: 'automatic' },
-        server: { host: '127.0.0.1', port: 0, strictPort: true,
+        server: { host: '127.0.0.1', port: 0, strictPort: false,
           proxy: { '/v1': { target: apiOrigin, changeOrigin: false } } },
       });
       await vite.listen();
@@ -35,6 +35,11 @@ test('multi-file drop and version history preserve recoverable content',
       });
       assert.equal(registered.status, 201);
       const cookie = registered.headers.get('set-cookie').split(';', 1)[0];
+      const collaborator = { email: 'collaborator@example.test', password: credentials.password };
+      assert.equal((await fetch(`${apiOrigin}/v1/auth/register`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(collaborator),
+      })).status, 201);
       const created = await fetch(`${apiOrigin}/v1/folders`, {
         method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'Photos' }),
@@ -98,7 +103,46 @@ test('multi-file drop and version history preserve recoverable content',
       await page.reload();
       await page.locator('.version-list li').nth(2).waitFor();
       assert.equal(await page.locator('.viewer-placeholder pre').innerText(), 'A short note');
-      await page.getByText('First draft').waitFor();
+      await page.getByRole('link', { name: 'Workspaces', exact: true }).click();
+      await page.getByRole('textbox', { name: 'Name' }).fill('Research notes');
+      await page.getByRole('textbox', { name: 'Description' }).fill('Reproducible trial');
+      await page.getByRole('button', { name: 'Create workspace' }).click();
+      await page.getByRole('heading', { name: 'Research notes' }).waitFor();
+      await page.getByRole('combobox', { name: 'File to add' }).selectOption({ label: 'notes.txt' });
+      await page.getByRole('button', { name: 'Add file' }).click();
+      await page.getByRole('checkbox').check();
+      await page.getByRole('textbox', { name: 'Snapshot name' }).fill('Trial one');
+      await page.getByRole('textbox', { name: 'What does this snapshot represent?' }).fill('Reviewed result');
+      await page.getByRole('button', { name: 'Review snapshot' }).click();
+      await page.getByText('Review “Trial one” before saving').waitFor();
+      await page.getByRole('button', { name: 'Create fixed snapshot' }).click();
+      await page.getByRole('heading', { name: 'Trial one' }).waitFor();
+      await page.reload();
+      await page.getByText('Reviewed result').waitFor();
+      assert.equal(await page.getByRole('link', { name: 'Download', exact: true }).count(), 1);
+      await page.getByRole('link', { name: 'Workspaces', exact: true }).click();
+      await page.getByRole('link', { name: /Research notes/u }).click();
+      await page.getByRole('textbox', { name: 'Team member email' }).fill(collaborator.email);
+      await page.getByRole('combobox', { name: 'Team member role' }).selectOption('contributor');
+      await page.getByRole('button', { name: 'Invite or update' }).click();
+      await page.getByText(/collaborator@example\.test · contributor/u).waitFor();
+      await page.getByRole('button', { name: 'Log out' }).click();
+      await page.getByRole('textbox', { name: 'Email' }).fill(collaborator.email);
+      await page.getByRole('textbox', { name: 'Password' }).fill(collaborator.password);
+      await page.getByRole('button', { name: 'Log in' }).click();
+      await page.getByRole('link', { name: 'Workspaces', exact: true }).click();
+      await page.getByRole('link', { name: /Research notes/u }).click();
+      await page.getByText('Your role: contributor.').waitFor();
+      await page.getByRole('link', { name: 'Trial one' }).click();
+      await page.getByRole('link', { name: 'Download all (.tar)' }).waitFor();
+      await page.getByRole('button', { name: 'Restore as new workspace' }).click();
+      await page.getByRole('heading', { name: 'Trial one (copy)' }).waitFor();
+      await page.getByRole('link', { name: 'Workspaces', exact: true }).click();
+      await page.getByRole('link', { name: /Research notes/u }).click();
+      await page.locator('input[aria-label="Choose workspace files"]').setInputFiles({
+        name: 'extra.txt', mimeType: 'text/plain', buffer: Buffer.from('Contribution'),
+      });
+      await page.getByText('extra.txt: success').waitFor();
       assert.deepEqual(pageErrors, []);
     } finally {
       if (browser) await browser.close();

@@ -26,7 +26,7 @@ test('Vite proxy preserves same-origin writes and rejects foreign origins', asyn
       configFile: false,
       root: webRoot,
       optimizeDeps: { noDiscovery: true, include: [] },
-      server: { host: '127.0.0.1', port: 0, strictPort: true, proxy: { '/v1': proxy } },
+      server: { host: '127.0.0.1', port: 0, strictPort: false, proxy: { '/v1': proxy } },
     });
     await vite.listen();
     const webOrigin = `http://127.0.0.1:${vite.httpServer.address().port}`;
