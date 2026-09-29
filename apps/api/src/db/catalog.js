@@ -4,6 +4,7 @@ import { dirname } from 'node:path';
 import { DEFAULT_THEME_SETTINGS, ROOT_FOLDER_ID, themeContrastIssues, validCreatorName, validThemeName,
   validThemeSettings } from '../../../../packages/shared/index.js';
 import { ApiError } from '../routes/errors.js';
+import { suggestFolder } from '../modules/files/suggest.js';
 
 const MAX_THEMES_PER_ACCOUNT = 20;
 
@@ -38,8 +39,10 @@ export async function openCatalog(path) {
   state.grants ??= [];
   state.themes ??= [];
   state.appearances ??= [];
+  state.organizationSuggestions ??= [];
+  state.organizationStats ??= [];
   if (![state.users, state.sessions, state.grants, state.themes,
-    state.appearances].every(Array.isArray)) {
+    state.appearances, state.organizationSuggestions, state.organizationStats].every(Array.isArray)) {
     throw new Error('Invalid account catalog');
   }
   for (const theme of state.themes) theme.creatorName ??= 'Community member';
@@ -231,6 +234,91 @@ export async function openCatalog(path) {
         return folder;
       });
     },
+    listFolders(ownerId) {
+      return state.folders.filter((folder) => folder.ownerId === ownerId);
+    },
+    async createOrganizationSuggestion(ownerId, name, currentFolderId) {
+      if (!folderExists(currentFolderId, ownerId)) {
+        throw new ApiError(404, 'FOLDER_NOT_FOUND', 'Current folder was not found');
+      }
+      const proposed = suggestFolder(name, currentFolderId, this.listFolders(ownerId));
+      if (!proposed) return { suggestion: null };
+      return write((next) => {
+        if (!folderExists(currentFolderId, ownerId, next)) {
+          throw new ApiError(404, 'FOLDER_NOT_FOUND', 'Current folder was not found');
+        }
+        const current = suggestFolder(name, currentFolderId,
+          next.folders.filter((folder) => folder.ownerId === ownerId));
+        if (!current) return { suggestion: null };
+        const now = Date.now();
+        next.organizationSuggestions = next.organizationSuggestions.filter((item) =>
+          now - Date.parse(item.createdAt) < 86_400_000);
+        const owned = next.organizationSuggestions.filter((item) => item.ownerId === ownerId);
+        if (owned.length >= 100) {
+          const remove = new Set(owned.slice(0, owned.length - 99).map((item) => item.id));
+          next.organizationSuggestions = next.organizationSuggestions.filter((item) => !remove.has(item.id));
+        }
+        const id = randomUUID();
+        next.organizationSuggestions.push({ id, ownerId, folderId: current.folderId,
+          rule: current.rule, createdAt: new Date(now).toISOString() });
+        let stats = next.organizationStats.find((item) => item.ownerId === ownerId);
+        if (!stats) {
+          stats = { ownerId, shown: 0, accepted: 0, keptCurrent: 0 };
+          next.organizationStats.push(stats);
+        }
+        stats.shown += 1;
+        return { suggestion: { id, ...current } };
+      });
+    },
+    async decideOrganizationSuggestion(ownerId, suggestionId, accept) {
+      return write((next) => {
+        const index = next.organizationSuggestions.findIndex((item) => item.id === suggestionId
+          && item.ownerId === ownerId && Date.now() - Date.parse(item.createdAt) < 86_400_000);
+        if (index === -1) {
+          throw new ApiError(404, 'SUGGESTION_NOT_FOUND', 'Folder suggestion was not found');
+        }
+        next.organizationSuggestions.splice(index, 1);
+        const stats = next.organizationStats.find((item) => item.ownerId === ownerId);
+        if (accept) stats.accepted += 1;
+        else stats.keptCurrent += 1;
+      });
+    },
+    organizationStats(ownerId) {
+      const stats = state.organizationStats.find((item) => item.ownerId === ownerId);
+      return stats ? { shown: stats.shown, accepted: stats.accepted, keptCurrent: stats.keptCurrent }
+        : { shown: 0, accepted: 0, keptCurrent: 0 };
+    },
+    async updateFolder(folderId, ownerId, changes) {
+      return write((next) => {
+        if (folderId === ROOT_FOLDER_ID) {
+          throw new ApiError(400, 'INVALID_FOLDER', 'Root folder cannot be changed');
+        }
+        const folder = next.folders.find((item) => item.id === folderId && item.ownerId === ownerId);
+        if (!folder) throw new ApiError(404, 'FOLDER_NOT_FOUND', 'Folder was not found');
+        const name = changes.name ?? folder.name;
+        const parentId = changes.parentId ?? folder.parentId;
+        if (!folderExists(parentId, ownerId, next)) {
+          throw new ApiError(404, 'FOLDER_NOT_FOUND', 'Destination folder was not found');
+        }
+        const visited = new Set();
+        let cursor = parentId;
+        while (cursor !== ROOT_FOLDER_ID) {
+          if (cursor === folderId || visited.has(cursor)) {
+            throw new ApiError(409, 'FOLDER_CYCLE', 'A folder cannot move inside itself');
+          }
+          visited.add(cursor);
+          cursor = next.folders.find((item) => item.id === cursor && item.ownerId === ownerId)?.parentId;
+          if (!cursor) throw new ApiError(404, 'FOLDER_NOT_FOUND', 'Destination folder was not found');
+        }
+        if (next.folders.some((item) => item.id !== folderId && item.ownerId === ownerId
+          && item.parentId === parentId && item.name === name)) {
+          throw new ApiError(409, 'NAME_CONFLICT', 'A folder with that name already exists here');
+        }
+        folder.name = name;
+        folder.parentId = parentId;
+        return folder;
+      });
+    },
     async addFile(details) {
       return write((next) => {
         if (!folderExists(details.folderId, details.ownerId, next)) {
@@ -241,6 +329,23 @@ export async function openCatalog(path) {
           createdAt: new Date().toISOString(),
           storageKey: details.storageKey };
         next.files.push(file);
+        return publicFile(file);
+      });
+    },
+    async updateFile(fileId, ownerId, changes) {
+      return write((next) => {
+        const file = next.files.find((item) => item.id === fileId && item.ownerId === ownerId);
+        if (!file) throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
+        const name = changes.name ?? file.name;
+        const folderId = changes.folderId ?? file.folderId;
+        if (!folderExists(folderId, ownerId, next)) {
+          throw new ApiError(404, 'FOLDER_NOT_FOUND', 'Destination folder was not found');
+        }
+        if (name.split('.').at(-1).toLowerCase() !== file.name.split('.').at(-1).toLowerCase()) {
+          throw new ApiError(400, 'FILE_EXTENSION_CHANGE', 'Keep the original file extension');
+        }
+        file.name = name;
+        file.folderId = folderId;
         return publicFile(file);
       });
     },

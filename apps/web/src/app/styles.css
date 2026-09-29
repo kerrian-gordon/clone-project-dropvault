@@ -163,8 +163,15 @@ h1 { margin: 0.4rem 0 0.75rem; font-size: 1.45rem; letter-spacing: -0.03em; font
 .upload-job-heading strong { overflow-wrap: anywhere; }
 .upload-queue progress { width: 100%; margin-top: 0.4rem; }
 .upload-queue li p { margin: 0.35rem 0; }
+.folder-suggestion { margin-top: 0.45rem; padding: 0.65rem 0.75rem; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); }
+.folder-suggestion .dialog-actions { justify-content: flex-start; margin-top: 0.5rem; }
 .row-main strong { overflow-wrap: anywhere; }
 .row-actions { justify-content: flex-end; flex-wrap: wrap; }
+.row { flex-wrap: wrap; }
+.item-edit-form { display: flex; align-items: end; gap: 0.5rem; flex-wrap: wrap; padding: 0.6rem 0; }
+.item-edit-form label { display: grid; gap: 0.2rem; font-size: 0.8rem; color: var(--muted); }
+.item-edit-form input, .item-edit-form select { min-width: 9rem; max-width: 15rem; padding: 0.4rem; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--ink); }
+.item-edit-form .muted { width: 100%; font-size: 0.75rem; }
 .share-form { display: flex; align-items: end; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
 .share-form label { width: 100%; font-size: 0.85rem; color: var(--muted); }
 .share-form input { padding: 0.55rem 0.65rem; border: 1px solid var(--line); border-radius: 6px; flex: 1; min-width: 12rem; background: var(--card); color: var(--ink); }

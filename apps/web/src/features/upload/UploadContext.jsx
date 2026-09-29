@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { MAX_NAME_LENGTH, MAX_UPLOAD_BYTES, SUPPORTED_UPLOAD_TYPES, routes, validName } from '../../../../../packages/shared/index.js';
+import { api } from '../../shared/lib/api.js';
 
 const UploadContext = createContext(null);
 const extensionOf = (name) => name.split('.').at(-1)?.toLowerCase();
@@ -44,6 +45,8 @@ export function UploadProvider({ children }) {
   const processing = useRef(false);
   const currentRequest = useRef(null);
   const nextId = useRef(0);
+  const active = useRef(true);
+  const decided = useRef(new Set());
 
   const update = useCallback((id, change) => {
     setJobs((previous) => previous.map((job) => job.id === id ? { ...job, ...change } : job));
@@ -73,13 +76,48 @@ export function UploadProvider({ children }) {
     const incoming = Array.from(files, (file) => {
       const error = validateUpload(file);
       return { id: ++nextId.current, file, name: file.name, size: file.size, folderId,
-        status: error ? 'failed' : 'queued', progress: 0, error, code: error ? 'CLIENT_VALIDATION' : '' };
+        sourceFolderId: folderId, destinationName: '', suggestion: null,
+        status: error ? 'failed' : 'checking', progress: 0, error,
+        code: error ? 'CLIENT_VALIDATION' : '' };
     });
     if (!incoming.length) return;
     setJobs((previous) => [...incoming, ...previous]);
-    queue.current.push(...incoming.filter((job) => !job.error));
+    for (const job of incoming.filter((item) => !item.error)) {
+      void api(routes.organizationSuggestions, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: job.name, currentFolderId: folderId }),
+      }).then(({ suggestion }) => {
+        if (!active.current) return;
+        if (suggestion) {
+          update(job.id, { status: 'suggested', suggestion });
+        } else {
+          update(job.id, { status: 'queued' });
+          queue.current.push(job);
+          void processQueue();
+        }
+      }).catch(() => {
+        if (!active.current) return;
+        update(job.id, { status: 'queued' });
+        queue.current.push(job);
+        void processQueue();
+      });
+    }
+  }, [processQueue, update]);
+
+  const chooseDestination = useCallback((id, accept) => {
+    const job = jobs.find((item) => item.id === id);
+    if (!job || job.status !== 'suggested' || decided.current.has(id)) return;
+    decided.current.add(id);
+    const folderId = accept ? job.suggestion.folderId : job.sourceFolderId;
+    update(id, { status: 'queued', folderId,
+      destinationName: accept ? job.suggestion.folderName : '' });
+    queue.current.push({ ...job, folderId });
     void processQueue();
-  }, [processQueue]);
+    void api(routes.organizationDecision(job.suggestion.id), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accept }),
+    }).catch(() => {});
+  }, [jobs, processQueue, update]);
 
   const retry = useCallback((id) => {
     const job = jobs.find((item) => item.id === id);
@@ -89,8 +127,11 @@ export function UploadProvider({ children }) {
     void processQueue();
   }, [jobs, processQueue, update]);
 
-  useEffect(() => () => { currentRequest.current?.abort(); queue.current = []; }, []);
-  return <UploadContext.Provider value={{ jobs, enqueue, retry, completedVersion }}>{children}</UploadContext.Provider>;
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; currentRequest.current?.abort(); queue.current = []; };
+  }, []);
+  return <UploadContext.Provider value={{ jobs, enqueue, chooseDestination, retry, completedVersion }}>{children}</UploadContext.Provider>;
 }
 
 export function useUploads() { return useContext(UploadContext); }
