@@ -1,0 +1,10 @@
+{
+  "purpose": "Unseen plain-text negatives for the revised CSV rule",
+  "samples": [
+    {"id":"gnu-gpl","filename":"gnu-gpl.txt","source_group":"gnu-licenses","url":"https://www.gnu.org/licenses/gpl-3.0.txt"},
+    {"id":"python-license","filename":"python-license.txt","source_group":"cpython","url":"https://raw.githubusercontent.com/python/cpython/main/LICENSE"},
+    {"id":"node-license","filename":"node-license.txt","source_group":"nodejs","url":"https://raw.githubusercontent.com/nodejs/node/main/LICENSE"},
+    {"id":"go-license","filename":"go-license.txt","source_group":"golang-go","url":"https://raw.githubusercontent.com/golang/go/master/LICENSE"},
+    {"id":"rust-mit","filename":"rust-mit.txt","source_group":"rust-lang","url":"https://raw.githubusercontent.com/rust-lang/rust/master/LICENSE-MIT"}
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "experiment": "first revised-detector run on preamble-csv sources",
+  "sample_count": 3,
+  "correct": 3,
+  "label_review": "pending human review; structural checks are provisional",
+  "results": [
+    {
+      "sample_id": "giss-global",
+      "source_group": "nasa-giss",
+      "expected": "CSV",
+      "structural_check": "needs_review",
+      "predicted": "CSV",
+      "reason": "delimited_table_after_text_preamble",
+      "correct": true
+    },
+    {
+      "sample_id": "giss-north",
+      "source_group": "nasa-giss",
+      "expected": "CSV",
+      "structural_check": "needs_review",
+      "predicted": "CSV",
+      "reason": "delimited_table_after_text_preamble",
+      "correct": true
+    },
+    {
+      "sample_id": "giss-south",
+      "source_group": "nasa-giss",
+      "expected": "CSV",
+      "structural_check": "needs_review",
+      "predicted": "CSV",
+      "reason": "delimited_table_after_text_preamble",
+      "correct": true
+    }
+  ]
+}

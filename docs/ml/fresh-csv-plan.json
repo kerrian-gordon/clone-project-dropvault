@@ -1,0 +1,10 @@
+{
+  "purpose": "Fresh CSV-only holdout chosen after the preamble rule was written",
+  "samples": [
+    {"id":"seaborn-iris","filename":"seaborn-iris.csv","source_group":"seaborn-data","url":"https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"},
+    {"id":"seaborn-flights","filename":"seaborn-flights.csv","source_group":"seaborn-data","url":"https://raw.githubusercontent.com/mwaskom/seaborn-data/master/flights.csv"},
+    {"id":"seaborn-tips","filename":"seaborn-tips.csv","source_group":"seaborn-data","url":"https://raw.githubusercontent.com/mwaskom/seaborn-data/master/tips.csv"},
+    {"id":"plotly-apple","filename":"plotly-apple.csv","source_group":"plotly-datasets","url":"https://raw.githubusercontent.com/plotly/datasets/master/finance-charts-apple.csv"},
+    {"id":"plotly-election","filename":"plotly-election.csv","source_group":"plotly-datasets","url":"https://raw.githubusercontent.com/plotly/datasets/master/election.csv"}
+  ]
+}

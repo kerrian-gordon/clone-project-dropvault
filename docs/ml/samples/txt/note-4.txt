@@ -1,0 +1,4 @@
+Checklist
+[ ] Verify source
+[ ] Check structure
+[ ] Record label

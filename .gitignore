@@ -24,3 +24,11 @@ build/
 !/storage/originals/.gitkeep
 !/storage/previews/.gitkeep
 !/storage/tmp/.gitkeep
+
+# Offline ML evaluation downloads and Python cache
+/docs/ml/new-source-files/
+/docs/ml/fresh-csv-files/
+/docs/ml/preamble-csv-files/
+/docs/ml/fresh-txt-files/
+/docs/ml/holdout-v2-files/
+__pycache__/

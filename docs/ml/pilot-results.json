@@ -1,0 +1,563 @@
+{
+  "experiment": "local format recognition pilot",
+  "sklearn_version": "1.9.1",
+  "seed": 7,
+  "threshold": 0.6,
+  "training_labels": [
+    "PDF",
+    "DOCX",
+    "PPTX",
+    "XLSX",
+    "JSON",
+    "CSV",
+    "TXT",
+    "ZIP"
+  ],
+  "training_candidates": 40,
+  "limits": [
+    "pending human label review",
+    "one source group per named format",
+    "no independent multi-source held-out set",
+    "scores are not calibrated",
+    "out-of-scope formats were not used for training"
+  ],
+  "cross_validation": {
+    "accuracy": 0.95,
+    "classification_report": {
+      "PDF": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 5.0
+      },
+      "DOCX": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 5.0
+      },
+      "PPTX": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 5.0
+      },
+      "XLSX": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 5.0
+      },
+      "JSON": {
+        "precision": 1.0,
+        "recall": 0.6,
+        "f1-score": 0.75,
+        "support": 5.0
+      },
+      "CSV": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 5.0
+      },
+      "TXT": {
+        "precision": 0.7142857142857143,
+        "recall": 1.0,
+        "f1-score": 0.8333333333333334,
+        "support": 5.0
+      },
+      "ZIP": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 5.0
+      },
+      "accuracy": 0.95,
+      "macro avg": {
+        "precision": 0.9642857142857143,
+        "recall": 0.95,
+        "f1-score": 0.9479166666666667,
+        "support": 40.0
+      },
+      "weighted avg": {
+        "precision": 0.9642857142857142,
+        "recall": 0.95,
+        "f1-score": 0.9479166666666667,
+        "support": 40.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        3,
+        0,
+        2,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        5,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        5,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        5
+      ]
+    ],
+    "predictions": [
+      {
+        "sample_id": "pilot-csv-01",
+        "actual": "CSV",
+        "predicted": "CSV",
+        "score": 0.85,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-csv-02",
+        "actual": "CSV",
+        "predicted": "CSV",
+        "score": 0.85,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-csv-03",
+        "actual": "CSV",
+        "predicted": "CSV",
+        "score": 0.93,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-csv-04",
+        "actual": "CSV",
+        "predicted": "CSV",
+        "score": 0.95,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-csv-05",
+        "actual": "CSV",
+        "predicted": "CSV",
+        "score": 0.96,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-docx-01",
+        "actual": "DOCX",
+        "predicted": "DOCX",
+        "score": 0.98,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-docx-02",
+        "actual": "DOCX",
+        "predicted": "DOCX",
+        "score": 1.0,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-docx-03",
+        "actual": "DOCX",
+        "predicted": "DOCX",
+        "score": 1.0,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-docx-04",
+        "actual": "DOCX",
+        "predicted": "DOCX",
+        "score": 1.0,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-docx-05",
+        "actual": "DOCX",
+        "predicted": "DOCX",
+        "score": 0.95,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-json-01",
+        "actual": "JSON",
+        "predicted": "JSON",
+        "score": 0.69,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-json-02",
+        "actual": "JSON",
+        "predicted": "TXT",
+        "score": 0.43,
+        "abstains_at_0_60": true
+      },
+      {
+        "sample_id": "pilot-json-03",
+        "actual": "JSON",
+        "predicted": "JSON",
+        "score": 0.67,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-json-04",
+        "actual": "JSON",
+        "predicted": "TXT",
+        "score": 0.42,
+        "abstains_at_0_60": true
+      },
+      {
+        "sample_id": "pilot-json-05",
+        "actual": "JSON",
+        "predicted": "JSON",
+        "score": 0.66,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-pdf-01",
+        "actual": "PDF",
+        "predicted": "PDF",
+        "score": 0.99,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-pdf-02",
+        "actual": "PDF",
+        "predicted": "PDF",
+        "score": 1.0,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-pdf-03",
+        "actual": "PDF",
+        "predicted": "PDF",
+        "score": 1.0,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-pdf-04",
+        "actual": "PDF",
+        "predicted": "PDF",
+        "score": 1.0,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-pdf-05",
+        "actual": "PDF",
+        "predicted": "PDF",
+        "score": 1.0,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-pptx-01",
+        "actual": "PPTX",
+        "predicted": "PPTX",
+        "score": 0.98,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-pptx-02",
+        "actual": "PPTX",
+        "predicted": "PPTX",
+        "score": 0.82,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-pptx-03",
+        "actual": "PPTX",
+        "predicted": "PPTX",
+        "score": 0.97,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-pptx-04",
+        "actual": "PPTX",
+        "predicted": "PPTX",
+        "score": 0.96,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-pptx-05",
+        "actual": "PPTX",
+        "predicted": "PPTX",
+        "score": 0.83,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-txt-01",
+        "actual": "TXT",
+        "predicted": "TXT",
+        "score": 0.69,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-txt-02",
+        "actual": "TXT",
+        "predicted": "TXT",
+        "score": 0.66,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-txt-03",
+        "actual": "TXT",
+        "predicted": "TXT",
+        "score": 0.52,
+        "abstains_at_0_60": true
+      },
+      {
+        "sample_id": "pilot-txt-04",
+        "actual": "TXT",
+        "predicted": "TXT",
+        "score": 0.54,
+        "abstains_at_0_60": true
+      },
+      {
+        "sample_id": "pilot-txt-05",
+        "actual": "TXT",
+        "predicted": "TXT",
+        "score": 0.76,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-xlsx-01",
+        "actual": "XLSX",
+        "predicted": "XLSX",
+        "score": 0.82,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-xlsx-02",
+        "actual": "XLSX",
+        "predicted": "XLSX",
+        "score": 0.72,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-xlsx-03",
+        "actual": "XLSX",
+        "predicted": "XLSX",
+        "score": 0.89,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-xlsx-04",
+        "actual": "XLSX",
+        "predicted": "XLSX",
+        "score": 0.73,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-xlsx-05",
+        "actual": "XLSX",
+        "predicted": "XLSX",
+        "score": 0.77,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-zip-01",
+        "actual": "ZIP",
+        "predicted": "ZIP",
+        "score": 0.72,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-zip-02",
+        "actual": "ZIP",
+        "predicted": "ZIP",
+        "score": 0.7,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-zip-03",
+        "actual": "ZIP",
+        "predicted": "ZIP",
+        "score": 0.76,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-zip-04",
+        "actual": "ZIP",
+        "predicted": "ZIP",
+        "score": 0.79,
+        "abstains_at_0_60": false
+      },
+      {
+        "sample_id": "pilot-zip-05",
+        "actual": "ZIP",
+        "predicted": "ZIP",
+        "score": 0.34,
+        "abstains_at_0_60": true
+      }
+    ]
+  },
+  "out_of_scope_challenge": [
+    {
+      "sample_id": "demo-mp4-001",
+      "predicted": "DOCX",
+      "score": 0.47,
+      "abstains_at_0_60": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-01",
+      "predicted": "DOCX",
+      "score": 0.27,
+      "abstains_at_0_60": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-02",
+      "predicted": "XLSX",
+      "score": 0.22,
+      "abstains_at_0_60": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-03",
+      "predicted": "DOCX",
+      "score": 0.46,
+      "abstains_at_0_60": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-04",
+      "predicted": "DOCX",
+      "score": 0.28,
+      "abstains_at_0_60": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-05",
+      "predicted": "TXT",
+      "score": 0.26,
+      "abstains_at_0_60": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-06",
+      "predicted": "TXT",
+      "score": 0.31,
+      "abstains_at_0_60": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-07",
+      "predicted": "ZIP",
+      "score": 0.33,
+      "abstains_at_0_60": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-08",
+      "predicted": "XLSX",
+      "score": 0.19,
+      "abstains_at_0_60": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-09",
+      "predicted": "TXT",
+      "score": 0.58,
+      "abstains_at_0_60": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-10",
+      "predicted": "JSON",
+      "score": 0.35,
+      "abstains_at_0_60": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-11",
+      "predicted": "TXT",
+      "score": 0.51,
+      "abstains_at_0_60": true
+    }
+  ],
+  "renamed_family_held_out": [
+    {
+      "sample_id": "pilot-renamed-pdf-01",
+      "actual": "PDF",
+      "excluded_family": "pilot-pdf-01",
+      "predicted": "PDF",
+      "score": 0.98,
+      "abstains_at_0_60": false
+    },
+    {
+      "sample_id": "pilot-renamed-docx-01",
+      "actual": "DOCX",
+      "excluded_family": "pilot-docx-01",
+      "predicted": "DOCX",
+      "score": 0.98,
+      "abstains_at_0_60": false
+    },
+    {
+      "sample_id": "pilot-renamed-json-01",
+      "actual": "JSON",
+      "excluded_family": "pilot-json-01",
+      "predicted": "JSON",
+      "score": 0.77,
+      "abstains_at_0_60": false
+    }
+  ],
+  "separate_source_pptx": [
+    {
+      "sample_id": "demo-pptx-001",
+      "actual": "PPTX",
+      "predicted": "PPTX",
+      "score": 0.3,
+      "abstains_at_0_60": true
+    }
+  ]
+}

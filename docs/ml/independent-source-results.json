@@ -1,0 +1,79 @@
+{
+  "experiment": "small independent-source challenge",
+  "sklearn_version": "1.9.1",
+  "training_candidates": 40,
+  "test_cases": 5,
+  "raw_correct": 3,
+  "suggestions": 3,
+  "correct_suggestions": 3,
+  "rule_correct": 5,
+  "limitations": [
+    "Only PPTX, JSON, and CSV appear in this challenge",
+    "Labels validated structurally but still await human provenance review",
+    "Two JSON files share a source group and are not independent observations",
+    "The rule baseline recognizes only the three tested formats",
+    "The pilot model's scores are not calibrated probabilities"
+  ],
+  "cases": [
+    {
+      "case_id": "presentation",
+      "relative_path": "presentations/DropVault-frontend-backend-live-demo.pptx",
+      "source_group": "project-presentation",
+      "sha256": "C6A40EE162F994044D2CFF7ABF5432F2E5853B9CB59CB27862FFF4258C5FB7BB",
+      "actual": "PPTX",
+      "content_rule": "PPTX",
+      "predicted": "DOCX",
+      "score": 0.39,
+      "abstains_at_0_60": true,
+      "suggestion_correct": false
+    },
+    {
+      "case_id": "mock-drive",
+      "relative_path": "apps/web/src/shared/data/mock-drive.json",
+      "source_group": "web-fixtures",
+      "sha256": "FD42C3B8AA7C223B7D2E7896BA0FC8E7153A7E91365EA2A69DE0FED31CC9FADB",
+      "actual": "JSON",
+      "content_rule": "JSON",
+      "predicted": "JSON",
+      "score": 0.72,
+      "abstains_at_0_60": false,
+      "suggestion_correct": true
+    },
+    {
+      "case_id": "mock-multi-user",
+      "relative_path": "apps/web/src/shared/data/mock-multi-user-drive.json",
+      "source_group": "web-fixtures",
+      "sha256": "5528CC0AEEFFCAEA526DDCBFBA5F2BCD799BA5E57237D4E5C2632A3ED40C12DF",
+      "actual": "JSON",
+      "content_rule": "JSON",
+      "predicted": "JSON",
+      "score": 0.75,
+      "abstains_at_0_60": false,
+      "suggestion_correct": true
+    },
+    {
+      "case_id": "root-package",
+      "relative_path": "package.json",
+      "source_group": "npm-config",
+      "sha256": "ED8D5BE1CEE4A9B9C2E6A3BCB9450069DB9F410773E7E1FEF0E7C51FD4C5ED74",
+      "actual": "JSON",
+      "content_rule": "JSON",
+      "predicted": "JSON",
+      "score": 0.86,
+      "abstains_at_0_60": false,
+      "suggestion_correct": true
+    },
+    {
+      "case_id": "baseline-table",
+      "relative_path": "docs/ml/file-recognition-baseline.csv",
+      "source_group": "baseline-export",
+      "sha256": "A080C5B8060B6555DC96B2A1E17B6C671C07D7CB4C2B9856C0611D2552D574DC",
+      "actual": "CSV",
+      "content_rule": "CSV",
+      "predicted": "JSON",
+      "score": 0.3,
+      "abstains_at_0_60": true,
+      "suggestion_correct": false
+    }
+  ]
+}

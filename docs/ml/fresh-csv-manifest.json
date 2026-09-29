@@ -1,0 +1,61 @@
+{
+    "purpose":  "Fresh CSV-only holdout chosen after the preamble rule was written",
+    "label_status":  "pending human review",
+    "samples":  [
+                    {
+                        "sample_id":  "seaborn-iris",
+                        "relative_path":  "docs/ml/fresh-csv-files/seaborn-iris.csv",
+                        "sha256":  "9CC1C345C71BCC9B486B74CBF6063FA66F4BB5E0F603A4B3C3471EC2E5E8E355",
+                        "bytes":  3858,
+                        "format_label":  "CSV",
+                        "source_group":  "seaborn-data",
+                        "source_url":  "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv",
+                        "split":  "fresh_csv_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "seaborn-flights",
+                        "relative_path":  "docs/ml/fresh-csv-files/seaborn-flights.csv",
+                        "sha256":  "237D834127D9C6355630D8F443A7A2377B5925923010009B59809BA0B67F4FAC",
+                        "bytes":  2350,
+                        "format_label":  "CSV",
+                        "source_group":  "seaborn-data",
+                        "source_url":  "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/flights.csv",
+                        "split":  "fresh_csv_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "seaborn-tips",
+                        "relative_path":  "docs/ml/fresh-csv-files/seaborn-tips.csv",
+                        "sha256":  "E54CC4D2CE1BFF65D32CA60B3E4B802E06BDE1D7E7CAF6F796F6BF7370E863B0",
+                        "bytes":  9729,
+                        "format_label":  "CSV",
+                        "source_group":  "seaborn-data",
+                        "source_url":  "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/tips.csv",
+                        "split":  "fresh_csv_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "plotly-apple",
+                        "relative_path":  "docs/ml/fresh-csv-files/plotly-apple.csv",
+                        "sha256":  "24C7604EDFD5AFE862DDB9F9535E2FD7351F43711BFC442BCA52055E15E37BCD",
+                        "bytes":  60220,
+                        "format_label":  "CSV",
+                        "source_group":  "plotly-datasets",
+                        "source_url":  "https://raw.githubusercontent.com/plotly/datasets/master/finance-charts-apple.csv",
+                        "split":  "fresh_csv_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "plotly-election",
+                        "relative_path":  "docs/ml/fresh-csv-files/plotly-election.csv",
+                        "sha256":  "EBD2122D21BE8B26D42051E3CFC2BBC888F5718FD59B48B8AADDC5AA7553FF56",
+                        "bytes":  3510,
+                        "format_label":  "CSV",
+                        "source_group":  "plotly-datasets",
+                        "source_url":  "https://raw.githubusercontent.com/plotly/datasets/master/election.csv",
+                        "split":  "fresh_csv_holdout",
+                        "review_status":  "pending"
+                    }
+                ]
+}

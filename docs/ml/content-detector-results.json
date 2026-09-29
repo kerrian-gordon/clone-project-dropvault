@@ -1,0 +1,718 @@
+{
+  "experiment": "offline content detector prototype",
+  "sample_count": 58,
+  "missing_samples": [
+    "presentation"
+  ],
+  "changed_samples": [
+    "mock-multi-user",
+    "root-package"
+  ],
+  "edge_checks": 16,
+  "limits": [
+    "sample labels and provenance await human review",
+    "synthetic known samples come from one source group per format",
+    "large files and ambiguous or malformed data may return UNKNOWN",
+    "this prototype is not an upload security validator"
+  ],
+  "summary": [
+    {
+      "group": "independent-source",
+      "total": 2,
+      "correct": 1,
+      "unknown": 1,
+      "incorrect_label": 0,
+      "predicted_counts": {
+        "JSON": 1,
+        "UNKNOWN": 1
+      }
+    },
+    {
+      "group": "out-of-scope",
+      "total": 12,
+      "correct": 12,
+      "unknown": 0,
+      "incorrect_label": 0,
+      "predicted_counts": {
+        "OUT_OF_SCOPE": 12
+      }
+    },
+    {
+      "group": "renamed-smoke",
+      "total": 3,
+      "correct": 3,
+      "unknown": 0,
+      "incorrect_label": 0,
+      "predicted_counts": {
+        "PDF": 1,
+        "DOCX": 1,
+        "JSON": 1
+      }
+    },
+    {
+      "group": "separate-source-pptx",
+      "total": 1,
+      "correct": 1,
+      "unknown": 0,
+      "incorrect_label": 0,
+      "predicted_counts": {
+        "PPTX": 1
+      }
+    },
+    {
+      "group": "synthetic-known",
+      "total": 40,
+      "correct": 40,
+      "unknown": 0,
+      "incorrect_label": 0,
+      "predicted_counts": {
+        "PDF": 5,
+        "DOCX": 5,
+        "PPTX": 5,
+        "XLSX": 5,
+        "JSON": 5,
+        "CSV": 5,
+        "TXT": 5,
+        "ZIP": 5
+      }
+    }
+  ],
+  "results": [
+    {
+      "sample_id": "demo-pptx-001",
+      "group": "separate-source-pptx",
+      "source_group": "dropvault-pptxgenjs",
+      "actual": "PPTX",
+      "predicted": "PPTX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "demo-mp4-001",
+      "group": "out-of-scope",
+      "source_group": "mdn-cc0-video",
+      "actual": "OUT_OF_SCOPE",
+      "predicted": "OUT_OF_SCOPE",
+      "reason": "mp4_family",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-01",
+      "group": "out-of-scope",
+      "source_group": "generated-pillow",
+      "actual": "OUT_OF_SCOPE",
+      "predicted": "OUT_OF_SCOPE",
+      "reason": "png",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-02",
+      "group": "out-of-scope",
+      "source_group": "generated-pillow",
+      "actual": "OUT_OF_SCOPE",
+      "predicted": "OUT_OF_SCOPE",
+      "reason": "jpeg",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-03",
+      "group": "out-of-scope",
+      "source_group": "generated-pillow",
+      "actual": "OUT_OF_SCOPE",
+      "predicted": "OUT_OF_SCOPE",
+      "reason": "gif",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-04",
+      "group": "out-of-scope",
+      "source_group": "generated-pillow",
+      "actual": "OUT_OF_SCOPE",
+      "predicted": "OUT_OF_SCOPE",
+      "reason": "riff_media",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-05",
+      "group": "out-of-scope",
+      "source_group": "generated-python-wave",
+      "actual": "OUT_OF_SCOPE",
+      "predicted": "OUT_OF_SCOPE",
+      "reason": "riff_media",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-06",
+      "group": "out-of-scope",
+      "source_group": "generated-python-gzip",
+      "actual": "OUT_OF_SCOPE",
+      "predicted": "OUT_OF_SCOPE",
+      "reason": "gzip",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-07",
+      "group": "out-of-scope",
+      "source_group": "generated-python-tarfile",
+      "actual": "OUT_OF_SCOPE",
+      "predicted": "OUT_OF_SCOPE",
+      "reason": "tar",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-08",
+      "group": "out-of-scope",
+      "source_group": "generated-python-bz2",
+      "actual": "OUT_OF_SCOPE",
+      "predicted": "OUT_OF_SCOPE",
+      "reason": "bzip2",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-09",
+      "group": "out-of-scope",
+      "source_group": "generated-python-text",
+      "actual": "OUT_OF_SCOPE",
+      "predicted": "OUT_OF_SCOPE",
+      "reason": "xml_markup",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-10",
+      "group": "out-of-scope",
+      "source_group": "generated-python-text",
+      "actual": "OUT_OF_SCOPE",
+      "predicted": "OUT_OF_SCOPE",
+      "reason": "xml_markup",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-out_of_scope-11",
+      "group": "out-of-scope",
+      "source_group": "generated-python-text",
+      "actual": "OUT_OF_SCOPE",
+      "predicted": "OUT_OF_SCOPE",
+      "reason": "html_markup",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-pdf-01",
+      "group": "synthetic-known",
+      "source_group": "generated-reportlab",
+      "actual": "PDF",
+      "predicted": "PDF",
+      "reason": "pdf_header_and_cross_reference",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-pdf-02",
+      "group": "synthetic-known",
+      "source_group": "generated-reportlab",
+      "actual": "PDF",
+      "predicted": "PDF",
+      "reason": "pdf_header_and_cross_reference",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-pdf-03",
+      "group": "synthetic-known",
+      "source_group": "generated-reportlab",
+      "actual": "PDF",
+      "predicted": "PDF",
+      "reason": "pdf_header_and_cross_reference",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-pdf-04",
+      "group": "synthetic-known",
+      "source_group": "generated-reportlab",
+      "actual": "PDF",
+      "predicted": "PDF",
+      "reason": "pdf_header_and_cross_reference",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-pdf-05",
+      "group": "synthetic-known",
+      "source_group": "generated-reportlab",
+      "actual": "PDF",
+      "predicted": "PDF",
+      "reason": "pdf_header_and_cross_reference",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-docx-01",
+      "group": "synthetic-known",
+      "source_group": "generated-python-docx",
+      "actual": "DOCX",
+      "predicted": "DOCX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-docx-02",
+      "group": "synthetic-known",
+      "source_group": "generated-python-docx",
+      "actual": "DOCX",
+      "predicted": "DOCX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-docx-03",
+      "group": "synthetic-known",
+      "source_group": "generated-python-docx",
+      "actual": "DOCX",
+      "predicted": "DOCX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-docx-04",
+      "group": "synthetic-known",
+      "source_group": "generated-python-docx",
+      "actual": "DOCX",
+      "predicted": "DOCX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-docx-05",
+      "group": "synthetic-known",
+      "source_group": "generated-python-docx",
+      "actual": "DOCX",
+      "predicted": "DOCX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-pptx-01",
+      "group": "synthetic-known",
+      "source_group": "generated-python-pptx",
+      "actual": "PPTX",
+      "predicted": "PPTX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-pptx-02",
+      "group": "synthetic-known",
+      "source_group": "generated-python-pptx",
+      "actual": "PPTX",
+      "predicted": "PPTX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-pptx-03",
+      "group": "synthetic-known",
+      "source_group": "generated-python-pptx",
+      "actual": "PPTX",
+      "predicted": "PPTX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-pptx-04",
+      "group": "synthetic-known",
+      "source_group": "generated-python-pptx",
+      "actual": "PPTX",
+      "predicted": "PPTX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-pptx-05",
+      "group": "synthetic-known",
+      "source_group": "generated-python-pptx",
+      "actual": "PPTX",
+      "predicted": "PPTX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-xlsx-01",
+      "group": "synthetic-known",
+      "source_group": "generated-openpyxl",
+      "actual": "XLSX",
+      "predicted": "XLSX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-xlsx-02",
+      "group": "synthetic-known",
+      "source_group": "generated-openpyxl",
+      "actual": "XLSX",
+      "predicted": "XLSX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-xlsx-03",
+      "group": "synthetic-known",
+      "source_group": "generated-openpyxl",
+      "actual": "XLSX",
+      "predicted": "XLSX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-xlsx-04",
+      "group": "synthetic-known",
+      "source_group": "generated-openpyxl",
+      "actual": "XLSX",
+      "predicted": "XLSX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-xlsx-05",
+      "group": "synthetic-known",
+      "source_group": "generated-openpyxl",
+      "actual": "XLSX",
+      "predicted": "XLSX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-json-01",
+      "group": "synthetic-known",
+      "source_group": "generated-python-json",
+      "actual": "JSON",
+      "predicted": "JSON",
+      "reason": "parsed_json_object_or_array",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-json-02",
+      "group": "synthetic-known",
+      "source_group": "generated-python-json",
+      "actual": "JSON",
+      "predicted": "JSON",
+      "reason": "parsed_json_object_or_array",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-json-03",
+      "group": "synthetic-known",
+      "source_group": "generated-python-json",
+      "actual": "JSON",
+      "predicted": "JSON",
+      "reason": "parsed_json_object_or_array",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-json-04",
+      "group": "synthetic-known",
+      "source_group": "generated-python-json",
+      "actual": "JSON",
+      "predicted": "JSON",
+      "reason": "parsed_json_object_or_array",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-json-05",
+      "group": "synthetic-known",
+      "source_group": "generated-python-json",
+      "actual": "JSON",
+      "predicted": "JSON",
+      "reason": "parsed_json_object_or_array",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-csv-01",
+      "group": "synthetic-known",
+      "source_group": "generated-python-csv",
+      "actual": "CSV",
+      "predicted": "CSV",
+      "reason": "consistent_delimited_table",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-csv-02",
+      "group": "synthetic-known",
+      "source_group": "generated-python-csv",
+      "actual": "CSV",
+      "predicted": "CSV",
+      "reason": "consistent_delimited_table",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-csv-03",
+      "group": "synthetic-known",
+      "source_group": "generated-python-csv",
+      "actual": "CSV",
+      "predicted": "CSV",
+      "reason": "consistent_delimited_table",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-csv-04",
+      "group": "synthetic-known",
+      "source_group": "generated-python-csv",
+      "actual": "CSV",
+      "predicted": "CSV",
+      "reason": "consistent_delimited_table",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-csv-05",
+      "group": "synthetic-known",
+      "source_group": "generated-python-csv",
+      "actual": "CSV",
+      "predicted": "CSV",
+      "reason": "consistent_delimited_table",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-txt-01",
+      "group": "synthetic-known",
+      "source_group": "generated-python-text",
+      "actual": "TXT",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-txt-02",
+      "group": "synthetic-known",
+      "source_group": "generated-python-text",
+      "actual": "TXT",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-txt-03",
+      "group": "synthetic-known",
+      "source_group": "generated-python-text",
+      "actual": "TXT",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-txt-04",
+      "group": "synthetic-known",
+      "source_group": "generated-python-text",
+      "actual": "TXT",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-txt-05",
+      "group": "synthetic-known",
+      "source_group": "generated-python-text",
+      "actual": "TXT",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-zip-01",
+      "group": "synthetic-known",
+      "source_group": "generated-python-zipfile",
+      "actual": "ZIP",
+      "predicted": "ZIP",
+      "reason": "valid_zip_container",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-zip-02",
+      "group": "synthetic-known",
+      "source_group": "generated-python-zipfile",
+      "actual": "ZIP",
+      "predicted": "ZIP",
+      "reason": "valid_zip_container",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-zip-03",
+      "group": "synthetic-known",
+      "source_group": "generated-python-zipfile",
+      "actual": "ZIP",
+      "predicted": "ZIP",
+      "reason": "valid_zip_container",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-zip-04",
+      "group": "synthetic-known",
+      "source_group": "generated-python-zipfile",
+      "actual": "ZIP",
+      "predicted": "ZIP",
+      "reason": "valid_zip_container",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-zip-05",
+      "group": "synthetic-known",
+      "source_group": "generated-python-zipfile",
+      "actual": "ZIP",
+      "predicted": "ZIP",
+      "reason": "valid_zip_container",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-renamed-pdf-01",
+      "group": "renamed-smoke",
+      "source_group": "generated-reportlab",
+      "actual": "PDF",
+      "predicted": "PDF",
+      "reason": "pdf_header_and_cross_reference",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-renamed-docx-01",
+      "group": "renamed-smoke",
+      "source_group": "generated-python-docx",
+      "actual": "DOCX",
+      "predicted": "DOCX",
+      "reason": "office_manifest_and_main_part",
+      "correct": true
+    },
+    {
+      "sample_id": "pilot-renamed-json-01",
+      "group": "renamed-smoke",
+      "source_group": "generated-python-json",
+      "actual": "JSON",
+      "predicted": "JSON",
+      "reason": "parsed_json_object_or_array",
+      "correct": true
+    },
+    {
+      "sample_id": "mock-drive",
+      "group": "independent-source",
+      "source_group": "web-fixtures",
+      "actual": "JSON",
+      "predicted": "JSON",
+      "reason": "parsed_json_object_or_array",
+      "correct": true
+    },
+    {
+      "sample_id": "baseline-table",
+      "group": "independent-source",
+      "source_group": "baseline-export",
+      "actual": "CSV",
+      "predicted": "UNKNOWN",
+      "reason": "ambiguous_text_table",
+      "correct": false
+    }
+  ],
+  "edge_results": [
+    {
+      "case": "empty",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "empty_or_input_limit",
+      "passed": true
+    },
+    {
+      "case": "truncated-pdf",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "incomplete_pdf",
+      "passed": true
+    },
+    {
+      "case": "fake-zip",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "invalid_zip_or_office_package",
+      "passed": true
+    },
+    {
+      "case": "json-scalar",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "ambiguous_json_scalar",
+      "passed": true
+    },
+    {
+      "case": "malformed-json",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "malformed_json_like_text",
+      "passed": true
+    },
+    {
+      "case": "two-line-prose",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "ambiguous_text_table",
+      "passed": true
+    },
+    {
+      "case": "csv-with-preamble",
+      "expected": "CSV",
+      "predicted": "CSV",
+      "reason": "delimited_table_after_text_preamble",
+      "passed": true
+    },
+    {
+      "case": "semicolon-table-with-preamble",
+      "expected": "CSV",
+      "predicted": "CSV",
+      "reason": "delimited_table_after_text_preamble",
+      "passed": true
+    },
+    {
+      "case": "prose-with-commas",
+      "expected": "TXT",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "passed": true
+    },
+    {
+      "case": "mixed-width-table-after-preamble",
+      "expected": "TXT",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "passed": true
+    },
+    {
+      "case": "long-preamble-before-table",
+      "expected": "TXT",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "passed": true
+    },
+    {
+      "case": "malformed-xml",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "ambiguous_or_malformed_markup",
+      "passed": true
+    },
+    {
+      "case": "unknown-binary",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "unrecognized_binary_or_encoding",
+      "passed": true
+    },
+    {
+      "case": "conflicting-office-parts",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "conflicting_office_parts",
+      "passed": true
+    },
+    {
+      "case": "forged-office-main-part",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "office_xml_structure_mismatch",
+      "passed": true
+    },
+    {
+      "case": "clear-text",
+      "expected": "TXT",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "passed": true
+    }
+  ]
+}
