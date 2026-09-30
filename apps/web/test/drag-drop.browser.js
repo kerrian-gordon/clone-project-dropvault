@@ -9,7 +9,7 @@ import { chromium } from 'playwright-core';
 import { createServer as createViteServer } from 'vite';
 import { createApiServer } from '../../api/src/server.js';
 
-test('dropping multiple files keeps the zone active over children and uploads each file',
+test('multi-file drop and version history preserve recoverable content',
   { timeout: 60_000 }, async () => {
     const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-drop-test-'));
     const webRoot = fileURLToPath(new URL('../', import.meta.url));
@@ -73,6 +73,32 @@ test('dropping multiple files keeps the zone active over children and uploads ea
       await page.getByText('Uploaded to Photos').waitFor();
       await page.getByRole('link', { name: 'Photos Folder' }).click();
       await page.getByRole('link', { name: /trip\.png/u }).waitFor();
+      await page.getByRole('link', { name: 'My files', exact: true }).click();
+      await page.getByRole('link', { name: /notes\.txt/u }).click();
+      await page.getByRole('button', { name: 'Upload new version' }).waitFor();
+      await page.locator('.version-history input[type="file"]').setInputFiles({
+        name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('A revised note'),
+      });
+      await page.getByText('A revised note').waitFor();
+      const entries = page.locator('.version-list li');
+      await entries.nth(1).waitFor();
+      assert.equal(await entries.count(), 2);
+      await entries.last().getByRole('button', { name: 'Name' }).click();
+      await page.getByRole('textbox', { name: 'Version name' }).fill('First draft');
+      await page.getByRole('button', { name: 'Save name' }).click();
+      await page.getByText('First draft').waitFor();
+      await entries.last().getByRole('button', { name: 'Preview' }).click();
+      await page.getByRole('button', { name: 'Compare with current' }).click();
+      await page.getByText('Selected version', { exact: true }).waitFor();
+      assert.match(await page.locator('.version-comparison').innerText(), /A short note/u);
+      assert.match(await page.locator('.version-comparison').innerText(), /A revised note/u);
+      await entries.last().getByRole('button', { name: 'Restore as newest' }).click();
+      await entries.nth(2).waitFor();
+      assert.equal(await page.locator('.viewer-placeholder pre').innerText(), 'A short note');
+      await page.reload();
+      await page.locator('.version-list li').nth(2).waitFor();
+      assert.equal(await page.locator('.viewer-placeholder pre').innerText(), 'A short note');
+      await page.getByText('First draft').waitFor();
       assert.deepEqual(pageErrors, []);
     } finally {
       if (browser) await browser.close();

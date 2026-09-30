@@ -1,5 +1,6 @@
 /** @typedef {{ id: string, name: string, parentId: string, ownerId: string, createdAt: string }} Folder */
 /** @typedef {{ id: string, name: string, folderId: string, ownerId: string, mimeType: string, size: number, createdAt: string }} FileRecord */
+/** @typedef {{ id: string, fileId: string, name: string, mimeType: string, size: number, createdAt: string, kind: 'uploaded' | 'replaced' | 'restored', restoredFrom?: string, label: string }} FileVersion */
 /** @typedef {{ id: string, email: string, tier: 'free' | 'demo', createdAt: string }} User */
 /** @typedef {{ usedBytes: number, limitBytes: number, tier: 'free' | 'demo' }} StorageUsage */
 /** @typedef {{ colors: { background: string, surface: string, text: string, accent: string }, font: 'Inter' | 'Arial' | 'Georgia', spacing: 'compact' | 'comfortable' }} ThemeSettings */
@@ -47,6 +48,10 @@ export const routes = Object.freeze({
   sharedFiles: '/v1/files/shared',
   file: (fileId) => `/v1/files/${encodeURIComponent(fileId)}`,
   content: (fileId) => `/v1/files/${encodeURIComponent(fileId)}/content`,
+  versions: (fileId) => `/v1/files/${encodeURIComponent(fileId)}/versions`,
+  version: (fileId, versionId) => `/v1/files/${encodeURIComponent(fileId)}/versions/${encodeURIComponent(versionId)}`,
+  versionContent: (fileId, versionId) => `/v1/files/${encodeURIComponent(fileId)}/versions/${encodeURIComponent(versionId)}/content`,
+  restoreVersion: (fileId, versionId) => `/v1/files/${encodeURIComponent(fileId)}/versions/${encodeURIComponent(versionId)}/restore`,
   usage: '/v1/storage/usage',
   shares: (fileId) => `/v1/files/${encodeURIComponent(fileId)}/shares`,
   revokeShare: (fileId, shareId) => `/v1/files/${encodeURIComponent(fileId)}/shares/${encodeURIComponent(shareId)}`,

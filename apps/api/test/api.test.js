@@ -535,6 +535,7 @@ test('startup restores interrupted deletion and removes committed staged bytes',
 
     await rename(original, staged);
     catalog.files = []; // Process stopped after catalog change, before byte cleanup.
+    catalog.versions = [];
     await writeFile(catalogPath, JSON.stringify(catalog));
     running = await start(storageRoot, 100, 100);
     assert.equal((await fetch(`${running.base}/v1/files/${file.id}`)).status, 404);
@@ -892,6 +893,87 @@ test('folder suggestions are opt-in, account-scoped, and choices persist', async
     assert.deepEqual(await (await nativeFetch(`${running.base}/v1/organization/stats`, {
       headers: { Cookie: ownerCookie },
     })).json(), { shown: 2, accepted: 1, keptCurrent: 1 });
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('file versions preserve older bytes, enforce quota and ownership, and restore safely', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-versions-test-'));
+  let running;
+  try {
+    running = await start(storageRoot, 100, 11);
+    await register(running.base, 'versions-owner@example.test');
+    const ownerCookie = activeCookie;
+    const ownerFetch = (path, options = {}) => nativeFetch(`${running.base}${path}`, {
+      ...options, headers: { ...options.headers, Cookie: ownerCookie },
+    });
+    const upload = await ownerFetch('/v1/files?name=draft.txt', {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'first',
+    });
+    assert.equal(upload.status, 201);
+    const file = await upload.json();
+    const path = `/v1/files/${file.id}/versions`;
+    const initial = await (await ownerFetch(path)).json();
+    assert.equal(initial.versions.length, 1);
+    const firstId = initial.versions[0].id;
+    const second = await ownerFetch(path, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'second',
+    });
+    assert.equal(second.status, 201);
+    assert.equal((await second.json()).id, file.id);
+    assert.equal((await (await ownerFetch('/v1/storage/usage')).json()).usedBytes, 11);
+    const blocked = await ownerFetch(path, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'third',
+    });
+    assert.equal(blocked.status, 507);
+    assert.equal((await blocked.json()).error.code, 'STORAGE_CAP_EXCEEDED');
+    assert.equal((await ownerFetch(`${path}/${firstId}/restore`, { method: 'POST' })).status, 507);
+    assert.equal((await (await ownerFetch(`${path}/${firstId}/content`)).text()), 'first');
+    assert.equal((await (await ownerFetch(`/v1/files/${file.id}/content`)).text()), 'second');
+    const labeled = await ownerFetch(`${path}/${firstId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: 'Approved draft' }),
+    });
+    assert.equal((await labeled.json()).label, 'Approved draft');
+
+    await register(running.base, 'versions-reader@example.test');
+    const readerCookie = activeCookie;
+    assert.equal((await nativeFetch(`${running.base}${path}`, {
+      headers: { Cookie: readerCookie },
+    })).status, 404);
+    const granted = await ownerFetch(`/v1/files/${file.id}/access`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'versions-reader@example.test' }),
+    });
+    assert.equal(granted.status, 201);
+    assert.equal((await nativeFetch(`${running.base}/v1/files/${file.id}/content`, {
+      headers: { Cookie: readerCookie },
+    })).status, 200);
+    assert.equal((await nativeFetch(`${running.base}${path}/${firstId}/content`, {
+      headers: { Cookie: readerCookie },
+    })).status, 404);
+
+    await stop(running.server);
+    running = await start(storageRoot, 100, 30);
+    const beforeRestore = await (await ownerFetch(path)).json();
+    assert.equal(beforeRestore.versions.length, 2);
+    assert.equal(beforeRestore.versions.find((version) => version.id === firstId).label, 'Approved draft');
+    const restored = await ownerFetch(`${path}/${firstId}/restore`, { method: 'POST' });
+    assert.equal(restored.status, 201);
+    const current = await restored.json();
+    assert.equal(current.id, file.id);
+    assert.notEqual(current.currentVersionId, firstId);
+    assert.equal((await (await ownerFetch(`/v1/files/${file.id}/content`)).text()), 'first');
+    const history = await (await ownerFetch(path)).json();
+    assert.equal(history.versions.length, 3);
+    assert.equal(history.versions[0].kind, 'restored');
+    assert.equal((await (await ownerFetch(`${path}/${beforeRestore.currentVersionId}/content`)).text()), 'second');
+    assert.equal((await (await ownerFetch('/v1/storage/usage')).json()).usedBytes, 16);
+    assert.equal((await ownerFetch(`/v1/files/${file.id}`, { method: 'DELETE' })).status, 204);
+    assert.equal((await (await ownerFetch('/v1/storage/usage')).json()).usedBytes, 0);
+    assert.deepEqual(await readdir(join(storageRoot, 'originals')), []);
   } finally {
     if (running) await stop(running.server);
     await rm(storageRoot, { recursive: true, force: true });

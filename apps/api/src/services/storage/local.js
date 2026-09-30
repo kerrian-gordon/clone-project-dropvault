@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
-import { access, mkdir, open, readdir, rename, rm } from 'node:fs/promises';
+import { access, copyFile, mkdir, open, readdir, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
@@ -84,6 +84,17 @@ export async function openLocalStorage(root) {
     },
     zipEntries(storageKey) {
       return zipEntryNames(join(originals, storageKey));
+    },
+    async copy(storageKey) {
+      const newKey = randomUUID();
+      const destination = join(originals, newKey);
+      try {
+        await copyFile(join(originals, storageKey), destination);
+      } catch (error) {
+        await rm(destination, { force: true });
+        throw error;
+      }
+      return { storageKey: newKey };
     },
     async remove(storageKey) {
       await rm(join(originals, storageKey), { force: true });
