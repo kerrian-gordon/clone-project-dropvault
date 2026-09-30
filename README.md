@@ -1,112 +1,103 @@
-# Dropvault
+# DropVault
 
-Starting point for a Dropbox-style document app. The shared contract and local API are implemented. The React web app has account entry, owned and shared file listings, a multi-file picker and drop area with per-file progress and errors, a storage meter, owner-only deletion, named-account access management, owner-only bearer-link sharing, a demo-plan upgrade and retry prompt for storage-limit errors, and a viewer with previews for common browser-supported formats.
+**Keep a project's files, collaborators, and exact milestones together.** DropVault is a two-person, Dropbox-style web app prototype. People can upload documents, data, images, media, and archives; share them with named accounts or temporary links; and collect related files in a workspace. A snapshot records the exact versions used for a milestone, so later edits do not change that record.
 
-The Themes page lets signed-in users preview and install community themes, search by name or creator, open a theme's details (what it can change, and that it cannot access files), customize their own saved appearance, and publish a snapshot with a public creator name. Creators can remove gallery entries without removing anyone's installed copy. The API checks color contrast when saving or publishing. The web app loads each account's appearance after sign-in and applies its colors, font, and spacing on later visits. See [the theme contract](docs/api.md#themes-and-saved-appearance). Umer's storefront requirements excerpt (what the PRD asks versus this prototype) is [Section 3](docs/community-theme-storefront-section-3.md).
+The app runs locally today. There is **no public hosted demo** yet; the [local demo](#try-it-locally) takes a few minutes.
 
-Owners can upload a new version of an existing file, name revisions, preview or download older bytes, compare text versions, and restore an older version as a new current revision. File IDs, folders, and grants remain stable. History does not expire by date in this prototype, but every retained revision counts toward storage usage; deleting an unpinned file removes all its revisions. See [the API contract](docs/api.md#file-model-and-limits).
+## See it
 
-Workspaces collect project files. Owners can invite viewers and contributors; contributors upload and replace files against the owner's quota. Owners save fixed snapshots of selected exact versions. Members can download a complete snapshot as a TAR archive, or copy it into a new workspace under their own account and quota. A workspace can link an uploaded `git archive` ZIP to the commit label in its ZIP comment, and snapshots retain that code and data link. This label is uploader supplied and is not verified against GitHub. See [workspace and snapshot endpoints](docs/api.md#workspaces-and-snapshots).
+These screenshots were captured from the running app with an isolated fake account and sample files on September 30, 2026. Click an image to view it at full size.
+
+| File browser and upload area | Saved project snapshot |
+| --- | --- |
+| [![DropVault file browser](docs/images/files.png)](docs/images/files.png) | [![DropVault snapshot](docs/images/snapshot.png)](docs/images/snapshot.png) |
+
+[See the workspace screen](docs/images/workspace.png), where an owner adds project files, invites contributors, and creates snapshots.
+
+## What works now
+
+- **Files:** Browse folders, drag and drop multiple files, track each upload, preview browser-supported formats, and download the originals. The API validates the declared type and file structure for selected formats. Supported extensions include PDF, DOCX, PPTX, XLSX, TXT, CSV, JSON, PNG, JPG, GIF, WebP, MP3, MP4, ZIP, and GZ. The default per-file limit is 100 MiB.
+- **Ownership and sharing:** Register and sign in; grant a named account access to a file; create and revoke seven-day bearer links; delete owned files; and see used storage against an account limit.
+- **Version history:** Upload a replacement, label versions, compare text revisions, preview or download older bytes, and restore an earlier version as a new current revision. Retained versions count toward storage.
+- **Project workspaces:** Group selected files, invite viewers or contributors, and save snapshots of exact file versions. Members can download a snapshot as a TAR archive; an authorized account can copy it into a new workspace under its own quota. A manually uploaded Git archive ZIP can carry a commit label alongside the data snapshot.
+- **Themes:** Browse community themes, install one, customize your saved appearance, and publish a theme with a public creator name.
+
+Workspaces currently list files without a nested folder tree. Snapshots record each selected file's existing folder path, and copying a snapshot recreates those paths in **My files**. The Git archive label is uploader supplied; DropVault does not connect to GitHub or verify that commit.
+
+## Try it locally
+
+Use Node.js 24. From a fresh checkout, run these from the repository root:
+
+```sh
+npm install
+npm --prefix apps/web install
+npm run seed:demo
+```
+
+The seed command prints a generated password for `alex@example.test` and `blair@example.test`. It creates sample file bytes in local storage and refuses to overwrite existing data. Start these in **separate terminals**:
+
+```sh
+npm run dev:api
+```
+
+```sh
+npm run dev:web
+```
+
+Open the URL printed by Vite, usually `http://127.0.0.1:5173`. On Windows PowerShell, use `npm.cmd` if `npm` is blocked by the shell's script policy. The [Mac setup guide](docs/mac-frontend-setup.md) gives first-time instructions.
+
+**Five-minute walkthrough:**
+
+1. Sign in as Alex and open **My files**. Preview a sample file, then drop a small TXT or CSV file into the upload area.
+2. Open **Workspaces**, create a project, add an owned file, select it, and save a snapshot. Open the snapshot to download its TAR archive or copy it into a new workspace.
+3. Return to a file's viewer to inspect version history or create a share link. Sign in as Blair to see the sample file shared with that account.
+4. Open **Themes** and install a community theme; sign out and back in to see the saved appearance.
+
+The demo accounts and sample files are for local testing only. The [development guide](docs/local-development.md) covers storage settings, seeding without overwriting data, tests, and troubleshooting.
+
+## How it is built
 
 ```text
-apps/
-  web/
-    public/                    Static files served by the browser app
-    src/
-      app/                     App setup, pages, and navigation
-      features/
-        file-browser/          Folder listing, search, and file actions
-        upload/                File picker, drag-and-drop area, and progress UI
-        viewer/                Preview UI for supported file types
-      shared/
-        components/            Reusable UI pieces
-        lib/                   Browser-side helpers and API client
-  api/
-    src/
-      routes/                  HTTP endpoints
-      modules/
-        files/                 File and folder metadata
-        uploads/               Upload validation and transfer handling
-        previews/              Preview generation and file type handling
-      services/
-        storage/               Storage provider integration
-      db/                      Local metadata catalog
-packages/
-  shared/                      Types and contracts shared by web and API
-storage/                       Local development files; contents are ignored
-  originals/                   Uploaded file bytes
-  previews/                    Generated thumbnails and previews
-  tmp/                         Incomplete uploads and processing work
-docs/                          Product and architecture notes
+React + Vite + React Router
+          │  /v1 API requests
+          ▼
+Node.js API ── shared contract in packages/shared
+    ├── local mode: JSON catalog + disk file bytes
+    └── optional deployment mode: PostgreSQL catalog + private AWS S3 bucket
 ```
 
-The upload feature is where both file selection and drag and drop will live. The API's upload module will validate incoming files, while the storage service will save their bytes. File metadata belongs in `files`; generated representations belong in `previews`. The viewer can choose a suitable display for images, PDFs, text, audio, video, and other supported formats, with download available for files that cannot be previewed.
+The web and API apps share route helpers, upload types, and limits in [`packages/shared`](packages/shared/index.js). The [API contract](docs/api.md) documents permissions, request and response shapes, storage behavior, and errors. The source lives in [`apps/web`](apps/web) and [`apps/api`](apps/api).
 
-The directories contain `.gitkeep` files so the structure is visible in Git. Local mode uses Node.js 24, local disk for file bytes, and a JSON metadata catalog. An optional deployment mode uses AWS S3 for bytes and PostgreSQL for the catalog; it permits one API process per database and has not yet been tested against live cloud resources. The API has account sessions, owner checks, per-account quotas, named-user access, and a defined upload-type list with a 100 MiB per-file limit.
+## Project status and limits
 
-## Run the API
+| Area | Status |
+| --- | --- |
+| Web and API flows | Working locally; automated API, web, and browser checks cover key paths. A complete browser check of every flow remains to be built. |
+| Storage | Local disk and JSON catalog are the tested development path. S3 and PostgreSQL code and an isolated smoke script exist, but the repository has not recorded a live AWS smoke run or production load test. |
+| Upgrades | The unpaid Demo tier switch is a **local-only test flow**. Public billing and entitlement are not implemented. |
+| GitHub | A Git archive ZIP can be linked manually. Repository sync, GitHub sign-in, and automatic README import are not implemented. |
+| File recognition ML | A supervised random-forest pilot and content detector were evaluated **offline**. Neither runs in the upload API; [the pilot report](docs/ml/pilot-report.md) explains why it is not ready as a product feature. |
 
-From the repository root, run `npm install`, then `npm run dev:api` while developing. Node watches the API source files and restarts the process when they change. Keep this terminal open while using the web app. Use `npm run start:api` to run without file watching. The API listens at `http://127.0.0.1:3000` and stores files in `storage/`. Set `PORT` or `DROPVAULT_STORAGE_DIR` to override those defaults. After installing the web dependencies, run `npm test` to check the API and Vite proxy. If the API exits while no source files are changing, read the error in its terminal; file watching does not fix a crash.
+The API has session cookies, ownership checks, per-account quotas, rate limits, and upload validation. These are prototype safeguards; see the [API contract](docs/api.md) for their boundaries. Do not put real credentials or private files in the repository.
 
-Local startup preserves stored bytes that are absent from the catalog, including pending deletions. This protects files when an older catalog backup is restored. Inspect unmatched files in `storage/originals/` and `storage/tmp/` before manually removing them; they still occupy disk space.
+## Team
 
-Set `DROPVAULT_STORAGE_LIMIT_BYTES` to change the storage cap (default 1 GiB). For example, in PowerShell run `$env:DROPVAULT_STORAGE_LIMIT_BYTES='104857600'` before starting the API to set a 100 MiB cap.
+DropVault is a collaboration between [@umerbashir-del](https://github.com/umerbashir-del) (backend, storage, and file-recognition research focus) and [@kerrian-gordon](https://github.com/kerrian-gordon) (frontend and user-experience focus). Product decisions and integration are shared; Git history and pull requests show the individual changes.
 
-For AWS deployment, set `DROPVAULT_STORAGE_BACKEND=s3`, `DROPVAULT_DATABASE_URL`, `DROPVAULT_S3_BUCKET`, and `DROPVAULT_AWS_REGION`; optionally set `DROPVAULT_S3_PREFIX` (default `dropvault/`). Use AWS's normal credential provider chain and keep the S3 bucket private. The database catalog is still loaded into one API process, with a PostgreSQL advisory lock preventing a second process from starting on the same database. S3 startup preserves objects absent from the catalog so an older database restore cannot erase newer file bytes. See [storage details and limits](docs/api.md#file-model-and-limits).
+## More detail
 
-The unpaid Demo plan switch is disabled by default and cannot be enabled with S3 storage or `NODE_ENV=production`. To test the local upgrade flow, set `DROPVAULT_ENABLE_DEMO_PLAN_SWITCH=1` before starting the API. Public deployments need a real entitlement or billing flow before offering upgrades.
+- [Local setup, configuration, and checks](docs/local-development.md)
+- [API, data model, and permissions](docs/api.md)
+- [Multi-user MVP plan](docs/multi-user-freemium-mvp.md)
+- [Offline file-recognition pilot and results](docs/ml/pilot-report.md)
+- [Theme storefront requirements](docs/community-theme-storefront-section-3.md)
 
-To verify the S3/PostgreSQL path before deployment, run `npm run smoke:production-storage` against a **fresh, dedicated** PostgreSQL database and a private test bucket. Set `DROPVAULT_SMOKE_DATABASE_URL` (database name must contain `smoke` or `test`), `DROPVAULT_SMOKE_S3_BUCKET`, `DROPVAULT_SMOKE_AWS_REGION`, `DROPVAULT_SMOKE_S3_PREFIX` (for example `smoke/`), and `DROPVAULT_SMOKE_CONFIRM=isolated-test-resources`. The command uses the normal AWS credential chain, refuses a database that already has a DropVault catalog, and creates a unique subprefix. It checks upload, download, replacement, snapshot export, and readback after restart. It leaves test data in those dedicated resources for inspection; remove the database and test prefix deliberately after reviewing the results. This command has not yet been run against live AWS from this repository.
+To run checks after installing dependencies:
 
-### Seed a local demo
-
-From a fresh checkout, before starting the API, run `npm run seed:demo`. This imports the two-account fixture into the local `storage/catalog.json` and creates actual sample file bytes in `storage/originals/`. It prints a generated password for both `alex@example.test` and `blair@example.test`; save that password for local testing. Passwords are hashed in the catalog, and the fixture JSON does not contain a password or session.
-
-Set `DROPVAULT_STORAGE_LIMIT_BYTES=104857600` when starting the API to reproduce Alex's full 100 MiB free tier and the blocked-upload upgrade flow. For PowerShell:
-
-```powershell
-npm.cmd run seed:demo
-$env:DROPVAULT_STORAGE_LIMIT_BYTES='104857600'
-$env:DROPVAULT_ENABLE_DEMO_PLAN_SWITCH='1'
-npm.cmd run dev:api
+```sh
+npm test
+npm run build:web
+npm --prefix apps/web run test:browser
 ```
 
-Run the web app in a second PowerShell terminal with `npm.cmd run dev:web`. Sign in as either demo account using the printed password. Alex owns three files and has granted Blair access to `Project-brief.pdf`. The seeded PDF, MP4, PPTX, and TXT contain sample content and can be downloaded; the PDF, video, and text can be previewed in the browser. The sample files are exactly the sizes listed in the JSON fixture, so Alex's usage begins at 100 MiB.
-
-The seed command refuses to run if `catalog.json` or stored files already exist. To keep existing data, set `DROPVAULT_STORAGE_DIR` to a **new empty directory** for both the seed command and the API. The seed is disabled when `NODE_ENV=production`; never use these public demo accounts for real user data.
-
-The request and response shapes, file model, limits, and example upload command are in [docs/api.md](docs/api.md). The web app uses the route helpers and documented file shapes in `packages/shared/index.js` and proxies `/v1` requests to the API during development.
-
-## Run the web app
-
-For a Mac setup from a new checkout, follow the [first-time frontend guide](docs/mac-frontend-setup.md).
-
-From the repository root, run `npm --prefix apps/web install` once. Start the API with `npm run dev:api`, then in another terminal run `npm run dev:web`. Open the URL Vite prints (normally `http://127.0.0.1:5173`). Vite proxies `/v1` to the local API so session cookies and API requests use the web origin. Run `npm run build:web` to check the production bundle.
-
-Run `npm --prefix apps/web run test:browser` to check the drag-and-drop upload flow in headless Chrome. The test starts its own API and Vite server with isolated temporary storage; Google Chrome must be installed.
-
-React Router uses browser history. `/` redirects to `/files`; `/files` lists the root, `/folders/:id` lists a folder, `/shared` lists files granted to the account, and `/view/:id` shows file details, download, ownership, and owner-only access controls. `/login` and `/register` are public; the file routes require a session and return to the requested URL after sign-in. Unknown URLs show a not-found page. The upload queue lives above the file routes so transfers continue while navigating within a signed-in session. The browser sends one raw request per queued file. On a storage-cap error, a local demo with plan switching enabled can retry the same selected file after the new allowance is confirmed. Otherwise the browser offers only a free-space-and-retry path. Selected files remain in memory only until the tab reloads or the user logs out. A production web server must serve `index.html` for direct visits and refreshes on SPA routes, while forwarding `/v1/*` to the API.
-
-File owners can open **Share link** from the viewer to create a seven-day bearer link, copy its URL, see link expiry dates, and revoke links. A new URL appears only when created because the API stores a hash of its token. The dialog makes the URL selectable if browser clipboard access is unavailable. Anyone holding an active link can download the current file without an account. When the API returns a relative link, the browser turns it into a URL on the current web origin; set `DROPVAULT_PUBLIC_BASE_URL` for a deployment with a different public API origin.
-
-The API and browser flows described above are implemented for local use. A complete browser integration check across every flow remains to be built. The work split below is the original milestone plan, retained as a record of responsibilities.
-
-## Suggested work split
-
-Agree on the shared contract first, then the three feature tracks can move in parallel. Each track has a clear folder to own and a result to demonstrate.
-
-| Track | Main folders | Work to do | Done when |
-| --- | --- | --- | --- |
-| 1. Shared contract | `packages/shared/`, `docs/` | Choose the stack and local storage approach. Define file and folder metadata, supported upload types and size limits, and the API requests and responses for upload, list, view, and download. | Web and API work can use the same file model and endpoints. |
-| 2. API and storage | `apps/api/src/routes/`, `modules/files/`, `modules/uploads/`, `services/storage/`, `db/` | Accept one or more files, validate them, store originals, save metadata, list files and folders, and serve downloads. Delete a file or a folder (reject non-empty folders). Compute total bytes used across all stored files and expose it via `GET /v1/storage/usage`. Block uploads that would exceed the configurable byte cap (`DROPVAULT_STORAGE_LIMIT_BYTES`). Issue and store shareable-link tokens; serve the file to anyone who presents a valid token via `GET /v1/shares/:token`. | A file can be uploaded, found again, downloaded, and deleted. The API refuses an upload that would exceed the storage cap and returns a clear error. A shareable link can be created and redeemed. |
-| 3. Browser and upload UI | `apps/web/src/app/`, `features/file-browser/`, `features/upload/`, `shared/` | Build folder navigation and file lists; add a file picker and drag-and-drop area for multiple files, plus progress and error states. Add a delete button with a confirmation step on each file row and folder. Show a storage meter (used-vs-limit bar) in the sidebar or header, fetched from `/v1/storage/usage`. When `usedBytes >= limitBytes`, disable the upload area, show a clear inline message, and surface an "Upgrade" call-to-action that opens an upgrade prompt (UI only — no payment processor this milestone). Add a share button that copies the shareable URL to the clipboard and shows it in a modal. | A user can drop several files, see their upload status, and find them in the browser. Files and empty folders can be deleted. The storage meter is always visible. Uploading at cap shows a clear error and an upgrade prompt. A file can be shared via a copied link. |
-| 4. Viewing and previews | `apps/web/src/features/viewer/`, `apps/api/src/modules/previews/`, `storage/previews/` | Detect file type and display supported formats. Start with images, PDFs, and text; offer download for other files. Add thumbnails or more preview types later. **Note:** Word (`.docx`) and PowerPoint (`.pptx`) are the PRD's core document types; they cannot be rendered inline by the browser and will fall back to download-only unless a conversion step (e.g. LibreOffice headless → PDF or thumbnail) is added. Confirm with the team whether that conversion is in scope for this milestone or a follow-on. | Supported files open in the app; other uploaded files remain accessible by download. |
-| 5. Integration and checks | Across the project | Connect the UI to the API and check the full upload, browse, view, and download flow with several file types and multiple files at once. Verify that deleting a file removes it from the browser and the freed bytes are immediately reflected in the storage meter. Verify that a shareable link resolves correctly from a fresh browser session without navigating through the file browser. Verify that the cap block and upgrade prompt appear when the limit is reached and clear after files are deleted. | The complete flow works from a fresh local setup. |
-
-Tracks 2, 3, and 4 can be assigned to different people once track 1 is agreed. Track 5 follows their integration. This keeps the first milestone focused on reliable storage and access across many file types, while preview support can expand over time.
-
-## Next milestone
-
-The [multi-user freemium MVP plan](docs/multi-user-freemium-mvp.md) records the account, permissions, per-user quota, sharing, upload, and front-end flows. A separate [two-account mock fixture](apps/web/src/shared/data/mock-multi-user-drive.json) supports the blocked-upload, upgrade, and named-user sharing prototypes; see its [usage notes](apps/web/src/shared/data/README.md).
-
-Machine-learning file classification is outside this MVP. The `feat/improved-file-uploading-and-storage-with-machine-learning` branch contains no ML work and currently matches `feat/shared-contract-api`; see the [MVP scope note](docs/multi-user-freemium-mvp.md#follow-on-work).
+The browser checks use headless Google Chrome and start their own isolated API and web servers.
