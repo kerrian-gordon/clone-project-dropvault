@@ -1,6 +1,6 @@
 # Multi-user freemium MVP
 
-This document defines the multi-user freemium milestone for Dropvault. The local API includes sessions, ownership, per-user quotas, named-user access, and a demo tier switch. The browser includes account entry, owned and shared listings, per-file uploads, deletion, access controls, a storage meter, a demo upgrade prompt that retries a blocked file, and previews for common browser-supported formats. Bearer-link sharing UI and a full browser integration check remain to be built. See [the implemented API contract](api.md) for exact routes and current limits.
+This document defines the multi-user freemium milestone for Dropvault. The local API includes sessions, ownership, per-user quotas, named-user access, and a demo tier switch. The browser includes account entry, owned and shared listings, per-file uploads, deletion, access controls, bearer-link sharing for owners, a storage meter, a demo upgrade prompt that retries a blocked file, and previews for common browser-supported formats. A full browser integration check across every flow remains to be built. See [the implemented API contract](api.md) for exact routes and current limits.
 
 ## Product goal
 

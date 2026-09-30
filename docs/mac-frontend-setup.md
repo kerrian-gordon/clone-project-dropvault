@@ -71,7 +71,7 @@ Open the repo folder in VS Code. The main frontend code is in `apps/web/src/`:
 
 - `features/file-browser/` — owned and shared file lists
 - `features/upload/` — file picker, drag and drop, progress, and upgrade prompt
-- `features/viewer/` — previews, download, and access controls
+- `features/viewer/` — previews, download, access controls, and share links
 - `app/` — routes, authentication context, and styles
 
 Save a frontend file to see the browser update. After changes, run `npm test` and `npm run build:web` from the repo root. Press **Control-C** in each Terminal window when you are done.
