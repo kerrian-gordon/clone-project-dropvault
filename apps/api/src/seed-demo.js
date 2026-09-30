@@ -314,7 +314,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   if (process.env.NODE_ENV === 'production') throw new Error('Demo seeding is disabled in production');
   const resetting = process.argv.includes('--reset');
   const listen = apiListenOptions(resetting ? { storageLimitBytes: demoFreeLimitBytes } : {});
-  if (resetting) await stopNodeListener(listen.port);
+  if (resetting) {
+    await stopNodeListener(listen.port);
+    const leftover = await listenerPids(listen.port);
+    if (leftover.length) {
+      throw new Error(`Port ${listen.port} is still in use`);
+    }
+  }
   const password = resetting
     ? demoPassword(listen.host)
     : (process.env.DROPVAULT_DEMO_PASSWORD || randomBytes(18).toString('base64url'));
@@ -327,14 +333,21 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   if (!resetting) {
     console.log('For the fixture\'s 100 MiB free cap, set DROPVAULT_STORAGE_LIMIT_BYTES=104857600 before starting the API.');
   } else {
-    const { server } = await listenApi({ storageRoot, storageLimitBytes: demoFreeLimitBytes });
-    console.log(`100 MiB free cap. Demo data: ${storageRoot}`);
-    const stop = () => {
-      server.close();
-      server.closeAllConnections?.();
-      rm(storageRoot, { recursive: true, force: true }).finally(() => process.exit(0));
-    };
-    process.once('SIGINT', stop);
-    process.once('SIGTERM', stop);
+    try {
+      const leftover = await listenerPids(listen.port);
+      if (leftover.length) throw new Error(`Port ${listen.port} is still in use`);
+      const { server } = await listenApi({ storageRoot, storageLimitBytes: demoFreeLimitBytes });
+      console.log(`100 MiB free cap. Demo data: ${storageRoot}`);
+      const stop = () => {
+        server.close();
+        server.closeAllConnections?.();
+        rm(storageRoot, { recursive: true, force: true }).finally(() => process.exit(0));
+      };
+      process.once('SIGINT', stop);
+      process.once('SIGTERM', stop);
+    } catch (error) {
+      await rm(storageRoot, { recursive: true, force: true });
+      throw error;
+    }
   }
 }
