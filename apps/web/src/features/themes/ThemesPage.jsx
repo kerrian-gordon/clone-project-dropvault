@@ -165,7 +165,7 @@ export function ThemesPage() {
       </div>
       <ThemeSample settings={draft} />
       {draftIssues.length > 0 && <p className="error" role="alert">{draftIssues.join('; ')}. Adjust the colors before saving.</p>}
-      <div className="theme-actions"><button type="button" disabled={busy || loading || saving || draftIssues.length > 0} onClick={() => run(() => saveSettings(draft), 'Your appearance has been saved.')}>Save my changes</button></div>
+      <div className="theme-actions"><button type="button" disabled={busy || loading || saving || draftIssues.length > 0} aria-busy={saving} onClick={() => run(() => saveSettings(draft), 'Your appearance has been saved.')}>Save my changes</button></div>
     </section>
 
     <section className="theme-section" aria-labelledby="publish-title">
@@ -173,7 +173,7 @@ export function ThemesPage() {
       <p className="muted">Publishing lists a snapshot as <strong>{user.displayName}</strong>. Changing accounts later does not rewrite themes already in the gallery.</p>
       <form className="theme-publish" onSubmit={publish}>
         <label>Theme name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} required /></label>
-        <button type="submit" disabled={busy || loading || saving || savedIssues.length > 0}>Publish theme</button>
+        <button type="submit" disabled={busy || loading || saving || savedIssues.length > 0} aria-busy={busy}>Publish theme</button>
       </form>
       {savedIssues.length > 0 && <p className="error">Update your saved colors before publishing: {savedIssues.join('; ')}.</p>}
     </section>
@@ -201,7 +201,7 @@ export function ThemesPage() {
         </button></div>
         {theme.creatorId === user.id && (confirmDeleteId === theme.id
           ? <div className="theme-remove-confirm"><span>Remove from gallery?</span>
-            <button type="button" className="btn-danger" disabled={busy} onClick={() => removeTheme(theme)}>Remove</button>
+            <button type="button" className="btn-danger" disabled={busy} aria-busy={busy} onClick={() => removeTheme(theme)}>Remove</button>
             <button type="button" className="btn-ghost" onClick={() => setConfirmDeleteId(null)}>Cancel</button></div>
           : <button type="button" className="btn-ghost theme-remove" disabled={busy} onClick={() => setConfirmDeleteId(theme.id)}>Remove my theme</button>)}
       </article>)}</div>
