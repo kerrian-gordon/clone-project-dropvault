@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DEFAULT_THEME_SETTINGS, uniqueDisplayName } from '../../../packages/shared/index.js';
@@ -202,4 +203,17 @@ test('a 401 can clear every cached appearance on the machine', () => {
   clearAllCachedAppearances(storage);
   assert.equal(readCachedAppearance('alex', storage), null);
   assert.equal(readCachedAppearance('blair', storage), null);
+});
+
+test('stylesheet :root tokens match the shared default theme', () => {
+  // First :root rule only, after comments are stripped so notes above the tokens cannot match.
+  const css = readFileSync(new URL('../src/app/styles.css', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  const root = css.match(/:root\s*{([^}]*)}/)[1];
+  const hex = (name) => root.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'i'))?.[1].toLowerCase();
+  const { colors } = DEFAULT_THEME_SETTINGS;
+  assert.equal(hex('paper'), colors.background);
+  assert.equal(hex('card'), colors.surface);
+  assert.equal(hex('ink'), colors.text);
+  assert.equal(hex('accent'), colors.accent);
 });

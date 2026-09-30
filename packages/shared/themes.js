@@ -2,9 +2,9 @@ export const THEME_FONTS = Object.freeze(['Inter', 'Arial', 'Georgia']);
 export const THEME_SPACINGS = Object.freeze(['compact', 'comfortable']);
 export const DEFAULT_THEME_SETTINGS = Object.freeze({
   colors: Object.freeze({
-    background: '#f3f5f7',
+    background: '#f7f5f2',
     surface: '#ffffff',
-    text: '#1b2330',
+    text: '#1e1919',
     accent: '#0061ff',
   }),
   font: 'Inter',
