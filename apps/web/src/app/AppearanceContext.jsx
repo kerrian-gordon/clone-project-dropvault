@@ -1,10 +1,10 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 import { routes } from '../../../../packages/shared/index.js';
 import { api } from '../shared/lib/api.js';
 import { useAuth } from './AuthContext.jsx';
-import { applyThemeToRoot, deriveAppearance, readCachedAppearance,
-  writeCachedAppearance } from './appearanceState.js';
+import { appearanceCacheKey, applyThemeToRoot, deriveAppearance, parseCachedAppearance,
+  readCachedAppearance, writeCachedAppearance } from './appearanceState.js';
 
 const AppearanceContext = createContext(null);
 
@@ -20,9 +20,23 @@ export function AppearanceProvider({ children }) {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const cached = useMemo(() => readCachedAppearance(userId), [userId]);
-  const { appearance, previewing, visibleSettings, loading } = deriveAppearance({
+  const { appearance, previewing, visibleSettings, loading, followStylesheet } = deriveAppearance({
     user, saved, cached, preview, error, pathname: location.pathname,
   });
+
+  const refresh = useCallback(async () => {
+    const accountId = userIdRef.current;
+    if (!accountId) return;
+    setError('');
+    try {
+      const value = await api(routes.appearance);
+      if (userIdRef.current !== accountId) return;
+      setSaved({ userId: accountId, appearance: value });
+      writeCachedAppearance(accountId, value);
+    } catch (caught) {
+      if (userIdRef.current === accountId) setError(caught.message);
+    }
+  }, []);
 
   useEffect(() => {
     setPreview(null);
@@ -46,11 +60,30 @@ export function AppearanceProvider({ children }) {
 
   useLayoutEffect(() => {
     const root = document.documentElement;
-    applyThemeToRoot(root, { followStylesheet: false, settings: visibleSettings });
+    applyThemeToRoot(root, { followStylesheet, settings: visibleSettings });
     return () => applyThemeToRoot(root, { followStylesheet: true, settings: visibleSettings });
-  }, [visibleSettings]);
+  }, [followStylesheet, visibleSettings]);
 
-  async function update(path, options) {
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === 'visible') void refresh();
+    }
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!userId) return undefined;
+    function onStorage(event) {
+      if (event.key !== appearanceCacheKey(userId) || !event.newValue) return;
+      const next = parseCachedAppearance(event.newValue);
+      if (next) setSaved({ userId, appearance: next });
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [userId]);
+
+  const update = useCallback(async (path, options) => {
     const accountId = userIdRef.current;
     if (!accountId) throw new Error('Sign in to continue');
     const requestId = mutationRef.current += 1;
@@ -71,24 +104,30 @@ export function AppearanceProvider({ children }) {
     } finally {
       if (requestId === mutationRef.current) setSaving(false);
     }
-  }
+  }, []);
 
-  const jsonPut = (body) => ({
+  const jsonPut = useCallback((body) => ({
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  });
+  }), []);
 
-  return <AppearanceContext.Provider value={{
-    appearance, loading, error, saving, previewing,
-    startPreview: (theme) => {
-      const accountId = userIdRef.current;
-      if (!accountId) return;
-      setPreview({ userId: accountId, id: theme.id, name: theme.name, settings: theme.settings });
-    },
-    stopPreview: () => setPreview(null),
-    install: (themeId) => update(routes.appearance, jsonPut({ themeId })),
-    saveSettings: (settings) => update(routes.appearanceSettings, jsonPut({ settings })),
-    reset: () => update(routes.appearance, { method: 'DELETE' }),
-  }}>{children}</AppearanceContext.Provider>;
+  const startPreview = useCallback((theme) => {
+    const accountId = userIdRef.current;
+    if (!accountId) return;
+    setPreview({ userId: accountId, id: theme.id, name: theme.name, settings: theme.settings });
+  }, []);
+  const stopPreview = useCallback(() => setPreview(null), []);
+  const install = useCallback((themeId) => update(routes.appearance, jsonPut({ themeId })), [jsonPut, update]);
+  const saveSettings = useCallback((settings) => update(routes.appearanceSettings, jsonPut({ settings })),
+    [jsonPut, update]);
+  const reset = useCallback(() => update(routes.appearance, { method: 'DELETE' }), [update]);
+
+  const value = useMemo(() => ({
+    appearance, loading, error, saving, previewing, startPreview, stopPreview,
+    install, saveSettings, reset, refresh,
+  }), [appearance, loading, error, saving, previewing, startPreview, stopPreview,
+    install, saveSettings, reset, refresh]);
+
+  return <AppearanceContext.Provider value={value}>{children}</AppearanceContext.Provider>;
 }
 
 export function useAppearance() {

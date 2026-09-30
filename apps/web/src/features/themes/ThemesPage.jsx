@@ -17,7 +17,7 @@ function galleryPath(offset, search) {
 export function ThemesPage() {
   const { user } = useAuth();
   const { appearance, loading, error: appearanceError, saving, install, saveSettings, reset,
-    previewing, startPreview, stopPreview } = useAppearance();
+    previewing, startPreview, stopPreview, refresh } = useAppearance();
   const [themes, setThemes] = useState([]);
   const [nextOffset, setNextOffset] = useState(null);
   const [galleryError, setGalleryError] = useState('');
@@ -111,8 +111,11 @@ export function ThemesPage() {
   return <section className="themes-page">
     <h1>Themes</h1>
     <p className="muted">Install a community theme, adjust your own copy, and keep it for your next visit.</p>
-    {appearanceError && <p className="error" role="alert">Could not load your saved appearance: {appearanceError}</p>}
-    {actionError && <p className="error" role="alert">{actionError}</p>}
+    {appearanceError && <p className="error" role="alert">
+      {appearanceError}{' '}
+      <button type="button" className="btn-ghost" onClick={() => void refresh()}>Try again</button>
+    </p>}
+    {actionError && actionError !== appearanceError && <p className="error" role="alert">{actionError}</p>}
     {notice && <p className="success" role="status">{notice}</p>}
     {previewing && <ThemePreviewBanner previewing={previewing} busy={busy || saving}
       onInstall={() => run(() => install(previewing.id), `${previewing.name} is now your appearance.`)}

@@ -1,13 +1,13 @@
 :root {
   --ink: #1b2330;
-  --muted: color-mix(in srgb, var(--ink) 75%, var(--card));
-  --line: color-mix(in srgb, var(--ink) 16%, var(--card));
   --paper: #f3f5f7;
   --card: #ffffff;
+  --muted: color-mix(in srgb, var(--ink) 60%, var(--paper));
+  --line: color-mix(in srgb, var(--ink) 16%, var(--paper));
   --accent: #0061ff;
   --accent-contrast: #ffffff;
   --app-font: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
-  --accent-ink: #003ba8;
+  --accent-ink: color-mix(in srgb, var(--accent) 72%, var(--ink));
   --danger: #c81e1e;
   --warn: #c2410c;
   font-family: var(--app-font);
@@ -130,7 +130,7 @@ h1 { margin: 0.4rem 0 0.75rem; font-size: 1.45rem; letter-spacing: -0.03em; font
 .auth-card form { display: grid; gap: 0.85rem; }
 .auth-card label { display: grid; gap: 0.3rem; font-size: 0.85rem; color: var(--muted); }
 .auth-card input { padding: 0.6rem 0.7rem; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--card); }
-.auth-card input:focus { outline: 2px solid #c7d9ff; border-color: var(--accent); }
+.auth-card input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 40%, var(--paper)); border-color: var(--accent); }
 .viewer-placeholder {
   margin-top: 1.25rem;
   padding: 1.35rem;
@@ -237,6 +237,9 @@ h1 { margin: 0.4rem 0 0.75rem; font-size: 1.45rem; letter-spacing: -0.03em; font
 :root[data-theme-spacing="compact"] .content { margin-top: 1rem; }
 :root[data-theme-spacing="compact"] .row-main { padding: 0.4rem 0.7rem; }
 :root[data-theme-spacing="compact"] .theme-section { padding: 0.7rem; margin: 0.7rem 0; }
+:root[data-theme-spacing="comfortable"] .content { margin-top: 1.75rem; }
+:root[data-theme-spacing="comfortable"] .row-main { padding: 0.65rem 1rem; }
+:root[data-theme-spacing="comfortable"] .theme-section { padding: 1.1rem; margin: 1.2rem 0; }
 @media (max-width: 650px) {
   .row { align-items: flex-start; flex-wrap: wrap; }
   .row-main { width: 100%; }
