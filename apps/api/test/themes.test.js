@@ -168,7 +168,7 @@ test('deleting another account\'s theme returns 404 like a missing theme', async
   }
 });
 
-test('theme and appearance writes reject a foreign Origin', async () => {
+test('theme and appearance writes reject a foreign Origin and allow a missing Origin', async () => {
   const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-theme-origin-'));
   let running;
   try {
@@ -203,6 +203,11 @@ test('theme and appearance writes reject a foreign Origin', async () => {
       method: 'DELETE', headers: { Origin: 'https://other.example' },
     });
     assert.equal(reset.status, 403);
+    const omittedOrigin = await request(cookie, '/v1/themes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'CLI publish', settings }),
+    });
+    assert.equal(omittedOrigin.status, 201);
   } finally {
     if (running) await stop(running.server);
     await rm(storageRoot, { recursive: true, force: true });
