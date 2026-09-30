@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand,
+import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, PutObjectCommand,
   S3Client } from '@aws-sdk/client-s3';
 import { ApiError, unwrapApiError } from '../../routes/errors.js';
 import { gitArchiveCommit, zipEntryNames } from '../../modules/uploads/zip.js';
@@ -29,20 +29,6 @@ export async function openS3Storage({ bucket, region, prefix = 'dropvault/', cli
   }
   return {
     async recoverDeletes() {},
-    async recoverOrphanUploads(referencedKeys) {
-      const referenced = new Set(referencedKeys);
-      let continuation;
-      do {
-        const page = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix,
-          ContinuationToken: continuation }));
-        for (const item of page.Contents ?? []) {
-          const storageKey = item.Key?.slice(prefix.length);
-          if (/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(storageKey)
-            && !referenced.has(storageKey)) await remove(storageKey);
-        }
-        continuation = page.IsTruncated ? page.NextContinuationToken : undefined;
-      } while (continuation);
-    },
     async save(request, maxUploadBytes, availableBytes) {
       const directory = await mkdtemp(join(tmpdir(), 'dropvault-s3-'));
       const path = join(directory, 'upload');

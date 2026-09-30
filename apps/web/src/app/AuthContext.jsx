@@ -8,9 +8,13 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [demoPlanSwitchEnabled, setDemoPlanSwitchEnabled] = useState(false);
 
   useEffect(() => {
     let active = true;
+    api('/v1/capabilities')
+      .then((capabilities) => { if (active) setDemoPlanSwitchEnabled(capabilities.demoPlanSwitchEnabled === true); })
+      .catch(() => { if (active) setDemoPlanSwitchEnabled(false); });
     api('/v1/account')
       .then((account) => { if (active) setUser(account); })
       .catch(() => { if (active) setUser(null); })
@@ -44,7 +48,8 @@ export function AuthProvider({ children }) {
     return account;
   }
 
-  return <AuthContext.Provider value={{ user, loading, signIn, signOut, changePlan }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading, signIn, signOut, changePlan,
+    demoPlanSwitchEnabled }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

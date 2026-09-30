@@ -44,7 +44,7 @@ async function readJson(request) {
 }
 
 export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BYTES,
-  storageLimitBytes, legacyClaimToken, publicBaseUrl }) {
+  storageLimitBytes, legacyClaimToken, publicBaseUrl, demoPlanSwitchEnabled = false }) {
   let pendingMutation = Promise.resolve();
   let activeMutations = 0;
   let activeUploads = 0;
@@ -173,6 +173,9 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       if (request.method === 'GET' && path === '/v1/health') {
         return json(response, 200, { status: 'ok' });
       }
+      if (request.method === 'GET' && path === '/v1/capabilities') {
+        return json(response, 200, { demoPlanSwitchEnabled });
+      }
       if (request.method === 'POST' && path === '/v1/auth/register') {
         authLimiter.registration(request.socket.remoteAddress);
         const input = await readJson(request);
@@ -273,6 +276,10 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         return json(response, 200, await mutate(() => catalog.claimLegacy(user.id)));
       }
       if (request.method === 'POST' && path === '/v1/account/plan') {
+        if (!demoPlanSwitchEnabled) {
+          throw new ApiError(403, 'DEMO_PLAN_DISABLED',
+            'The demo plan switch is unavailable on this server');
+        }
         const input = await readJson(request);
         if (!['free', 'demo'].includes(input?.tier)) {
           throw new ApiError(400, 'INVALID_TIER', 'Choose free or demo');
