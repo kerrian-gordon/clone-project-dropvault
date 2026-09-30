@@ -1,0 +1,1292 @@
+﻿{
+    "experiment":  "Apache Tika local detector benchmark",
+    "tika_version":  "3.3.2",
+    "endpoint":  "http://127.0.0.1:9998/detect/stream",
+    "sample_count":  61,
+    "request_count":  122,
+    "score_note":  "Tika MIME values are mapped to the eight pilot labels plus OUT_OF_SCOPE; JSON/CSV may need filename hints.",
+    "summary":  [
+                    {
+                        "group":  "independent-source",
+                        "mode":  "content_only",
+                        "total":  5,
+                        "correct":  1
+                    },
+                    {
+                        "group":  "independent-source",
+                        "mode":  "filename_hint",
+                        "total":  5,
+                        "correct":  5
+                    },
+                    {
+                        "group":  "out-of-scope",
+                        "mode":  "content_only",
+                        "total":  12,
+                        "correct":  11
+                    },
+                    {
+                        "group":  "out-of-scope",
+                        "mode":  "filename_hint",
+                        "total":  12,
+                        "correct":  12
+                    },
+                    {
+                        "group":  "renamed-smoke",
+                        "mode":  "content_only",
+                        "total":  3,
+                        "correct":  2
+                    },
+                    {
+                        "group":  "renamed-smoke",
+                        "mode":  "filename_hint",
+                        "total":  3,
+                        "correct":  2
+                    },
+                    {
+                        "group":  "separate-source-pptx",
+                        "mode":  "content_only",
+                        "total":  1,
+                        "correct":  1
+                    },
+                    {
+                        "group":  "separate-source-pptx",
+                        "mode":  "filename_hint",
+                        "total":  1,
+                        "correct":  1
+                    },
+                    {
+                        "group":  "synthetic-known",
+                        "mode":  "content_only",
+                        "total":  40,
+                        "correct":  30
+                    },
+                    {
+                        "group":  "synthetic-known",
+                        "mode":  "filename_hint",
+                        "total":  40,
+                        "correct":  40
+                    }
+                ],
+    "results":  [
+                    {
+                        "sample_id":  "demo-pptx-001",
+                        "group":  "separate-source-pptx",
+                        "source_group":  "dropvault-pptxgenjs",
+                        "actual":  "PPTX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "demo-pptx-001",
+                        "group":  "separate-source-pptx",
+                        "source_group":  "dropvault-pptxgenjs",
+                        "actual":  "PPTX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "demo-mp4-001",
+                        "group":  "out-of-scope",
+                        "source_group":  "mdn-cc0-video",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "content_only",
+                        "tika_mime":  "video/mp4",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "demo-mp4-001",
+                        "group":  "out-of-scope",
+                        "source_group":  "mdn-cc0-video",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "video/mp4",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-01",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-pillow",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "content_only",
+                        "tika_mime":  "image/png",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-01",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-pillow",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "image/png",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-02",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-pillow",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "content_only",
+                        "tika_mime":  "image/jpeg",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-02",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-pillow",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "image/jpeg",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-03",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-pillow",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "content_only",
+                        "tika_mime":  "image/gif",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-03",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-pillow",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "image/gif",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-04",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-pillow",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "content_only",
+                        "tika_mime":  "image/webp",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-04",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-pillow",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "image/webp",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-05",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-python-wave",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "content_only",
+                        "tika_mime":  "audio/vnd.wave",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-05",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-python-wave",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "audio/vnd.wave",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-06",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-python-gzip",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/gzip",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-06",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-python-gzip",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/gzip",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-07",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-python-tarfile",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/x-tar",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-07",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-python-tarfile",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/x-tar",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-08",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-python-bz2",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/x-bzip2",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-08",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-python-bz2",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/x-bzip2",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-09",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-python-text",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-09",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-python-text",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/xml",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-10",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-python-text",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "content_only",
+                        "tika_mime":  "image/svg+xml",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-10",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-python-text",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "image/svg+xml",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-11",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-python-text",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/html",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-out_of_scope-11",
+                        "group":  "out-of-scope",
+                        "source_group":  "generated-python-text",
+                        "actual":  "OUT_OF_SCOPE",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/html",
+                        "tika_label":  "OUT_OF_SCOPE",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pdf-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-reportlab",
+                        "actual":  "PDF",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/pdf",
+                        "tika_label":  "PDF",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pdf-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-reportlab",
+                        "actual":  "PDF",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/pdf",
+                        "tika_label":  "PDF",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pdf-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-reportlab",
+                        "actual":  "PDF",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/pdf",
+                        "tika_label":  "PDF",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pdf-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-reportlab",
+                        "actual":  "PDF",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/pdf",
+                        "tika_label":  "PDF",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pdf-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-reportlab",
+                        "actual":  "PDF",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/pdf",
+                        "tika_label":  "PDF",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pdf-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-reportlab",
+                        "actual":  "PDF",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/pdf",
+                        "tika_label":  "PDF",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pdf-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-reportlab",
+                        "actual":  "PDF",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/pdf",
+                        "tika_label":  "PDF",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pdf-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-reportlab",
+                        "actual":  "PDF",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/pdf",
+                        "tika_label":  "PDF",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pdf-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-reportlab",
+                        "actual":  "PDF",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/pdf",
+                        "tika_label":  "PDF",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pdf-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-reportlab",
+                        "actual":  "PDF",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/pdf",
+                        "tika_label":  "PDF",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-docx-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-docx",
+                        "actual":  "DOCX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "tika_label":  "DOCX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-docx-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-docx",
+                        "actual":  "DOCX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "tika_label":  "DOCX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-docx-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-docx",
+                        "actual":  "DOCX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "tika_label":  "DOCX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-docx-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-docx",
+                        "actual":  "DOCX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "tika_label":  "DOCX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-docx-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-docx",
+                        "actual":  "DOCX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "tika_label":  "DOCX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-docx-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-docx",
+                        "actual":  "DOCX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "tika_label":  "DOCX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-docx-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-docx",
+                        "actual":  "DOCX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "tika_label":  "DOCX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-docx-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-docx",
+                        "actual":  "DOCX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "tika_label":  "DOCX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-docx-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-docx",
+                        "actual":  "DOCX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "tika_label":  "DOCX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-docx-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-docx",
+                        "actual":  "DOCX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "tika_label":  "DOCX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pptx-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-pptx",
+                        "actual":  "PPTX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pptx-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-pptx",
+                        "actual":  "PPTX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pptx-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-pptx",
+                        "actual":  "PPTX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pptx-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-pptx",
+                        "actual":  "PPTX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pptx-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-pptx",
+                        "actual":  "PPTX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pptx-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-pptx",
+                        "actual":  "PPTX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pptx-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-pptx",
+                        "actual":  "PPTX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pptx-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-pptx",
+                        "actual":  "PPTX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pptx-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-pptx",
+                        "actual":  "PPTX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-pptx-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-pptx",
+                        "actual":  "PPTX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-xlsx-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-openpyxl",
+                        "actual":  "XLSX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "tika_label":  "XLSX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-xlsx-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-openpyxl",
+                        "actual":  "XLSX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "tika_label":  "XLSX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-xlsx-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-openpyxl",
+                        "actual":  "XLSX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "tika_label":  "XLSX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-xlsx-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-openpyxl",
+                        "actual":  "XLSX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "tika_label":  "XLSX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-xlsx-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-openpyxl",
+                        "actual":  "XLSX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "tika_label":  "XLSX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-xlsx-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-openpyxl",
+                        "actual":  "XLSX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "tika_label":  "XLSX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-xlsx-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-openpyxl",
+                        "actual":  "XLSX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "tika_label":  "XLSX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-xlsx-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-openpyxl",
+                        "actual":  "XLSX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "tika_label":  "XLSX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-xlsx-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-openpyxl",
+                        "actual":  "XLSX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "tika_label":  "XLSX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-xlsx-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-openpyxl",
+                        "actual":  "XLSX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "tika_label":  "XLSX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-json-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-json",
+                        "actual":  "JSON",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "pilot-json-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-json",
+                        "actual":  "JSON",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/json",
+                        "tika_label":  "JSON",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-json-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-json",
+                        "actual":  "JSON",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "pilot-json-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-json",
+                        "actual":  "JSON",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/json",
+                        "tika_label":  "JSON",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-json-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-json",
+                        "actual":  "JSON",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "pilot-json-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-json",
+                        "actual":  "JSON",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/json",
+                        "tika_label":  "JSON",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-json-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-json",
+                        "actual":  "JSON",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "pilot-json-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-json",
+                        "actual":  "JSON",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/json",
+                        "tika_label":  "JSON",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-json-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-json",
+                        "actual":  "JSON",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "pilot-json-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-json",
+                        "actual":  "JSON",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/json",
+                        "tika_label":  "JSON",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-csv-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-csv",
+                        "actual":  "CSV",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "pilot-csv-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-csv",
+                        "actual":  "CSV",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/csv",
+                        "tika_label":  "CSV",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-csv-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-csv",
+                        "actual":  "CSV",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "pilot-csv-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-csv",
+                        "actual":  "CSV",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/csv",
+                        "tika_label":  "CSV",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-csv-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-csv",
+                        "actual":  "CSV",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "pilot-csv-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-csv",
+                        "actual":  "CSV",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/csv",
+                        "tika_label":  "CSV",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-csv-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-csv",
+                        "actual":  "CSV",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "pilot-csv-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-csv",
+                        "actual":  "CSV",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/csv",
+                        "tika_label":  "CSV",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-csv-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-csv",
+                        "actual":  "CSV",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "pilot-csv-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-csv",
+                        "actual":  "CSV",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/csv",
+                        "tika_label":  "CSV",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-txt-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-text",
+                        "actual":  "TXT",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-txt-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-text",
+                        "actual":  "TXT",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-txt-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-text",
+                        "actual":  "TXT",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-txt-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-text",
+                        "actual":  "TXT",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-txt-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-text",
+                        "actual":  "TXT",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-txt-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-text",
+                        "actual":  "TXT",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-txt-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-text",
+                        "actual":  "TXT",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-txt-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-text",
+                        "actual":  "TXT",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-txt-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-text",
+                        "actual":  "TXT",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-txt-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-text",
+                        "actual":  "TXT",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-zip-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-zipfile",
+                        "actual":  "ZIP",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/zip",
+                        "tika_label":  "ZIP",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-zip-01",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-zipfile",
+                        "actual":  "ZIP",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/zip",
+                        "tika_label":  "ZIP",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-zip-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-zipfile",
+                        "actual":  "ZIP",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/zip",
+                        "tika_label":  "ZIP",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-zip-02",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-zipfile",
+                        "actual":  "ZIP",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/zip",
+                        "tika_label":  "ZIP",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-zip-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-zipfile",
+                        "actual":  "ZIP",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/zip",
+                        "tika_label":  "ZIP",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-zip-03",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-zipfile",
+                        "actual":  "ZIP",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/zip",
+                        "tika_label":  "ZIP",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-zip-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-zipfile",
+                        "actual":  "ZIP",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/zip",
+                        "tika_label":  "ZIP",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-zip-04",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-zipfile",
+                        "actual":  "ZIP",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/zip",
+                        "tika_label":  "ZIP",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-zip-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-zipfile",
+                        "actual":  "ZIP",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/zip",
+                        "tika_label":  "ZIP",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-zip-05",
+                        "group":  "synthetic-known",
+                        "source_group":  "generated-python-zipfile",
+                        "actual":  "ZIP",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/zip",
+                        "tika_label":  "ZIP",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-renamed-pdf-01",
+                        "group":  "renamed-smoke",
+                        "source_group":  "generated-reportlab",
+                        "actual":  "PDF",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/pdf",
+                        "tika_label":  "PDF",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-renamed-pdf-01",
+                        "group":  "renamed-smoke",
+                        "source_group":  "generated-reportlab",
+                        "actual":  "PDF",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/pdf",
+                        "tika_label":  "PDF",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-renamed-docx-01",
+                        "group":  "renamed-smoke",
+                        "source_group":  "generated-python-docx",
+                        "actual":  "DOCX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "tika_label":  "DOCX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-renamed-docx-01",
+                        "group":  "renamed-smoke",
+                        "source_group":  "generated-python-docx",
+                        "actual":  "DOCX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "tika_label":  "DOCX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "pilot-renamed-json-01",
+                        "group":  "renamed-smoke",
+                        "source_group":  "generated-python-json",
+                        "actual":  "JSON",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "pilot-renamed-json-01",
+                        "group":  "renamed-smoke",
+                        "source_group":  "generated-python-json",
+                        "actual":  "JSON",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "presentation",
+                        "group":  "independent-source",
+                        "source_group":  "project-presentation",
+                        "actual":  "PPTX",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "presentation",
+                        "group":  "independent-source",
+                        "source_group":  "project-presentation",
+                        "actual":  "PPTX",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "mock-drive",
+                        "group":  "independent-source",
+                        "source_group":  "web-fixtures",
+                        "actual":  "JSON",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "mock-drive",
+                        "group":  "independent-source",
+                        "source_group":  "web-fixtures",
+                        "actual":  "JSON",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/json",
+                        "tika_label":  "JSON",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "mock-multi-user",
+                        "group":  "independent-source",
+                        "source_group":  "web-fixtures",
+                        "actual":  "JSON",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "mock-multi-user",
+                        "group":  "independent-source",
+                        "source_group":  "web-fixtures",
+                        "actual":  "JSON",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/json",
+                        "tika_label":  "JSON",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "root-package",
+                        "group":  "independent-source",
+                        "source_group":  "npm-config",
+                        "actual":  "JSON",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "root-package",
+                        "group":  "independent-source",
+                        "source_group":  "npm-config",
+                        "actual":  "JSON",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/json",
+                        "tika_label":  "JSON",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "baseline-table",
+                        "group":  "independent-source",
+                        "source_group":  "baseline-export",
+                        "actual":  "CSV",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "baseline-table",
+                        "group":  "independent-source",
+                        "source_group":  "baseline-export",
+                        "actual":  "CSV",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/csv",
+                        "tika_label":  "CSV",
+                        "correct":  true
+                    }
+                ]
+}

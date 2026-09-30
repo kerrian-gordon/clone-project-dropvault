@@ -8,6 +8,7 @@ import { ViewerPage } from '../features/viewer/ViewerPage.jsx';
 import { UploadProvider } from '../features/upload/UploadContext.jsx';
 import { ThemesPage } from '../features/themes/ThemesPage.jsx';
 import { ThemeDetailPage } from '../features/themes/ThemeDetailPage.jsx';
+import { WorkspacesPage, WorkspacePage, SnapshotPage } from '../features/workspaces/WorkspacesPage.jsx';
 
 function ProtectedLayout() {
   const { user, loading, signOut } = useAuth();
@@ -45,6 +46,7 @@ function ProtectedLayout() {
             >My files</Link>
             <NavLink to="/shared">Shared with me</NavLink>
             <NavLink to="/themes">Themes</NavLink>
+            <NavLink to="/workspaces">Workspaces</NavLink>
           </nav>
           {/* Storage meter: leave it out until there is ONE usage context. Files also calls
               useStorage() for the 507 upgrade retry, so a second copy here would go stale after
@@ -131,6 +133,9 @@ export function App() {
           <Route path="/view/:id" element={<ViewerPage />} />
           <Route path="/themes" element={<ThemesPage />} />
           <Route path="/themes/:id" element={<ThemeDetailPage />} />
+          <Route path="/workspaces" element={<WorkspacesPage />} />
+          <Route path="/workspaces/:id" element={<WorkspacePage />} />
+          <Route path="/snapshots/:id" element={<SnapshotPage />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes></AppearanceProvider>

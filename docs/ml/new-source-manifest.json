@@ -1,0 +1,226 @@
+{
+    "purpose":  "Source-separated local challenge; downloaded files are Git-ignored",
+    "label_status":  "pending human review",
+    "samples":  [
+                    {
+                        "sample_id":  "poi-sample-show",
+                        "relative_path":  "docs/ml/new-source-files/poi-sample-show.pptx",
+                        "sha256":  "BFB4B2F07C9233AFD2F32AA5781D849D0C7D225BF03721A10BECF487B481D828",
+                        "bytes":  39083,
+                        "format_label":  "PPTX",
+                        "source_group":  "apache-poi",
+                        "source_url":  "https://raw.githubusercontent.com/apache/poi/581a4cba5973743e35482163c8848ced8b7ae4f0/test-data/slideshow/SampleShow.pptx",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "poi-smart-art",
+                        "relative_path":  "docs/ml/new-source-files/poi-smart-art.pptx",
+                        "sha256":  "B97E4C6D2EE1DD4094F50F9043820610268DD452D7717C537F5456636ADCC353",
+                        "bytes":  41382,
+                        "format_label":  "PPTX",
+                        "source_group":  "apache-poi",
+                        "source_url":  "https://raw.githubusercontent.com/apache/poi/581a4cba5973743e35482163c8848ced8b7ae4f0/test-data/slideshow/SmartArt.pptx",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "poi-with-master",
+                        "relative_path":  "docs/ml/new-source-files/poi-with-master.pptx",
+                        "sha256":  "54AE7677FD2813A815160CC72BD8960A4E482690DFC369B392868521C9B61549",
+                        "bytes":  47505,
+                        "format_label":  "PPTX",
+                        "source_group":  "apache-poi",
+                        "source_url":  "https://raw.githubusercontent.com/apache/poi/581a4cba5973743e35482163c8848ced8b7ae4f0/test-data/slideshow/WithMaster.pptx",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "poi-bar-chart",
+                        "relative_path":  "docs/ml/new-source-files/poi-bar-chart.pptx",
+                        "sha256":  "79E1D218BFB2903E8DC8425A6B1997D9C1976F5A5F025BADA85B0C47B5777969",
+                        "bytes":  44410,
+                        "format_label":  "PPTX",
+                        "source_group":  "apache-poi",
+                        "source_url":  "https://raw.githubusercontent.com/apache/poi/581a4cba5973743e35482163c8848ced8b7ae4f0/test-data/slideshow/bar-chart.pptx",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "openxml-empty-slide",
+                        "relative_path":  "docs/ml/new-source-files/openxml-empty-slide.pptx",
+                        "sha256":  "A78B21B5F2F99C7F0F125EB8B689AC7B1A96F32B9A08318093FAA44BA51CA639",
+                        "bytes":  41813,
+                        "format_label":  "PPTX",
+                        "source_group":  "openxml-sdk",
+                        "source_url":  "https://raw.githubusercontent.com/dotnet/Open-XML-SDK/431ab05cf160248cc3885a4a766026d4f8243792/samples/Linq/SvgExample/Content/EmptySlide.pptx",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "schema-additional",
+                        "relative_path":  "docs/ml/new-source-files/schema-additional.json",
+                        "sha256":  "B96BD533416386AC6421737B48C5C072870AB5DBEA910585E9E8FA6305C7CA91",
+                        "bytes":  7711,
+                        "format_label":  "JSON",
+                        "source_group":  "json-schema-test-suite",
+                        "source_url":  "https://raw.githubusercontent.com/json-schema-org/JSON-Schema-Test-Suite/5b0ee1613e45fcc2bddac00e07c19cd49b00d8a8/tests/draft2020-12/additionalProperties.json",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "schema-allof",
+                        "relative_path":  "docs/ml/new-source-files/schema-allof.json",
+                        "sha256":  "81045B06706A28F6AA337B485B41A764098E10AC73BB1D346BA0A4285A63E970",
+                        "bytes":  8701,
+                        "format_label":  "JSON",
+                        "source_group":  "json-schema-test-suite",
+                        "source_url":  "https://raw.githubusercontent.com/json-schema-org/JSON-Schema-Test-Suite/5b0ee1613e45fcc2bddac00e07c19cd49b00d8a8/tests/draft2020-12/allOf.json",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "schema-contains",
+                        "relative_path":  "docs/ml/new-source-files/schema-contains.json",
+                        "sha256":  "086782FC8B54AC77A4A2AFE8B84F8CC7FC9CA7B22473EBD8DB3480F2EB8D0AB6",
+                        "bytes":  5174,
+                        "format_label":  "JSON",
+                        "source_group":  "json-schema-test-suite",
+                        "source_url":  "https://raw.githubusercontent.com/json-schema-org/JSON-Schema-Test-Suite/5b0ee1613e45fcc2bddac00e07c19cd49b00d8a8/tests/draft2020-12/contains.json",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "usgs-jan-json",
+                        "relative_path":  "docs/ml/new-source-files/usgs-jan.json",
+                        "sha256":  "B4EBEECD3A7A24BB30FDE9FC50B5B42959C5483E87296CD7D2909C51E9DB04D4",
+                        "bytes":  52137,
+                        "format_label":  "JSON",
+                        "source_group":  "usgs-earthquake-api",
+                        "source_url":  "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson\u0026starttime=2025-01-01\u0026endtime=2025-01-02\u0026minmagnitude=3\u0026limit=100",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "usgs-feb-json",
+                        "relative_path":  "docs/ml/new-source-files/usgs-feb.json",
+                        "sha256":  "1326C0D8D9EE01B1FD1C5A2CDB55F23797886A1ADFDCEC50A66A0081444D91F0",
+                        "bytes":  38878,
+                        "format_label":  "JSON",
+                        "source_group":  "usgs-earthquake-api",
+                        "source_url":  "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson\u0026starttime=2025-02-01\u0026endtime=2025-02-02\u0026minmagnitude=3\u0026limit=100",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "usgs-jan-csv",
+                        "relative_path":  "docs/ml/new-source-files/usgs-jan.csv",
+                        "sha256":  "C7FFDA6046920C9CAAC691FAB29E7FF526786579A79A17C45EC5A05A7CE7A388",
+                        "bytes":  13957,
+                        "format_label":  "CSV",
+                        "source_group":  "usgs-earthquake-api",
+                        "source_url":  "https://earthquake.usgs.gov/fdsnws/event/1/query?format=csv\u0026starttime=2025-01-01\u0026endtime=2025-01-02\u0026minmagnitude=3\u0026limit=100",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "usgs-feb-csv",
+                        "relative_path":  "docs/ml/new-source-files/usgs-feb.csv",
+                        "sha256":  "A86AA7ABAAE9961BAF72178921AFD20BA73459F0C96046D36A5A3B4AEFC5CAF1",
+                        "bytes":  10547,
+                        "format_label":  "CSV",
+                        "source_group":  "usgs-earthquake-api",
+                        "source_url":  "https://earthquake.usgs.gov/fdsnws/event/1/query?format=csv\u0026starttime=2025-02-01\u0026endtime=2025-02-02\u0026minmagnitude=3\u0026limit=100",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "usgs-mar-csv",
+                        "relative_path":  "docs/ml/new-source-files/usgs-mar.csv",
+                        "sha256":  "14954B03E16D685B9DF73B659E38EFB97813F960E5F048D795FA279DC0C7D5E0",
+                        "bytes":  11367,
+                        "format_label":  "CSV",
+                        "source_group":  "usgs-earthquake-api",
+                        "source_url":  "https://earthquake.usgs.gov/fdsnws/event/1/query?format=csv\u0026starttime=2025-03-01\u0026endtime=2025-03-02\u0026minmagnitude=3\u0026limit=100",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "nasa-ny-csv",
+                        "relative_path":  "docs/ml/new-source-files/nasa-ny.csv",
+                        "sha256":  "24FB0C41472ADEBEBD6A49BEF9C14F186D4A6CEC23DE62E8DEC60701795A4332",
+                        "bytes":  1220,
+                        "format_label":  "CSV",
+                        "source_group":  "nasa-power-api",
+                        "source_url":  "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=T2M,PS\u0026community=RE\u0026longitude=-74\u0026latitude=40.7\u0026start=20250101\u0026end=20250131\u0026format=CSV",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "nasa-la-csv",
+                        "relative_path":  "docs/ml/new-source-files/nasa-la.csv",
+                        "sha256":  "8C2F9541CD30D265916B51783CA095E36DC77C25B8D27DFEE06981C4CA3E25B3",
+                        "bytes":  1201,
+                        "format_label":  "CSV",
+                        "source_group":  "nasa-power-api",
+                        "source_url":  "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=T2M,PS\u0026community=RE\u0026longitude=-118.2\u0026latitude=34\u0026start=20250101\u0026end=20250131\u0026format=CSV",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "gutenberg-alice",
+                        "relative_path":  "docs/ml/new-source-files/gutenberg-alice.txt",
+                        "sha256":  "01B38EA4C710A84BC18D0BD41271A5A1A92B94E97B2812F4DECE97D4A694725E",
+                        "bytes":  174311,
+                        "format_label":  "TXT",
+                        "source_group":  "project-gutenberg",
+                        "source_url":  "https://www.gutenberg.org/cache/epub/11/pg11.txt",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "gutenberg-frankenstein",
+                        "relative_path":  "docs/ml/new-source-files/gutenberg-frankenstein.txt",
+                        "sha256":  "7810CD483CFFCF2CC8A1D8F0D5807931E69D4F48CD14149B8C76F88AF82FEAD3",
+                        "bytes":  448885,
+                        "format_label":  "TXT",
+                        "source_group":  "project-gutenberg",
+                        "source_url":  "https://www.gutenberg.org/cache/epub/84/pg84.txt",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "gutenberg-pride",
+                        "relative_path":  "docs/ml/new-source-files/gutenberg-pride.txt",
+                        "sha256":  "3F6BB9D6F78E0293B56ACD4714DD68CB7D6D1D293402031CE9D5A216BCAF9D75",
+                        "bytes":  772386,
+                        "format_label":  "TXT",
+                        "source_group":  "project-gutenberg",
+                        "source_url":  "https://www.gutenberg.org/cache/epub/1342/pg1342.txt",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "rfc-8259",
+                        "relative_path":  "docs/ml/new-source-files/rfc-8259.txt",
+                        "sha256":  "61A5378F4255C720BEB2A4B4A63B29540147C140F36988BF086291989B4CD2D7",
+                        "bytes":  28360,
+                        "format_label":  "TXT",
+                        "source_group":  "rfc-editor",
+                        "source_url":  "https://www.rfc-editor.org/rfc/rfc8259.txt",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "rfc-4180",
+                        "relative_path":  "docs/ml/new-source-files/rfc-4180.txt",
+                        "sha256":  "5D9EC035AA40C0108362CB767C9E2D08C30F7225CB2A4715F484CB13C29B5F21",
+                        "bytes":  12931,
+                        "format_label":  "TXT",
+                        "source_group":  "rfc-editor",
+                        "source_url":  "https://www.rfc-editor.org/rfc/rfc4180.txt",
+                        "split":  "new_source_holdout",
+                        "review_status":  "pending"
+                    }
+                ]
+}

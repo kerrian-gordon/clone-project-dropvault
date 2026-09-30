@@ -5,17 +5,18 @@ import { formatBytes } from '../../shared/components/StorageMeter.jsx';
 import { useUploads } from './UploadContext.jsx';
 
 export function UploadPanel({ folderId, usage, refreshUsage }) {
-  const { jobs, enqueue, retry } = useUploads();
+  const { jobs, enqueue, chooseDestination, retry } = useUploads();
   const { user, changePlan } = useAuth();
   const input = useRef(null);
   const upgradeDialog = useRef(null);
+  const dragDepth = useRef(0);
   const [dragging, setDragging] = useState(false);
   const [upgradeJobId, setUpgradeJobId] = useState(null);
   const [upgradePending, setUpgradePending] = useState(false);
   const [upgradeError, setUpgradeError] = useState('');
   const accept = Object.keys(SUPPORTED_UPLOAD_TYPES).map((extension) => `.${extension}`).join(',');
   const blockedJob = jobs.find((job) => job.id === upgradeJobId);
-  const cappedJobs = jobs.filter((job) => job.folderId === folderId && job.status === 'failed'
+  const cappedJobs = jobs.filter((job) => job.sourceFolderId === folderId && job.status === 'failed'
     && job.code === 'STORAGE_CAP_EXCEEDED');
   const freeLimit = usage?.tier === 'demo' ? usage.limitBytes / 10 : usage?.limitBytes;
   const demoHasSpace = !usage || !blockedJob || usage.usedBytes + blockedJob.size <= freeLimit * 10;
@@ -62,15 +63,35 @@ export function UploadPanel({ folderId, usage, refreshUsage }) {
     }
   }
 
-  function addFiles(files) { enqueue(files, folderId); setDragging(false); }
-  function onDrop(event) { event.preventDefault(); addFiles(event.dataTransfer.files); }
-  const visibleJobs = jobs.filter((job) => job.folderId === folderId);
+  function addFiles(files) { enqueue(files, folderId); }
+  function resetDragState() { dragDepth.current = 0; setDragging(false); }
+  function onDragEnter(event) {
+    event.preventDefault();
+    dragDepth.current += 1;
+    setDragging(true);
+  }
+  function onDragOver(event) {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+  }
+  function onDragLeave(event) {
+    event.preventDefault();
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragging(false);
+  }
+  function onDrop(event) {
+    event.preventDefault();
+    resetDragState();
+    if (event.dataTransfer?.files?.length) addFiles(event.dataTransfer.files);
+  }
+  const visibleJobs = jobs.filter((job) => job.sourceFolderId === folderId);
 
   return <section className="upload-panel" aria-label="Upload files">
     <div className={`drop-zone${dragging ? ' dragging' : ''}`}
-      onDragEnter={(event) => { event.preventDefault(); setDragging(true); }}
-      onDragOver={(event) => event.preventDefault()}
-      onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDragging(false); }}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDragEnd={resetDragState}
       onDrop={onDrop}>
       <p><strong>Drop files here</strong> or choose them from your device.</p>
       <button type="button" onClick={() => input.current?.click()}>Choose files</button>
@@ -82,9 +103,20 @@ export function UploadPanel({ folderId, usage, refreshUsage }) {
       <h2>Uploads</h2>
       <ul>{visibleJobs.map((job) => <li key={job.id}>
         <div className="upload-job-heading"><strong>{job.name}</strong><span>{formatBytes(job.size)}</span></div>
+        {job.status === 'suggested' && <div className="folder-suggestion">
+          <p>Suggested folder: <strong>{job.suggestion.folderName}</strong>. {job.suggestion.reason}.</p>
+          <div className="dialog-actions">
+            <button type="button" onClick={() => chooseDestination(job.id, true)}>Use suggested folder</button>
+            <button type="button" className="btn-ghost" onClick={() => chooseDestination(job.id, false)}>Keep here</button>
+          </div>
+        </div>}
         {job.status === 'uploading' && <progress max="100" value={job.progress} aria-label={`${job.name} upload progress`} />}
         <p className={job.status === 'failed' ? 'error' : 'muted'} role={job.status === 'failed' ? 'alert' : undefined}>
-          {job.status === 'failed' ? job.error : job.status === 'success' ? 'Uploaded' : job.status === 'queued' ? 'Waiting' : `${job.progress}% uploaded`}
+          {job.status === 'failed' ? job.error : job.status === 'success' ? `Uploaded${job.destinationName ? ` to ${job.destinationName}` : ''}`
+            : job.status === 'checking' ? 'Checking for a matching folder…'
+              : job.status === 'suggested' ? 'Choose where to upload this file.'
+                : job.status === 'queued' ? `Waiting${job.destinationName ? ` for ${job.destinationName}` : ''}`
+                  : `${job.progress}% uploaded${job.destinationName ? ` to ${job.destinationName}` : ''}`}
         </p>
         {job.status === 'failed' && job.code !== 'CLIENT_VALIDATION' && <button type="button" className="btn-ghost" onClick={() => retry(job.id)}>Retry</button>}
         {job.code === 'STORAGE_CAP_EXCEEDED' && <div className="cap-actions">

@@ -1,0 +1,18 @@
+{
+  "purpose": "Second source-separated offline format check, selected before scoring",
+  "selected_at": "2026-09-28",
+  "max_bytes_per_file": 8388608,
+  "label_status": "provisional; human review pending",
+  "selection_note": "The original Git 2.0.0 release-note URL returned 404 during download; replaced with Linux README before any detector scoring.",
+  "samples": [
+    {"id": "colors-philocalyst", "filename": "colors-philocalyst.csv", "expected": "CSV", "condition": "valid", "source_group": "philocalyst-color-names", "url": "https://raw.githubusercontent.com/philocalyst/color-names/canonical/color-names/src/colornames.csv"},
+    {"id": "colors-rondomondo", "filename": "colors-rondomondo.csv", "expected": "CSV", "condition": "valid", "source_group": "rondomondo-colourmapper", "url": "https://raw.githubusercontent.com/rondomondo/colourmapper/main/src/colourmapper/crayola2.mapping.csv"},
+    {"id": "bert-sample-text", "filename": "bert-sample-text.txt", "expected": "TXT", "condition": "valid", "source_group": "google-research-bert", "url": "https://raw.githubusercontent.com/google-research/bert/master/sample_text.txt"},
+    {"id": "linux-readme", "filename": "linux-readme.txt", "expected": "TXT", "condition": "valid", "source_group": "linux-kernel", "url": "https://raw.githubusercontent.com/torvalds/linux/master/README"},
+    {"id": "pdf-one-page", "filename": "pdf-one-page.pdf", "expected": "PDF", "condition": "valid", "source_group": "tinytoolkit-pdf-samples", "url": "https://raw.githubusercontent.com/tinytoolkit-org/pdf-sample-files/master/out/sample-1-page.pdf"},
+    {"id": "pdf-form", "filename": "pdf-form.pdf", "expected": "PDF", "condition": "valid", "source_group": "tinytoolkit-pdf-samples", "url": "https://raw.githubusercontent.com/tinytoolkit-org/pdf-sample-files/master/out/sample-form.pdf"},
+    {"id": "pdf-password", "filename": "pdf-password.pdf", "expected": "PDF", "condition": "valid_encrypted", "source_group": "tinytoolkit-pdf-samples", "url": "https://raw.githubusercontent.com/tinytoolkit-org/pdf-sample-files/master/out/sample-password-protected.pdf"},
+    {"id": "pdf-corrupted", "filename": "pdf-corrupted.pdf", "expected": "UNKNOWN", "condition": "damaged_pdf", "source_group": "tinytoolkit-pdf-samples", "url": "https://raw.githubusercontent.com/tinytoolkit-org/pdf-sample-files/master/out/sample-corrupted.pdf"},
+    {"id": "pdf-openprinting", "filename": "pdf-openprinting.pdf", "expected": "PDF", "condition": "valid", "source_group": "openprinting-sample-files", "url": "https://raw.githubusercontent.com/OpenPrinting/sample-files/master/pdf/a4-portrait-vector-color.pdf"}
+  ]
+}

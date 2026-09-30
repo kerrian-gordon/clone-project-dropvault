@@ -1,0 +1,417 @@
+﻿{
+    "experiment":  "Tika 3.3.2 on frozen new-source holdout",
+    "endpoint":  "http://127.0.0.1:9998/detect/stream",
+    "sample_count":  20,
+    "summary":  [
+                    {
+                        "label":  "PPTX",
+                        "mode":  "content_only",
+                        "total":  5,
+                        "correct":  5
+                    },
+                    {
+                        "label":  "PPTX",
+                        "mode":  "filename_hint",
+                        "total":  5,
+                        "correct":  5
+                    },
+                    {
+                        "label":  "JSON",
+                        "mode":  "content_only",
+                        "total":  5,
+                        "correct":  0
+                    },
+                    {
+                        "label":  "JSON",
+                        "mode":  "filename_hint",
+                        "total":  5,
+                        "correct":  5
+                    },
+                    {
+                        "label":  "CSV",
+                        "mode":  "content_only",
+                        "total":  5,
+                        "correct":  0
+                    },
+                    {
+                        "label":  "CSV",
+                        "mode":  "filename_hint",
+                        "total":  5,
+                        "correct":  5
+                    },
+                    {
+                        "label":  "TXT",
+                        "mode":  "content_only",
+                        "total":  5,
+                        "correct":  5
+                    },
+                    {
+                        "label":  "TXT",
+                        "mode":  "filename_hint",
+                        "total":  5,
+                        "correct":  5
+                    }
+                ],
+    "results":  [
+                    {
+                        "sample_id":  "poi-sample-show",
+                        "actual":  "PPTX",
+                        "source_group":  "apache-poi",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "poi-sample-show",
+                        "actual":  "PPTX",
+                        "source_group":  "apache-poi",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "poi-smart-art",
+                        "actual":  "PPTX",
+                        "source_group":  "apache-poi",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "poi-smart-art",
+                        "actual":  "PPTX",
+                        "source_group":  "apache-poi",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "poi-with-master",
+                        "actual":  "PPTX",
+                        "source_group":  "apache-poi",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "poi-with-master",
+                        "actual":  "PPTX",
+                        "source_group":  "apache-poi",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "poi-bar-chart",
+                        "actual":  "PPTX",
+                        "source_group":  "apache-poi",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "poi-bar-chart",
+                        "actual":  "PPTX",
+                        "source_group":  "apache-poi",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "openxml-empty-slide",
+                        "actual":  "PPTX",
+                        "source_group":  "openxml-sdk",
+                        "mode":  "content_only",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "openxml-empty-slide",
+                        "actual":  "PPTX",
+                        "source_group":  "openxml-sdk",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "tika_label":  "PPTX",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "schema-additional",
+                        "actual":  "JSON",
+                        "source_group":  "json-schema-test-suite",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "schema-additional",
+                        "actual":  "JSON",
+                        "source_group":  "json-schema-test-suite",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/json",
+                        "tika_label":  "JSON",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "schema-allof",
+                        "actual":  "JSON",
+                        "source_group":  "json-schema-test-suite",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "schema-allof",
+                        "actual":  "JSON",
+                        "source_group":  "json-schema-test-suite",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/json",
+                        "tika_label":  "JSON",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "schema-contains",
+                        "actual":  "JSON",
+                        "source_group":  "json-schema-test-suite",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "schema-contains",
+                        "actual":  "JSON",
+                        "source_group":  "json-schema-test-suite",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/json",
+                        "tika_label":  "JSON",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "usgs-jan-json",
+                        "actual":  "JSON",
+                        "source_group":  "usgs-earthquake-api",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "usgs-jan-json",
+                        "actual":  "JSON",
+                        "source_group":  "usgs-earthquake-api",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/json",
+                        "tika_label":  "JSON",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "usgs-feb-json",
+                        "actual":  "JSON",
+                        "source_group":  "usgs-earthquake-api",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "usgs-feb-json",
+                        "actual":  "JSON",
+                        "source_group":  "usgs-earthquake-api",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "application/json",
+                        "tika_label":  "JSON",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "usgs-jan-csv",
+                        "actual":  "CSV",
+                        "source_group":  "usgs-earthquake-api",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "usgs-jan-csv",
+                        "actual":  "CSV",
+                        "source_group":  "usgs-earthquake-api",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/csv",
+                        "tika_label":  "CSV",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "usgs-feb-csv",
+                        "actual":  "CSV",
+                        "source_group":  "usgs-earthquake-api",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "usgs-feb-csv",
+                        "actual":  "CSV",
+                        "source_group":  "usgs-earthquake-api",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/csv",
+                        "tika_label":  "CSV",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "usgs-mar-csv",
+                        "actual":  "CSV",
+                        "source_group":  "usgs-earthquake-api",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "usgs-mar-csv",
+                        "actual":  "CSV",
+                        "source_group":  "usgs-earthquake-api",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/csv",
+                        "tika_label":  "CSV",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "nasa-ny-csv",
+                        "actual":  "CSV",
+                        "source_group":  "nasa-power-api",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "nasa-ny-csv",
+                        "actual":  "CSV",
+                        "source_group":  "nasa-power-api",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/csv",
+                        "tika_label":  "CSV",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "nasa-la-csv",
+                        "actual":  "CSV",
+                        "source_group":  "nasa-power-api",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  false
+                    },
+                    {
+                        "sample_id":  "nasa-la-csv",
+                        "actual":  "CSV",
+                        "source_group":  "nasa-power-api",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/csv",
+                        "tika_label":  "CSV",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "gutenberg-alice",
+                        "actual":  "TXT",
+                        "source_group":  "project-gutenberg",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "gutenberg-alice",
+                        "actual":  "TXT",
+                        "source_group":  "project-gutenberg",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "gutenberg-frankenstein",
+                        "actual":  "TXT",
+                        "source_group":  "project-gutenberg",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "gutenberg-frankenstein",
+                        "actual":  "TXT",
+                        "source_group":  "project-gutenberg",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "gutenberg-pride",
+                        "actual":  "TXT",
+                        "source_group":  "project-gutenberg",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "gutenberg-pride",
+                        "actual":  "TXT",
+                        "source_group":  "project-gutenberg",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "rfc-8259",
+                        "actual":  "TXT",
+                        "source_group":  "rfc-editor",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "rfc-8259",
+                        "actual":  "TXT",
+                        "source_group":  "rfc-editor",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "rfc-4180",
+                        "actual":  "TXT",
+                        "source_group":  "rfc-editor",
+                        "mode":  "content_only",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    },
+                    {
+                        "sample_id":  "rfc-4180",
+                        "actual":  "TXT",
+                        "source_group":  "rfc-editor",
+                        "mode":  "filename_hint",
+                        "tika_mime":  "text/plain",
+                        "tika_label":  "TXT",
+                        "correct":  true
+                    }
+                ]
+}

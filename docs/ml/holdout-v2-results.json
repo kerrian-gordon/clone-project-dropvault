@@ -1,0 +1,140 @@
+{
+  "experiment": "detector evaluation on frozen second source-separated set",
+  "label_review": "provisional; human review pending",
+  "limitations": [
+    "PDF labels rely on the providers' descriptions; no independent PDF parser was available",
+    "CSV and TXT structural notes are basic checks, not human label review",
+    "nine files and clustered PDF sources cannot estimate deployment accuracy"
+  ],
+  "summary": {
+    "sample_count": 9,
+    "matches_expectation": 7,
+    "abstentions_on_valid_files": 2,
+    "wrong_suggestions": 0,
+    "by_expected": {
+      "CSV": 2,
+      "TXT": 2,
+      "PDF": 4,
+      "UNKNOWN": 1
+    }
+  },
+  "results": [
+    {
+      "sample_id": "colors-philocalyst",
+      "source_group": "philocalyst-color-names",
+      "condition": "valid",
+      "expected": "CSV",
+      "predicted": "UNKNOWN",
+      "reason": "ambiguous_text_table",
+      "matches_expectation": false,
+      "abstained": true,
+      "wrong_suggestion": false,
+      "structural_note": "consistent_csv_rows",
+      "review_status": "pending"
+    },
+    {
+      "sample_id": "colors-rondomondo",
+      "source_group": "rondomondo-colourmapper",
+      "condition": "valid",
+      "expected": "CSV",
+      "predicted": "UNKNOWN",
+      "reason": "ambiguous_text_table",
+      "matches_expectation": false,
+      "abstained": true,
+      "wrong_suggestion": false,
+      "structural_note": "consistent_csv_rows",
+      "review_status": "pending"
+    },
+    {
+      "sample_id": "bert-sample-text",
+      "source_group": "google-research-bert",
+      "condition": "valid",
+      "expected": "TXT",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "matches_expectation": true,
+      "abstained": false,
+      "wrong_suggestion": false,
+      "structural_note": "readable_utf8_text",
+      "review_status": "pending"
+    },
+    {
+      "sample_id": "linux-readme",
+      "source_group": "linux-kernel",
+      "condition": "valid",
+      "expected": "TXT",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "matches_expectation": true,
+      "abstained": false,
+      "wrong_suggestion": false,
+      "structural_note": "readable_utf8_text",
+      "review_status": "pending"
+    },
+    {
+      "sample_id": "pdf-one-page",
+      "source_group": "tinytoolkit-pdf-samples",
+      "condition": "valid",
+      "expected": "PDF",
+      "predicted": "PDF",
+      "reason": "pdf_header_and_cross_reference",
+      "matches_expectation": true,
+      "abstained": false,
+      "wrong_suggestion": false,
+      "structural_note": "pdf_signature_present; validity_not_independently_checked",
+      "review_status": "pending"
+    },
+    {
+      "sample_id": "pdf-form",
+      "source_group": "tinytoolkit-pdf-samples",
+      "condition": "valid",
+      "expected": "PDF",
+      "predicted": "PDF",
+      "reason": "pdf_header_and_cross_reference",
+      "matches_expectation": true,
+      "abstained": false,
+      "wrong_suggestion": false,
+      "structural_note": "pdf_signature_present; validity_not_independently_checked",
+      "review_status": "pending"
+    },
+    {
+      "sample_id": "pdf-password",
+      "source_group": "tinytoolkit-pdf-samples",
+      "condition": "valid_encrypted",
+      "expected": "PDF",
+      "predicted": "PDF",
+      "reason": "pdf_header_and_cross_reference",
+      "matches_expectation": true,
+      "abstained": false,
+      "wrong_suggestion": false,
+      "structural_note": "pdf_signature_present; validity_not_independently_checked",
+      "review_status": "pending"
+    },
+    {
+      "sample_id": "pdf-corrupted",
+      "source_group": "tinytoolkit-pdf-samples",
+      "condition": "damaged_pdf",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "incomplete_pdf",
+      "matches_expectation": true,
+      "abstained": false,
+      "wrong_suggestion": false,
+      "structural_note": "pdf_signature_present; validity_not_independently_checked",
+      "review_status": "pending"
+    },
+    {
+      "sample_id": "pdf-openprinting",
+      "source_group": "openprinting-sample-files",
+      "condition": "valid",
+      "expected": "PDF",
+      "predicted": "PDF",
+      "reason": "pdf_header_and_cross_reference",
+      "matches_expectation": true,
+      "abstained": false,
+      "wrong_suggestion": false,
+      "structural_note": "pdf_signature_present; validity_not_independently_checked",
+      "review_status": "pending"
+    }
+  ]
+}

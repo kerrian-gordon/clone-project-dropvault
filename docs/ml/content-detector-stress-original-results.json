@@ -1,0 +1,137 @@
+{
+  "purpose": "local adversarial check; synthetic expectations require review",
+  "sample_count": 13,
+  "matches_expectation": 11,
+  "results": [
+    {
+      "case": "comma-prose-three-lines",
+      "bytes": 94,
+      "expected": "TXT",
+      "predicted": "CSV",
+      "reason": "consistent_delimited_table",
+      "matches_expectation": false,
+      "rationale": "Three grammatical sentences, not a data table",
+      "elapsed_ms": 0.41
+    },
+    {
+      "case": "comma-prose-with-title",
+      "bytes": 108,
+      "expected": "TXT",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "matches_expectation": true,
+      "rationale": "A title should not turn prose into CSV",
+      "elapsed_ms": 0.17
+    },
+    {
+      "case": "fake-pdf-envelope",
+      "bytes": 34,
+      "expected": "UNKNOWN",
+      "predicted": "PDF",
+      "reason": "pdf_header_and_trailer",
+      "matches_expectation": false,
+      "rationale": "PDF markers alone do not establish a valid PDF",
+      "elapsed_ms": 0.04
+    },
+    {
+      "case": "truncated-zip",
+      "bytes": 7,
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "invalid_zip_or_office_package",
+      "matches_expectation": true,
+      "rationale": "Broken ZIP container",
+      "elapsed_ms": 0.02
+    },
+    {
+      "case": "duplicate-zip-names",
+      "bytes": 217,
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "duplicate_zip_names",
+      "matches_expectation": true,
+      "rationale": "Duplicate archive paths are ambiguous",
+      "elapsed_ms": 0.67
+    },
+    {
+      "case": "plain-zip",
+      "bytes": 119,
+      "expected": "ZIP",
+      "predicted": "ZIP",
+      "reason": "valid_zip_container",
+      "matches_expectation": true,
+      "rationale": "A valid ordinary archive",
+      "elapsed_ms": 0.03
+    },
+    {
+      "case": "utf16-text",
+      "bytes": 48,
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "unrecognized_binary_or_encoding",
+      "matches_expectation": true,
+      "rationale": "UTF-16 is intentionally outside the UTF-8 text parser",
+      "elapsed_ms": 0.01
+    },
+    {
+      "case": "bom-json",
+      "bytes": 11,
+      "expected": "JSON",
+      "predicted": "JSON",
+      "reason": "parsed_json_object_or_array",
+      "matches_expectation": true,
+      "rationale": "UTF-8 BOM before a JSON object",
+      "elapsed_ms": 0.01
+    },
+    {
+      "case": "two-row-csv",
+      "bytes": 16,
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "ambiguous_two_line_table",
+      "matches_expectation": true,
+      "rationale": "Two rows remain ambiguous",
+      "elapsed_ms": 0.03
+    },
+    {
+      "case": "quoted-multiline-csv",
+      "bytes": 66,
+      "expected": "CSV",
+      "predicted": "CSV",
+      "reason": "consistent_delimited_table",
+      "matches_expectation": true,
+      "rationale": "Quoted newlines are valid CSV fields",
+      "elapsed_ms": 0.03
+    },
+    {
+      "case": "broken-json",
+      "bytes": 5,
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "malformed_json_like_text",
+      "matches_expectation": true,
+      "rationale": "Incomplete JSON",
+      "elapsed_ms": 0.01
+    },
+    {
+      "case": "html-document",
+      "bytes": 42,
+      "expected": "OUT_OF_SCOPE",
+      "predicted": "OUT_OF_SCOPE",
+      "reason": "html_markup",
+      "matches_expectation": true,
+      "rationale": "Recognizable HTML",
+      "elapsed_ms": 0.01
+    },
+    {
+      "case": "input-over-limit",
+      "bytes": 8388609,
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "reason": "empty_or_input_limit",
+      "matches_expectation": true,
+      "rationale": "The detector must reject oversized inputs before parsing",
+      "elapsed_ms": 0.0
+    }
+  ]
+}

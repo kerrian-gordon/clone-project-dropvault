@@ -1,0 +1,39 @@
+{
+    "purpose":  "First untouched preamble-CSV source check after the rule was written",
+    "label_status":  "pending human review",
+    "samples":  [
+                    {
+                        "sample_id":  "giss-global",
+                        "relative_path":  "docs/ml/preamble-csv-files/giss-global.csv",
+                        "sha256":  "C9CE0750CA93A8241C42FE86CD5BF54D07B28B21AE650B0AE49A206907018CD9",
+                        "bytes":  12887,
+                        "format_label":  "CSV",
+                        "source_group":  "nasa-giss",
+                        "source_url":  "https://data.giss.nasa.gov/gistemp/tabledata_v4/GLB.Ts%2BdSST.csv",
+                        "split":  "preamble_csv_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "giss-north",
+                        "relative_path":  "docs/ml/preamble-csv-files/giss-north.csv",
+                        "sha256":  "478319F2AE822F1A70C49913D6281B8FA70EFBCB7DC0348764D1FC2C3E0A9CB5",
+                        "bytes":  12940,
+                        "format_label":  "CSV",
+                        "source_group":  "nasa-giss",
+                        "source_url":  "https://data.giss.nasa.gov/gistemp/tabledata_v4/NH.Ts%2BdSST.csv",
+                        "split":  "preamble_csv_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "giss-south",
+                        "relative_path":  "docs/ml/preamble-csv-files/giss-south.csv",
+                        "sha256":  "261350363C0343368B4FF018BBFB9A08DEB7228B9D2C74A3FA18901C8698C6EF",
+                        "bytes":  12881,
+                        "format_label":  "CSV",
+                        "source_group":  "nasa-giss",
+                        "source_url":  "https://data.giss.nasa.gov/gistemp/tabledata_v4/SH.Ts%2BdSST.csv",
+                        "split":  "preamble_csv_holdout",
+                        "review_status":  "pending"
+                    }
+                ]
+}

@@ -1,0 +1,25 @@
+{
+  "purpose": "Local source-separated evaluation; downloaded bytes stay outside Git",
+  "samples": [
+    {"id":"poi-sample-show","label":"PPTX","source_group":"apache-poi","filename":"poi-sample-show.pptx","url":"https://raw.githubusercontent.com/apache/poi/581a4cba5973743e35482163c8848ced8b7ae4f0/test-data/slideshow/SampleShow.pptx"},
+    {"id":"poi-smart-art","label":"PPTX","source_group":"apache-poi","filename":"poi-smart-art.pptx","url":"https://raw.githubusercontent.com/apache/poi/581a4cba5973743e35482163c8848ced8b7ae4f0/test-data/slideshow/SmartArt.pptx"},
+    {"id":"poi-with-master","label":"PPTX","source_group":"apache-poi","filename":"poi-with-master.pptx","url":"https://raw.githubusercontent.com/apache/poi/581a4cba5973743e35482163c8848ced8b7ae4f0/test-data/slideshow/WithMaster.pptx"},
+    {"id":"poi-bar-chart","label":"PPTX","source_group":"apache-poi","filename":"poi-bar-chart.pptx","url":"https://raw.githubusercontent.com/apache/poi/581a4cba5973743e35482163c8848ced8b7ae4f0/test-data/slideshow/bar-chart.pptx"},
+    {"id":"openxml-empty-slide","label":"PPTX","source_group":"openxml-sdk","filename":"openxml-empty-slide.pptx","url":"https://raw.githubusercontent.com/dotnet/Open-XML-SDK/431ab05cf160248cc3885a4a766026d4f8243792/samples/Linq/SvgExample/Content/EmptySlide.pptx"},
+    {"id":"schema-additional","label":"JSON","source_group":"json-schema-test-suite","filename":"schema-additional.json","url":"https://raw.githubusercontent.com/json-schema-org/JSON-Schema-Test-Suite/5b0ee1613e45fcc2bddac00e07c19cd49b00d8a8/tests/draft2020-12/additionalProperties.json"},
+    {"id":"schema-allof","label":"JSON","source_group":"json-schema-test-suite","filename":"schema-allof.json","url":"https://raw.githubusercontent.com/json-schema-org/JSON-Schema-Test-Suite/5b0ee1613e45fcc2bddac00e07c19cd49b00d8a8/tests/draft2020-12/allOf.json"},
+    {"id":"schema-contains","label":"JSON","source_group":"json-schema-test-suite","filename":"schema-contains.json","url":"https://raw.githubusercontent.com/json-schema-org/JSON-Schema-Test-Suite/5b0ee1613e45fcc2bddac00e07c19cd49b00d8a8/tests/draft2020-12/contains.json"},
+    {"id":"usgs-jan-json","label":"JSON","source_group":"usgs-earthquake-api","filename":"usgs-jan.json","url":"https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-01-01&endtime=2025-01-02&minmagnitude=3&limit=100"},
+    {"id":"usgs-feb-json","label":"JSON","source_group":"usgs-earthquake-api","filename":"usgs-feb.json","url":"https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-02-01&endtime=2025-02-02&minmagnitude=3&limit=100"},
+    {"id":"usgs-jan-csv","label":"CSV","source_group":"usgs-earthquake-api","filename":"usgs-jan.csv","url":"https://earthquake.usgs.gov/fdsnws/event/1/query?format=csv&starttime=2025-01-01&endtime=2025-01-02&minmagnitude=3&limit=100"},
+    {"id":"usgs-feb-csv","label":"CSV","source_group":"usgs-earthquake-api","filename":"usgs-feb.csv","url":"https://earthquake.usgs.gov/fdsnws/event/1/query?format=csv&starttime=2025-02-01&endtime=2025-02-02&minmagnitude=3&limit=100"},
+    {"id":"usgs-mar-csv","label":"CSV","source_group":"usgs-earthquake-api","filename":"usgs-mar.csv","url":"https://earthquake.usgs.gov/fdsnws/event/1/query?format=csv&starttime=2025-03-01&endtime=2025-03-02&minmagnitude=3&limit=100"},
+    {"id":"nasa-ny-csv","label":"CSV","source_group":"nasa-power-api","filename":"nasa-ny.csv","url":"https://power.larc.nasa.gov/api/temporal/daily/point?parameters=T2M,PS&community=RE&longitude=-74&latitude=40.7&start=20250101&end=20250131&format=CSV"},
+    {"id":"nasa-la-csv","label":"CSV","source_group":"nasa-power-api","filename":"nasa-la.csv","url":"https://power.larc.nasa.gov/api/temporal/daily/point?parameters=T2M,PS&community=RE&longitude=-118.2&latitude=34&start=20250101&end=20250131&format=CSV"},
+    {"id":"gutenberg-alice","label":"TXT","source_group":"project-gutenberg","filename":"gutenberg-alice.txt","url":"https://www.gutenberg.org/cache/epub/11/pg11.txt"},
+    {"id":"gutenberg-frankenstein","label":"TXT","source_group":"project-gutenberg","filename":"gutenberg-frankenstein.txt","url":"https://www.gutenberg.org/cache/epub/84/pg84.txt"},
+    {"id":"gutenberg-pride","label":"TXT","source_group":"project-gutenberg","filename":"gutenberg-pride.txt","url":"https://www.gutenberg.org/cache/epub/1342/pg1342.txt"},
+    {"id":"rfc-8259","label":"TXT","source_group":"rfc-editor","filename":"rfc-8259.txt","url":"https://www.rfc-editor.org/rfc/rfc8259.txt"},
+    {"id":"rfc-4180","label":"TXT","source_group":"rfc-editor","filename":"rfc-4180.txt","url":"https://www.rfc-editor.org/rfc/rfc4180.txt"}
+  ]
+}

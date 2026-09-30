@@ -1,0 +1,53 @@
+{
+  "experiment": "first revised-detector run on fresh-csv sources",
+  "sample_count": 5,
+  "correct": 5,
+  "label_review": "pending human review; structural checks are provisional",
+  "results": [
+    {
+      "sample_id": "seaborn-iris",
+      "source_group": "seaborn-data",
+      "expected": "CSV",
+      "structural_check": "consistent_csv_rows",
+      "predicted": "CSV",
+      "reason": "consistent_delimited_table",
+      "correct": true
+    },
+    {
+      "sample_id": "seaborn-flights",
+      "source_group": "seaborn-data",
+      "expected": "CSV",
+      "structural_check": "consistent_csv_rows",
+      "predicted": "CSV",
+      "reason": "consistent_delimited_table",
+      "correct": true
+    },
+    {
+      "sample_id": "seaborn-tips",
+      "source_group": "seaborn-data",
+      "expected": "CSV",
+      "structural_check": "consistent_csv_rows",
+      "predicted": "CSV",
+      "reason": "consistent_delimited_table",
+      "correct": true
+    },
+    {
+      "sample_id": "plotly-apple",
+      "source_group": "plotly-datasets",
+      "expected": "CSV",
+      "structural_check": "consistent_csv_rows",
+      "predicted": "CSV",
+      "reason": "consistent_delimited_table",
+      "correct": true
+    },
+    {
+      "sample_id": "plotly-election",
+      "source_group": "plotly-datasets",
+      "expected": "CSV",
+      "structural_check": "consistent_csv_rows",
+      "predicted": "CSV",
+      "reason": "consistent_delimited_table",
+      "correct": true
+    }
+  ]
+}

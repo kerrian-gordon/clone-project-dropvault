@@ -8,16 +8,66 @@ import { StorageMeter, formatBytes } from '../../shared/components/StorageMeter.
 import { api } from '../../shared/lib/api.js';
 import { useStorage } from '../../shared/lib/useStorage.js';
 
-function ItemActions({ item, type, onDeleted }) {
+function folderPath(folder, byId) {
+  const names = [folder.name];
+  const seen = new Set([folder.id]);
+  let parentId = folder.parentId;
+  while (parentId !== ROOT_FOLDER_ID && byId.has(parentId) && !seen.has(parentId)) {
+    const parent = byId.get(parentId);
+    names.unshift(parent.name);
+    seen.add(parentId);
+    parentId = parent.parentId;
+  }
+  return `My files / ${names.join(' / ')}`;
+}
+
+function ItemActions({ item, type, onDeleted, onChanged }) {
   const [confirming, setConfirming] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [folders, setFolders] = useState(null);
+  const [name, setName] = useState(item.name);
+  const [destination, setDestination] = useState(type === 'file' ? item.folderId : item.parentId);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+
+  async function openEditor() {
+    setConfirming(false);
+    setEditing(true);
+    setName(item.name);
+    setDestination(type === 'file' ? item.folderId : item.parentId);
+    setFolders(null);
+    setError('');
+    try {
+      const result = await api(routes.folders);
+      setFolders(result.folders);
+    } catch (caught) {
+      setError(caught.message);
+    }
+  }
+
+  async function save(event) {
+    event.preventDefault();
+    setPending(true);
+    setError('');
+    try {
+      const path = type === 'file' ? routes.file(item.id) : routes.folder(item.id);
+      const body = type === 'file' ? { name, folderId: destination } : { name, parentId: destination };
+      await api(path, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body) });
+      setEditing(false);
+      void onChanged();
+    } catch (caught) {
+      setError(caught.message);
+    } finally {
+      setPending(false);
+    }
+  }
 
   async function remove() {
     setPending(true);
     setError('');
     try {
-      const path = type === 'file' ? routes.file(item.id) : `/v1/folders/${encodeURIComponent(item.id)}`;
+      const path = type === 'file' ? routes.file(item.id) : routes.folder(item.id);
       await api(path, { method: 'DELETE' });
       onDeleted(item.id);
     } catch (caught) {
@@ -28,13 +78,48 @@ function ItemActions({ item, type, onDeleted }) {
     }
   }
 
+  const byId = new Map((folders || []).map((folder) => [folder.id, folder]));
+  function availableDestination(folder) {
+    if (type === 'file') return true;
+    const seen = new Set();
+    let current = folder;
+    while (current && !seen.has(current.id)) {
+      if (current.id === item.id) return false;
+      seen.add(current.id);
+      current = byId.get(current.parentId);
+    }
+    return true;
+  }
+
   return <div className="row-actions">
     {error && <span className="error" role="alert">{error}</span>}
-    {confirming ? <>
+    {editing ? <form className="item-edit-form" onSubmit={save}>
+      <label>
+        <span>Name</span>
+        <input value={name} maxLength={255} onChange={(event) => setName(event.target.value)}
+          disabled={pending || !folders} required />
+      </label>
+      <label>
+        <span>Move to</span>
+        <select value={destination} onChange={(event) => setDestination(event.target.value)}
+          disabled={pending || !folders}>
+          <option value={ROOT_FOLDER_ID}>My files</option>
+          {(folders || []).filter(availableDestination).map((folder) =>
+            <option key={folder.id} value={folder.id}>{folderPath(folder, byId)}</option>)}
+        </select>
+      </label>
+      <button type="submit" disabled={pending || !folders}>{pending ? 'Saving...' : 'Save'}</button>
+      <button type="button" className="btn-ghost" disabled={pending}
+        onClick={() => { setEditing(false); setError(''); }}>Cancel</button>
+      {type === 'file' && <span className="muted">Keep the file extension unchanged.</span>}
+    </form> : confirming ? <>
       <span>Delete “{item.name}”?</span>
       <button type="button" className="btn-danger" disabled={pending} aria-busy={pending} onClick={remove}>{pending ? 'Deleting…' : 'Delete'}</button>
       <button type="button" className="btn-ghost" disabled={pending} onClick={() => setConfirming(false)}>Cancel</button>
-    </> : <button type="button" className="btn-ghost" onClick={() => setConfirming(true)}>Delete</button>}
+    </> : <>
+      <button type="button" className="btn-ghost" onClick={openEditor}>Rename or move</button>
+      <button type="button" className="btn-ghost" onClick={() => setConfirming(true)}>Delete</button>
+    </>}
   </div>;
 }
 
@@ -47,6 +132,10 @@ export function FilesPage() {
   const { usage, error: usageError, refreshUsage } = useStorage();
   const [listing, setListing] = useState(null);
   const [error, setError] = useState('');
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [folderPending, setFolderPending] = useState(false);
+  const [folderError, setFolderError] = useState('');
   const refreshVersion = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -83,11 +172,38 @@ export function FilesPage() {
     void refreshUsage();
   }
 
+  async function createFolder(event) {
+    event.preventDefault();
+    setFolderPending(true);
+    setFolderError('');
+    try {
+      await api(routes.folders, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newFolderName, parentId: folderId }),
+      });
+      setCreatingFolder(false);
+      setNewFolderName('');
+      await refresh();
+    } catch (caught) {
+      setFolderError(caught.message);
+    } finally {
+      setFolderPending(false);
+    }
+  }
+
   const title = id ? location.state?.folderName || 'Folder' : 'My files';
   return <section>
     {id && <Link to="/files">← My files</Link>}
     <h1>{title}</h1>
     <StorageMeter usage={usage} error={usageError} />
+    {creatingFolder ? <form className="item-edit-form" onSubmit={createFolder}>
+      <label><span>Folder name</span><input autoFocus value={newFolderName} maxLength={255}
+        onChange={(event) => setNewFolderName(event.target.value)} disabled={folderPending} required /></label>
+      <button type="submit" disabled={folderPending}>{folderPending ? 'Creating…' : 'Create folder'}</button>
+      <button type="button" className="btn-ghost" disabled={folderPending}
+        onClick={() => { setCreatingFolder(false); setFolderError(''); setNewFolderName(''); }}>Cancel</button>
+      {folderError && <span className="error" role="alert">{folderError}</span>}
+    </form> : <button type="button" className="btn-ghost" onClick={() => setCreatingFolder(true)}>New folder</button>}
     <UploadPanel folderId={folderId} usage={usage} refreshUsage={refreshUsage} />
     {error && <p className="error" role="alert">{error}</p>}
     {!listing && !error && <p>Loading files…</p>}
@@ -96,13 +212,13 @@ export function FilesPage() {
         <Link className="row-main" to={`/folders/${encodeURIComponent(folder.id)}`} state={{ folderName: folder.name }}>
           <span className="item-icon" aria-hidden="true">📁</span><strong>{folder.name}</strong><span className="muted">Folder</span>
         </Link>
-        {folder.ownerId === user.id && <ItemActions item={folder} type="folder" onDeleted={onDeleted} />}
+        {folder.ownerId === user.id && <ItemActions item={folder} type="folder" onDeleted={onDeleted} onChanged={refresh} />}
       </div>)}
       {listing.files.map((file) => <div className="row" key={file.id}>
         <Link className="row-main" to={`/view/${encodeURIComponent(file.id)}`}>
           <span className="item-icon" aria-hidden="true">📄</span><strong>{file.name}</strong><span className="muted">{formatBytes(file.size)} · {file.ownerId === user.id ? 'Owned by you' : 'Shared with you'}</span>
         </Link>
-        {file.ownerId === user.id && <ItemActions item={file} type="file" onDeleted={onDeleted} />}
+        {file.ownerId === user.id && <ItemActions item={file} type="file" onDeleted={onDeleted} onChanged={refresh} />}
       </div>)}
       {!listing.folders.length && !listing.files.length && <p className="empty">This folder is empty.</p>}
     </div>}

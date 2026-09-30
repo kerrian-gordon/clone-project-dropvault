@@ -19,10 +19,21 @@ export function apiListenOptions(overrides = {}) {
     ? overrides.publicBaseUrl
     : process.env.DROPVAULT_PUBLIC_BASE_URL;
   const host = overrides.host ?? process.env.DROPVAULT_HOST ?? '127.0.0.1';
+  const storageBackend = overrides.storageBackend ?? process.env.DROPVAULT_STORAGE_BACKEND ?? 'local';
+  if (!['local', 's3'].includes(storageBackend)) {
+    throw new Error('DROPVAULT_STORAGE_BACKEND must be local or s3');
+  }
+  const productionStorage = storageBackend === 's3'
+    ? { databaseUrl: overrides.databaseUrl ?? process.env.DROPVAULT_DATABASE_URL,
+      bucket: overrides.s3Bucket ?? process.env.DROPVAULT_S3_BUCKET,
+      region: overrides.awsRegion ?? process.env.DROPVAULT_AWS_REGION,
+      prefix: overrides.s3Prefix ?? process.env.DROPVAULT_S3_PREFIX ?? 'dropvault/' }
+    : undefined;
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('PORT must be an integer from 1 to 65535');
   }
-  return { storageRoot, port, storageLimitBytes, legacyClaimToken, publicBaseUrl, host };
+  return { storageRoot, port, storageLimitBytes, legacyClaimToken, publicBaseUrl, host,
+    productionStorage };
 }
 
 export async function listenApi(overrides = {}) {
@@ -32,6 +43,7 @@ export async function listenApi(overrides = {}) {
     storageLimitBytes: options.storageLimitBytes,
     legacyClaimToken: options.legacyClaimToken,
     publicBaseUrl: options.publicBaseUrl,
+    productionStorage: options.productionStorage,
   });
   await new Promise((resolveListen, reject) => {
     server.once('error', reject);

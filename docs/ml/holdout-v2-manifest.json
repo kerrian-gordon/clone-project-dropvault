@@ -1,0 +1,105 @@
+{
+    "purpose":  "Second source-separated offline format check, selected before scoring",
+    "label_status":  "provisional; human review pending",
+    "samples":  [
+                    {
+                        "sample_id":  "colors-philocalyst",
+                        "relative_path":  "docs/ml/holdout-v2-files/colors-philocalyst.csv",
+                        "expected":  "CSV",
+                        "condition":  "valid",
+                        "source_group":  "philocalyst-color-names",
+                        "source_url":  "https://raw.githubusercontent.com/philocalyst/color-names/canonical/color-names/src/colornames.csv",
+                        "sha256":  "E456EA053A746696343E2BB5356492FCA332D665D42DAA767C0C6961B7F31DEB",
+                        "bytes":  669571,
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "colors-rondomondo",
+                        "relative_path":  "docs/ml/holdout-v2-files/colors-rondomondo.csv",
+                        "expected":  "CSV",
+                        "condition":  "valid",
+                        "source_group":  "rondomondo-colourmapper",
+                        "source_url":  "https://raw.githubusercontent.com/rondomondo/colourmapper/main/src/colourmapper/crayola2.mapping.csv",
+                        "sha256":  "F5C326FEC0AA034212FE6C14A2479245AD8570EAFB17FA35FBC9A93680F1CDDB",
+                        "bytes":  10130,
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "bert-sample-text",
+                        "relative_path":  "docs/ml/holdout-v2-files/bert-sample-text.txt",
+                        "expected":  "TXT",
+                        "condition":  "valid",
+                        "source_group":  "google-research-bert",
+                        "source_url":  "https://raw.githubusercontent.com/google-research/bert/master/sample_text.txt",
+                        "sha256":  "5205AAFA90AFB0841B24B05CB461345E3692A85D8EA8027D8935AF103FD5C613",
+                        "bytes":  4394,
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "linux-readme",
+                        "relative_path":  "docs/ml/holdout-v2-files/linux-readme.txt",
+                        "expected":  "TXT",
+                        "condition":  "valid",
+                        "source_group":  "linux-kernel",
+                        "source_url":  "https://raw.githubusercontent.com/torvalds/linux/master/README",
+                        "sha256":  "D9E6892FF2C83807C34F4AEB06BFF724068803D0E03470BFB81A8F5CBDE5F090",
+                        "bytes":  6034,
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "pdf-one-page",
+                        "relative_path":  "docs/ml/holdout-v2-files/pdf-one-page.pdf",
+                        "expected":  "PDF",
+                        "condition":  "valid",
+                        "source_group":  "tinytoolkit-pdf-samples",
+                        "source_url":  "https://raw.githubusercontent.com/tinytoolkit-org/pdf-sample-files/master/out/sample-1-page.pdf",
+                        "sha256":  "ADA1603D4396B84AC0D85CA940B0149DF13FD4A6BEB46F2F2F62C4C8A6BC69B2",
+                        "bytes":  3312,
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "pdf-form",
+                        "relative_path":  "docs/ml/holdout-v2-files/pdf-form.pdf",
+                        "expected":  "PDF",
+                        "condition":  "valid",
+                        "source_group":  "tinytoolkit-pdf-samples",
+                        "source_url":  "https://raw.githubusercontent.com/tinytoolkit-org/pdf-sample-files/master/out/sample-form.pdf",
+                        "sha256":  "5A681D44622F2EE577808E77F034525314D48A628B9CAD26F7788564C9E922E8",
+                        "bytes":  10768,
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "pdf-password",
+                        "relative_path":  "docs/ml/holdout-v2-files/pdf-password.pdf",
+                        "expected":  "PDF",
+                        "condition":  "valid_encrypted",
+                        "source_group":  "tinytoolkit-pdf-samples",
+                        "source_url":  "https://raw.githubusercontent.com/tinytoolkit-org/pdf-sample-files/master/out/sample-password-protected.pdf",
+                        "sha256":  "010A138651A1B04955EC12436A8E9FEA33B1B171A7A10896278223FFFE20F734",
+                        "bytes":  7618,
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "pdf-corrupted",
+                        "relative_path":  "docs/ml/holdout-v2-files/pdf-corrupted.pdf",
+                        "expected":  "UNKNOWN",
+                        "condition":  "damaged_pdf",
+                        "source_group":  "tinytoolkit-pdf-samples",
+                        "source_url":  "https://raw.githubusercontent.com/tinytoolkit-org/pdf-sample-files/master/out/sample-corrupted.pdf",
+                        "sha256":  "CE46A4623725AC4497DED46604283789E193719E934656D00FF219725A21954A",
+                        "bytes":  7062,
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "pdf-openprinting",
+                        "relative_path":  "docs/ml/holdout-v2-files/pdf-openprinting.pdf",
+                        "expected":  "PDF",
+                        "condition":  "valid",
+                        "source_group":  "openprinting-sample-files",
+                        "source_url":  "https://raw.githubusercontent.com/OpenPrinting/sample-files/master/pdf/a4-portrait-vector-color.pdf",
+                        "sha256":  "FD426FBE9A782361615F524A5B975B55291CB34C2990664F496DD0B162A7D7E1",
+                        "bytes":  42041,
+                        "review_status":  "pending"
+                    }
+                ]
+}

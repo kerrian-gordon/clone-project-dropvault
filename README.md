@@ -4,6 +4,10 @@ Starting point for a Dropbox-style document app. The shared contract and local A
 
 The Themes page lets signed-in users preview and install community themes, search by name or creator, open a theme's details (what it can change, and that it cannot access files), customize their own saved appearance, and publish a snapshot with a public creator name. Creators can remove gallery entries without removing anyone's installed copy. The API checks color contrast when saving or publishing. The web app loads each account's appearance after sign-in and applies its colors, font, and spacing on later visits. See [the theme contract](docs/api.md#themes-and-saved-appearance). Umer's storefront requirements excerpt (what the PRD asks versus this prototype) is [Section 3](docs/community-theme-storefront-section-3.md).
 
+Owners can upload a new version of an existing file, name revisions, preview or download older bytes, compare text versions, and restore an older version as a new current revision. File IDs, folders, and grants remain stable. History does not expire by date in this prototype, but every retained revision counts toward storage usage; deleting an unpinned file removes all its revisions. See [the API contract](docs/api.md#file-model-and-limits).
+
+Workspaces collect project files. Owners can invite viewers and contributors; contributors upload and replace files against the owner's quota. Owners save fixed snapshots of selected exact versions. Members can download a complete snapshot as a TAR archive, or copy it into a new workspace under their own account and quota. A workspace can link an uploaded `git archive` ZIP to the commit label in its ZIP comment, and snapshots retain that code and data link. This label is uploader supplied and is not verified against GitHub. See [workspace and snapshot endpoints](docs/api.md#workspaces-and-snapshots).
+
 ```text
 apps/
   web/
@@ -38,13 +42,15 @@ docs/                          Product and architecture notes
 
 The upload feature is where both file selection and drag and drop will live. The API's upload module will validate incoming files, while the storage service will save their bytes. File metadata belongs in `files`; generated representations belong in `previews`. The viewer can choose a suitable display for images, PDFs, text, audio, video, and other supported formats, with download available for files that cannot be previewed.
 
-The directories contain `.gitkeep` files so the structure is visible in Git. The API uses Node.js 24 built-in modules, local disk for file bytes, and a JSON metadata catalog. It now has local account sessions, owner checks, per-account quotas, named-user access, and a defined upload-type list with a 100 MiB per-file limit. Production storage remains future work.
+The directories contain `.gitkeep` files so the structure is visible in Git. Local mode uses Node.js 24, local disk for file bytes, and a JSON metadata catalog. An optional deployment mode uses AWS S3 for bytes and PostgreSQL for the catalog; it permits one API process per database and has not yet been tested against live cloud resources. The API has account sessions, owner checks, per-account quotas, named-user access, and a defined upload-type list with a 100 MiB per-file limit.
 
 ## Run the API
 
-From the repository root, run `npm run dev:api` while developing. Node watches the API source files and restarts the process when they change. Keep this terminal open while using the web app. Use `npm run start:api` to run without file watching. The API listens at `http://127.0.0.1:3000` and stores files in `storage/`. Set `PORT` or `DROPVAULT_STORAGE_DIR` to override those defaults. After installing the web dependencies, run `npm test` to check the API and Vite proxy. If the API exits while no source files are changing, read the error in its terminal; file watching does not fix a crash.
+From the repository root, run `npm install`, then `npm run dev:api` while developing. Node watches the API source files and restarts the process when they change. Keep this terminal open while using the web app. Use `npm run start:api` to run without file watching. The API listens at `http://127.0.0.1:3000` and stores files in `storage/`. Set `PORT` or `DROPVAULT_STORAGE_DIR` to override those defaults. After installing the web dependencies, run `npm test` to check the API and Vite proxy. If the API exits while no source files are changing, read the error in its terminal; file watching does not fix a crash.
 
 Set `DROPVAULT_STORAGE_LIMIT_BYTES` to change the storage cap (default 1 GiB). For example, in PowerShell run `$env:DROPVAULT_STORAGE_LIMIT_BYTES='104857600'` before starting the API to set a 100 MiB cap.
+
+For AWS deployment, set `DROPVAULT_STORAGE_BACKEND=s3`, `DROPVAULT_DATABASE_URL`, `DROPVAULT_S3_BUCKET`, and `DROPVAULT_AWS_REGION`; optionally set `DROPVAULT_S3_PREFIX` (default `dropvault/`). Use AWS's normal credential provider chain and keep the S3 bucket private. The database catalog is still loaded into one API process, with a PostgreSQL advisory lock preventing a second process from starting on the same database. See [storage details and limits](docs/api.md#file-model-and-limits).
 
 ### Seed a local demo
 
@@ -69,6 +75,8 @@ The request and response shapes, file model, limits, and example upload command 
 For a Mac setup from a new checkout, follow the [first-time frontend guide](docs/mac-frontend-setup.md).
 
 From the repository root, run `npm --prefix apps/web install` once. Start the API with `npm run dev:api`, then in another terminal run `npm run dev:web`. Open the URL Vite prints (normally `http://127.0.0.1:5173`). Vite proxies `/v1` to the local API so session cookies and API requests use the web origin. Run `npm run build:web` to check the production bundle.
+
+Run `npm --prefix apps/web run test:browser` to check the drag-and-drop upload flow in headless Chrome. The test starts its own API and Vite server with isolated temporary storage; Google Chrome must be installed.
 
 React Router uses browser history. `/` redirects to `/files`; `/files` lists the root, `/folders/:id` lists a folder, `/shared` lists files granted to the account, and `/view/:id` shows file details, download, ownership, and owner-only access controls. `/login` and `/register` are public; the file routes require a session and return to the requested URL after sign-in. Unknown URLs show a not-found page. The upload queue lives above the file routes so transfers continue while navigating within a signed-in session. The browser sends one raw request per queued file. On a storage-cap error, the user can switch to the local demo tier and retry the same selected file after the new allowance is confirmed. Selected files remain in memory only until the tab reloads or the user logs out. A production web server must serve `index.html` for direct visits and refreshes on SPA routes, while forwarding `/v1/*` to the API.
 

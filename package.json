@@ -13,5 +13,9 @@
     "dev:web": "npm --prefix apps/web run dev",
     "build:web": "npm --prefix apps/web run build",
     "test": "node --test apps/api/test/*.test.js && npm --prefix apps/web test"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1142.0",
+    "pg": "^8.23.0"
   }
 }

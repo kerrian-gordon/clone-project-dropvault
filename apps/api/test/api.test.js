@@ -27,7 +27,7 @@ async function register(base, email = 'owner@example.test') {
   return response.json();
 }
 
-function emptyZip(entries) {
+function emptyZip(entries, comment = '') {
   const local = [];
   const central = [];
   let offset = 0;
@@ -52,8 +52,80 @@ function emptyZip(entries) {
   end.writeUInt16LE(entries.length, 10);
   end.writeUInt32LE(centralBytes.length, 12);
   end.writeUInt32LE(localBytes.length, 16);
-  return Buffer.concat([localBytes, centralBytes, end]);
+  const commentBytes = Buffer.from(comment, 'ascii');
+  end.writeUInt16LE(commentBytes.length, 20);
+  return Buffer.concat([localBytes, centralBytes, end, commentBytes]);
 }
+
+test('workspace snapshots bind a Git archive version and preserve its commit label in a copy', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-git-test-'));
+  let running;
+  try {
+    running = await start(storageRoot, 1000);
+    await register(running.base);
+    const commit = 'a'.repeat(40);
+    const zip = emptyZip(['README.md'], commit);
+    const uploaded = await fetch(`${running.base}/v1/files?name=code.zip`, {
+      method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: zip,
+    });
+    assert.equal(uploaded.status, 201);
+    const file = await uploaded.json();
+    const folder = await (await fetch(`${running.base}/v1/folders`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Code' }),
+    })).json();
+    assert.equal((await fetch(`${running.base}/v1/files/${file.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderId: folder.id }),
+    })).status, 200);
+    const workspace = await (await fetch(`${running.base}/v1/workspaces`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Code and data', description: '' }),
+    })).json();
+    const jsonRequest = (path, method, body) => fetch(`${running.base}${path}`, {
+      method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    assert.equal((await jsonRequest(`/v1/workspaces/${workspace.id}/files`, 'POST',
+      { fileId: file.id })).status, 200);
+    const linked = await jsonRequest(`/v1/workspaces/${workspace.id}/git`, 'PUT', { fileId: file.id });
+    assert.equal(linked.status, 200);
+    assert.equal((await linked.json()).commitSha, commit);
+    const snapshot = await jsonRequest(`/v1/workspaces/${workspace.id}/snapshots`, 'POST',
+      { name: 'Run one', note: '', fileIds: [file.id] });
+    assert.equal(snapshot.status, 201);
+    const saved = await snapshot.json();
+    assert.equal(saved.git.archiveVersionId, file.currentVersionId);
+    assert.equal(saved.git.commitSha, commit);
+    assert.deepEqual(saved.items[0].folderPath, ['Code']);
+    const archive = await fetch(`${running.base}/v1/snapshots/${saved.id}/archive`);
+    const tar = Buffer.from(await archive.arrayBuffer());
+    const manifestLength = Number.parseInt(tar.subarray(124, 136).toString('ascii').trim(), 8);
+    const manifest = JSON.parse(tar.subarray(512, 512 + manifestLength).toString('utf8'));
+    assert.equal(manifest.git.commitSha, commit);
+    assert.match(manifest.files[0].path, /^files\/Code\//u);
+    const replacement = await fetch(`${running.base}/v1/files/${file.id}/versions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/zip' },
+      body: emptyZip(['README.md'], 'b'.repeat(40)),
+    });
+    assert.equal(replacement.status, 201);
+    const stale = await jsonRequest(`/v1/workspaces/${workspace.id}/snapshots`, 'POST',
+      { name: 'Run two', note: '', fileIds: [file.id] });
+    assert.equal(stale.status, 409);
+    assert.equal((await stale.json()).error.code, 'GIT_ARCHIVE_CHANGED');
+    const copied = await fetch(`${running.base}/v1/snapshots/${saved.id}/copy`, { method: 'POST' });
+    assert.equal(copied.status, 201);
+    const copy = await copied.json();
+    assert.equal(copy.git.commitSha, commit);
+    assert.notEqual(copy.git.archiveFileId, file.id);
+    const copiedFiles = await (await fetch(`${running.base}/v1/workspaces/${copy.id}/files`)).json();
+    const allFolders = await (await fetch(`${running.base}/v1/folders`)).json();
+    const copiedFolder = allFolders.folders.find((item) => item.id === copiedFiles.files[0].folderId);
+    assert.equal(copiedFolder.name, 'Code');
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
 
 async function start(storageRoot, maxUploadBytes, storageLimitBytes, options = {}) {
   const server = await createApiServer({ storageRoot, maxUploadBytes, storageLimitBytes, ...options });
@@ -126,6 +198,303 @@ test('upload multiple file types, browse folders, download, and retain metadata 
     running = await start(storageRoot, 32);
     const persisted = await fetch(`${running.base}/v1/folders/${folder.id}/children`);
     assert.equal((await persisted.json()).files.length, 2);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('workspace snapshots pin exact versions, preserve quota, and enforce live file access', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-snapshot-test-'));
+  let running;
+  try {
+    running = await start(storageRoot, 100, 20);
+    await register(running.base);
+    const ownerCookie = activeCookie;
+    const requestJson = (path, method, body) => fetch(`${running.base}${path}`, {
+      method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    assert.equal((await requestJson('/v1/account/plan', 'POST', { tier: 'demo' })).status, 200);
+    const upload = await fetch(`${running.base}/v1/files?name=results.txt`, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'first result',
+    });
+    assert.equal(upload.status, 201);
+    const file = await upload.json();
+    const secondUpload = await fetch(`${running.base}/v1/files?name=methods.txt`, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'method one',
+    });
+    assert.equal(secondUpload.status, 201);
+    const secondFile = await secondUpload.json();
+    const workspaceResponse = await requestJson('/v1/workspaces', 'POST',
+      { name: 'Study', description: 'Trial one' });
+    assert.equal(workspaceResponse.status, 201);
+    const workspace = await workspaceResponse.json();
+    assert.equal((await requestJson(`/v1/workspaces/${workspace.id}/files`, 'POST',
+      { fileId: file.id })).status, 200);
+    assert.equal((await requestJson(`/v1/workspaces/${workspace.id}/files`, 'POST',
+      { fileId: secondFile.id })).status, 200);
+    const usageBefore = await (await fetch(`${running.base}/v1/storage/usage`)).json();
+    const snapshotResponse = await requestJson(`/v1/workspaces/${workspace.id}/snapshots`, 'POST',
+      { name: 'First analysis', note: 'Submitted result', fileIds: [file.id, secondFile.id] });
+    assert.equal(snapshotResponse.status, 201);
+    const snapshot = await snapshotResponse.json();
+    assert.equal(snapshot.items[0].versionId, file.currentVersionId);
+    assert.equal(snapshot.items[0].name, 'results.txt');
+    assert.deepEqual(await (await fetch(`${running.base}/v1/storage/usage`)).json(), usageBefore);
+    assert.equal((await requestJson(`/v1/workspaces/${workspace.id}/snapshots`, 'POST',
+      { name: 'Wrong file', note: '', fileIds: ['missing'] })).status, 400);
+
+    const replacement = await fetch(`${running.base}/v1/files/${file.id}/versions`, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'second result',
+    });
+    assert.equal(replacement.status, 201);
+    assert.equal((await requestJson(`/v1/files/${file.id}`, 'PATCH',
+      { name: 'renamed.txt' })).status, 200);
+    const movedFolder = await (await requestJson('/v1/folders', 'POST', { name: 'Archive' })).json();
+    assert.equal((await requestJson(`/v1/files/${file.id}`, 'PATCH',
+      { folderId: movedFolder.id })).status, 200);
+    assert.equal(await (await fetch(`${running.base}/v1/snapshots/${snapshot.id}/files/${file.id}/content`)).text(),
+      'first result');
+    assert.equal((await (await fetch(`${running.base}/v1/snapshots/${snapshot.id}`)).json()).items[0].name,
+      'results.txt');
+    assert.equal((await (await fetch(`${running.base}/v1/snapshots/${snapshot.id}`)).json()).items[0].folderId,
+      'root');
+    const archive = await fetch(`${running.base}/v1/snapshots/${snapshot.id}/archive`);
+    assert.equal(archive.status, 200);
+    assert.match(archive.headers.get('content-type'), /application\/x-tar/u);
+    const tar = Buffer.from(await archive.arrayBuffer());
+    const manifestLength = Number.parseInt(tar.subarray(124, 136).toString('ascii').trim(), 8);
+    const manifest = JSON.parse(tar.subarray(512, 512 + manifestLength).toString('utf8'));
+    assert.equal(manifest.snapshotId, snapshot.id);
+    assert.deepEqual(manifest.files.map((item) => item.name), ['results.txt', 'methods.txt']);
+    const firstFileOffset = 512 + Math.ceil(manifestLength / 512) * 512 + 512;
+    assert.equal(tar.subarray(firstFileOffset, firstFileOffset + file.size).toString(), 'first result');
+    const blocked = await fetch(`${running.base}/v1/files/${file.id}`, { method: 'DELETE' });
+    assert.equal(blocked.status, 409);
+    assert.equal((await blocked.json()).error.code, 'FILE_IN_SNAPSHOT');
+    assert.equal((await fetch(`${running.base}/v1/workspaces/${workspace.id}`, { method: 'DELETE' })).status, 409);
+
+    await register(running.base, 'reader@example.test');
+    const readerCookie = activeCookie;
+    assert.equal((await fetch(`${running.base}/v1/snapshots/${snapshot.id}`)).status, 404);
+    activeCookie = ownerCookie;
+    const prematureShare = await requestJson(`/v1/snapshots/${snapshot.id}/access`, 'POST',
+      { email: 'reader@example.test' });
+    assert.equal(prematureShare.status, 409);
+    assert.equal((await prematureShare.json()).error.code, 'SNAPSHOT_ACCESS_INCOMPLETE');
+    assert.equal((await requestJson(`/v1/files/${file.id}/access`, 'POST',
+      { email: 'reader@example.test' })).status, 201);
+    assert.equal((await requestJson(`/v1/snapshots/${snapshot.id}/access`, 'POST',
+      { email: 'reader@example.test' })).status, 409);
+    assert.equal((await requestJson(`/v1/files/${secondFile.id}/access`, 'POST',
+      { email: 'reader@example.test' })).status, 201);
+    assert.equal((await requestJson(`/v1/snapshots/${snapshot.id}/access`, 'POST',
+      { email: 'reader@example.test' })).status, 201);
+    activeCookie = readerCookie;
+    assert.equal((await fetch(`${running.base}/v1/snapshots/${snapshot.id}`)).status, 200);
+    assert.equal(await (await fetch(`${running.base}/v1/snapshots/${snapshot.id}/files/${file.id}/content`)).text(),
+      'first result');
+    assert.equal((await fetch(`${running.base}/v1/snapshots/${snapshot.id}/copy`, {
+      method: 'POST',
+    })).status, 507);
+    assert.equal((await requestJson('/v1/account/plan', 'POST', { tier: 'demo' })).status, 200);
+    const copiedResponse = await fetch(`${running.base}/v1/snapshots/${snapshot.id}/copy`, { method: 'POST' });
+    assert.equal(copiedResponse.status, 201);
+    const copiedWorkspace = await copiedResponse.json();
+    const copiedFiles = await (await fetch(`${running.base}/v1/workspaces/${copiedWorkspace.id}/files`)).json();
+    assert.equal(copiedFiles.files.length, 2);
+    assert.equal(await (await fetch(`${running.base}/v1/files/${copiedFiles.files[0].id}/content`)).text(),
+      'first result');
+    assert.equal((await (await fetch(`${running.base}/v1/storage/usage`)).json()).usedBytes,
+      file.size + secondFile.size);
+    assert.equal((await fetch(`${running.base}/v1/workspaces/${workspace.id}`)).status, 404);
+    activeCookie = ownerCookie;
+    const access = await (await fetch(`${running.base}/v1/files/${secondFile.id}/access`)).json();
+    assert.equal(access.users.length, 1);
+    assert.equal((await fetch(`${running.base}/v1/files/${secondFile.id}/access/${access.users[0].userId}`, {
+      method: 'DELETE',
+    })).status, 204);
+    activeCookie = readerCookie;
+    assert.equal((await fetch(`${running.base}/v1/snapshots/${snapshot.id}`)).status, 404);
+    assert.equal((await fetch(`${running.base}/v1/snapshots/${snapshot.id}/files/${file.id}/content`)).status, 404);
+    activeCookie = ownerCookie;
+    assert.equal((await (await fetch(`${running.base}/v1/snapshots/${snapshot.id}/access`)).json()).users.length, 0);
+    assert.equal((await requestJson(`/v1/files/${secondFile.id}/access`, 'POST',
+      { email: 'reader@example.test' })).status, 201);
+    activeCookie = readerCookie;
+    assert.equal((await fetch(`${running.base}/v1/snapshots/${snapshot.id}`)).status, 404);
+    activeCookie = ownerCookie;
+
+    await stop(running.server);
+    running = await start(storageRoot, 100, 20);
+    assert.equal(await (await fetch(`${running.base}/v1/snapshots/${snapshot.id}/files/${file.id}/content`)).text(),
+      'first result');
+    assert.equal((await fetch(`${running.base}/v1/snapshots/${snapshot.id}`, { method: 'DELETE' })).status, 204);
+    assert.equal((await fetch(`${running.base}/v1/files/${file.id}`, { method: 'DELETE' })).status, 204);
+    assert.equal((await fetch(`${running.base}/v1/workspaces/${workspace.id}`, { method: 'DELETE' })).status, 204);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('workspace viewers and contributors use live files within their roles', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-team-test-'));
+  let running;
+  try {
+    running = await start(storageRoot, 100, 100);
+    await register(running.base, 'project-owner@example.test');
+    const ownerCookie = activeCookie;
+    const requestJson = (path, method, body) => fetch(`${running.base}${path}`, {
+      method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const workspace = await (await requestJson('/v1/workspaces', 'POST',
+      { name: 'Shared study', description: '' })).json();
+    const original = await (await fetch(`${running.base}/v1/workspaces/${workspace.id}/uploads?name=data.txt`, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'initial',
+    })).json();
+    await register(running.base, 'viewer@example.test');
+    const viewerCookie = activeCookie;
+    await register(running.base, 'contributor@example.test');
+    const contributorCookie = activeCookie;
+    activeCookie = ownerCookie;
+    const viewerGrant = await requestJson(`/v1/workspaces/${workspace.id}/access`, 'POST',
+      { email: 'viewer@example.test', role: 'viewer' });
+    assert.equal(viewerGrant.status, 201);
+    const viewer = await viewerGrant.json();
+    assert.equal((await requestJson(`/v1/workspaces/${workspace.id}/access`, 'POST',
+      { email: 'contributor@example.test', role: 'contributor' })).status, 201);
+
+    activeCookie = viewerCookie;
+    assert.equal((await fetch(`${running.base}/v1/workspaces/${workspace.id}`)).status, 200);
+    assert.equal(await (await fetch(`${running.base}/v1/workspaces/${workspace.id}/files/${original.id}/content`)).text(),
+      'initial');
+    assert.equal((await fetch(`${running.base}/v1/files/${original.id}/content`)).status, 404);
+    assert.equal((await fetch(`${running.base}/v1/workspaces/${workspace.id}/uploads?name=wrong.txt`, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'no',
+    })).status, 404);
+    assert.equal((await requestJson(`/v1/workspaces/${workspace.id}/snapshots`, 'POST',
+      { name: 'Unauthorized', note: '', fileIds: [original.id] })).status, 404);
+
+    activeCookie = contributorCookie;
+    const contributed = await fetch(`${running.base}/v1/workspaces/${workspace.id}/uploads?name=notes.txt`, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'draft',
+    });
+    assert.equal(contributed.status, 201);
+    const added = await contributed.json();
+    assert.equal(added.ownerId, workspace.ownerId);
+    assert.equal((await (await fetch(`${running.base}/v1/storage/usage`)).json()).usedBytes, 0);
+    assert.equal((await fetch(`${running.base}/v1/files/${added.id}/content`)).status, 404);
+    activeCookie = ownerCookie;
+    assert.equal((await (await fetch(`${running.base}/v1/storage/usage`)).json()).usedBytes, 12);
+    const snapshot = await (await requestJson(`/v1/workspaces/${workspace.id}/snapshots`, 'POST',
+      { name: 'Draft', note: '', fileIds: [added.id] })).json();
+    activeCookie = contributorCookie;
+    const replacement = await fetch(`${running.base}/v1/workspaces/${workspace.id}/files/${added.id}/versions`, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'final',
+    });
+    assert.equal(replacement.status, 201);
+    assert.equal(await (await fetch(`${running.base}/v1/snapshots/${snapshot.id}/files/${added.id}/content`)).text(),
+      'draft');
+    assert.equal(await (await fetch(`${running.base}/v1/workspaces/${workspace.id}/files/${added.id}/content`)).text(),
+      'final');
+    assert.equal((await fetch(`${running.base}/v1/files/${added.id}`, { method: 'DELETE' })).status, 404);
+
+    activeCookie = ownerCookie;
+    assert.equal((await fetch(`${running.base}/v1/workspaces/${workspace.id}/access/${viewer.userId}`, {
+      method: 'DELETE',
+    })).status, 204);
+    activeCookie = viewerCookie;
+    assert.equal((await fetch(`${running.base}/v1/workspaces/${workspace.id}`)).status, 404);
+    assert.equal((await fetch(`${running.base}/v1/workspaces/${workspace.id}/files/${original.id}/content`)).status, 404);
+    assert.equal((await fetch(`${running.base}/v1/snapshots/${snapshot.id}`)).status, 404);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('owner can rename and move files and folders without changing file bytes or access', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-manage-test-'));
+  let running;
+  try {
+    running = await start(storageRoot, 100, 100);
+    await register(running.base);
+    const ownerCookie = activeCookie;
+    const sendJson = (path, method, body) => fetch(`${running.base}${path}`, {
+      method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const makeFolder = async (name, parentId = 'root') => {
+      const response = await sendJson('/v1/folders', 'POST', { name, parentId });
+      assert.equal(response.status, 201);
+      return response.json();
+    };
+    const projects = await makeFolder('Projects');
+    const drafts = await makeFolder('Drafts', projects.id);
+    const archive = await makeFolder('Archive');
+    const upload = await fetch(`${running.base}/v1/files?name=notes.txt&folderId=${drafts.id}`, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'saved bytes',
+    });
+    assert.equal(upload.status, 201);
+    const file = await upload.json();
+
+    const folderList = await (await fetch(`${running.base}/v1/folders`)).json();
+    assert.equal(folderList.folders.length, 3);
+    const renamed = await sendJson(`/v1/files/${file.id}`, 'PATCH',
+      { name: 'final.txt', folderId: archive.id });
+    assert.equal(renamed.status, 200);
+    assert.equal((await renamed.json()).folderId, archive.id);
+    assert.equal((await (await fetch(`${running.base}/v1/folders/${drafts.id}/children`)).json()).files.length, 0);
+    assert.equal((await (await fetch(`${running.base}/v1/folders/${archive.id}/children`)).json()).files[0].name,
+      'final.txt');
+    assert.equal(await (await fetch(`${running.base}/v1/files/${file.id}/content`)).text(), 'saved bytes');
+    assert.equal((await (await fetch(`${running.base}/v1/storage/usage`)).json()).usedBytes, 11);
+
+    const moved = await sendJson(`/v1/folders/${projects.id}`, 'PATCH',
+      { name: 'Work', parentId: archive.id });
+    assert.equal(moved.status, 200);
+    assert.equal((await moved.json()).parentId, archive.id);
+    assert.equal((await (await fetch(`${running.base}/v1/folders/${archive.id}/children`)).json()).folders[0].name,
+      'Work');
+    const cycle = await sendJson(`/v1/folders/${archive.id}`, 'PATCH', { parentId: drafts.id });
+    assert.equal(cycle.status, 409);
+    assert.equal((await cycle.json()).error.code, 'FOLDER_CYCLE');
+    const existing = await makeFolder('Existing', archive.id);
+    const conflict = await sendJson(`/v1/folders/${projects.id}`, 'PATCH', { name: existing.name });
+    assert.equal(conflict.status, 409);
+    assert.equal((await conflict.json()).error.code, 'NAME_CONFLICT');
+    const extension = await sendJson(`/v1/files/${file.id}`, 'PATCH', { name: 'final.pdf' });
+    assert.equal(extension.status, 400);
+    assert.equal((await extension.json()).error.code, 'FILE_EXTENSION_CHANGE');
+    assert.equal((await sendJson(`/v1/files/${file.id}`, 'PATCH', { folderId: 'missing' })).status, 404);
+    assert.equal((await sendJson(`/v1/folders/${projects.id}`, 'PATCH', { parentId: 'missing' })).status, 404);
+    assert.equal((await sendJson('/v1/folders/root', 'PATCH', { name: 'Other' })).status, 400);
+
+    await register(running.base, 'other@example.test');
+    const recipientCookie = activeCookie;
+    const privateFolder = await makeFolder('Private');
+    assert.equal((await fetch(`${running.base}/v1/folders`)).status, 200);
+    assert.equal((await (await fetch(`${running.base}/v1/folders`)).json()).folders.length, 1);
+    assert.equal((await sendJson(`/v1/files/${file.id}`, 'PATCH', { name: 'stolen.txt' })).status, 404);
+    assert.equal((await sendJson(`/v1/folders/${projects.id}`, 'PATCH', { name: 'Stolen' })).status, 404);
+    activeCookie = ownerCookie;
+    assert.equal((await sendJson(`/v1/files/${file.id}`, 'PATCH',
+      { folderId: privateFolder.id })).status, 404);
+    const grant = await sendJson(`/v1/files/${file.id}/access`, 'POST',
+      { email: 'other@example.test' });
+    assert.equal(grant.status, 201);
+    activeCookie = recipientCookie;
+    assert.equal(await (await fetch(`${running.base}/v1/files/${file.id}/content`)).text(), 'saved bytes');
+    assert.equal((await sendJson(`/v1/files/${file.id}`, 'PATCH', { name: 'stolen.txt' })).status, 404);
+    activeCookie = ownerCookie;
+
+    await stop(running.server);
+    running = await start(storageRoot, 100, 100);
+    const persisted = await (await fetch(`${running.base}/v1/files/${file.id}`)).json();
+    assert.equal(persisted.name, 'final.txt');
+    assert.equal(persisted.folderId, archive.id);
+    assert.equal((await (await fetch(`${running.base}/v1/folders/${archive.id}/children`)).json())
+      .folders[0].name, 'Work');
   } finally {
     if (running) await stop(running.server);
     await rm(storageRoot, { recursive: true, force: true });
@@ -448,6 +817,7 @@ test('startup restores interrupted deletion and removes committed staged bytes',
 
     await rename(original, staged);
     catalog.files = []; // Process stopped after catalog change, before byte cleanup.
+    catalog.versions = [];
     await writeFile(catalogPath, JSON.stringify(catalog));
     running = await start(storageRoot, 100, 100);
     assert.equal((await fetch(`${running.base}/v1/files/${file.id}`)).status, 404);
@@ -739,6 +1109,153 @@ test('quota rejection drains a declared upload body', async () => {
       drained,
       new Promise((_, reject) => setTimeout(() => reject(new Error('Upload body was not drained')), 1000)),
     ]);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('folder suggestions are opt-in, account-scoped, and choices persist', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-suggestions-test-'));
+  let running;
+  const jsonHeaders = { 'Content-Type': 'application/json' };
+  try {
+    running = await start(storageRoot, 1024);
+    await register(running.base, 'suggest-owner@example.test');
+    const ownerCookie = activeCookie;
+    const folderResponse = await fetch(`${running.base}/v1/folders`, {
+      method: 'POST', headers: jsonHeaders, body: JSON.stringify({ name: 'Photos' }),
+    });
+    const folder = await folderResponse.json();
+    const requestSuggestion = (name, currentFolderId = 'root') => nativeFetch(
+      `${running.base}/v1/organization/suggestions`, {
+        method: 'POST', headers: { ...jsonHeaders, Cookie: ownerCookie },
+        body: JSON.stringify({ name, currentFolderId }),
+      });
+    const suggestionResponse = await requestSuggestion('holiday.jpg');
+    assert.equal(suggestionResponse.status, 200);
+    const { suggestion } = await suggestionResponse.json();
+    assert.equal(suggestion.folderId, folder.id);
+    assert.equal(suggestion.rule, 'type_match');
+    assert.deepEqual(await (await requestSuggestion('holiday.jpg', folder.id)).json(),
+      { suggestion: null });
+    assert.deepEqual(await (await requestSuggestion('unknown.txt')).json(),
+      { suggestion: null });
+
+    await register(running.base, 'suggest-other@example.test');
+    const otherCookie = activeCookie;
+    assert.deepEqual(await (await nativeFetch(`${running.base}/v1/organization/suggestions`, {
+      method: 'POST', headers: { ...jsonHeaders, Cookie: otherCookie },
+      body: JSON.stringify({ name: 'holiday.jpg', currentFolderId: 'root' }),
+    })).json(), { suggestion: null });
+    const forbidden = await nativeFetch(`${running.base}/v1/organization/suggestions/${suggestion.id}/decision`, {
+      method: 'POST', headers: { ...jsonHeaders, Cookie: otherCookie },
+      body: JSON.stringify({ accept: true }),
+    });
+    assert.equal(forbidden.status, 404);
+    const choice = await nativeFetch(`${running.base}/v1/organization/suggestions/${suggestion.id}/decision`, {
+      method: 'POST', headers: { ...jsonHeaders, Cookie: ownerCookie },
+      body: JSON.stringify({ accept: true }),
+    });
+    assert.equal(choice.status, 204);
+    assert.equal((await nativeFetch(`${running.base}/v1/organization/suggestions/${suggestion.id}/decision`, {
+      method: 'POST', headers: { ...jsonHeaders, Cookie: ownerCookie },
+      body: JSON.stringify({ accept: true }),
+    })).status, 404);
+    const second = (await (await requestSuggestion('another.jpg')).json()).suggestion;
+    assert.equal((await nativeFetch(`${running.base}/v1/organization/suggestions/${second.id}/decision`, {
+      method: 'POST', headers: { ...jsonHeaders, Cookie: ownerCookie },
+      body: JSON.stringify({ accept: false }),
+    })).status, 204);
+    assert.deepEqual(await (await nativeFetch(`${running.base}/v1/organization/stats`, {
+      headers: { Cookie: ownerCookie },
+    })).json(), { shown: 2, accepted: 1, keptCurrent: 1 });
+    await stop(running.server);
+    running = await start(storageRoot, 1024);
+    assert.deepEqual(await (await nativeFetch(`${running.base}/v1/organization/stats`, {
+      headers: { Cookie: ownerCookie },
+    })).json(), { shown: 2, accepted: 1, keptCurrent: 1 });
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('file versions preserve older bytes, enforce quota and ownership, and restore safely', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-versions-test-'));
+  let running;
+  try {
+    running = await start(storageRoot, 100, 11);
+    await register(running.base, 'versions-owner@example.test');
+    const ownerCookie = activeCookie;
+    const ownerFetch = (path, options = {}) => nativeFetch(`${running.base}${path}`, {
+      ...options, headers: { ...options.headers, Cookie: ownerCookie },
+    });
+    const upload = await ownerFetch('/v1/files?name=draft.txt', {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'first',
+    });
+    assert.equal(upload.status, 201);
+    const file = await upload.json();
+    const path = `/v1/files/${file.id}/versions`;
+    const initial = await (await ownerFetch(path)).json();
+    assert.equal(initial.versions.length, 1);
+    const firstId = initial.versions[0].id;
+    const second = await ownerFetch(path, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'second',
+    });
+    assert.equal(second.status, 201);
+    assert.equal((await second.json()).id, file.id);
+    assert.equal((await (await ownerFetch('/v1/storage/usage')).json()).usedBytes, 11);
+    const blocked = await ownerFetch(path, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'third',
+    });
+    assert.equal(blocked.status, 507);
+    assert.equal((await blocked.json()).error.code, 'STORAGE_CAP_EXCEEDED');
+    assert.equal((await ownerFetch(`${path}/${firstId}/restore`, { method: 'POST' })).status, 507);
+    assert.equal((await (await ownerFetch(`${path}/${firstId}/content`)).text()), 'first');
+    assert.equal((await (await ownerFetch(`/v1/files/${file.id}/content`)).text()), 'second');
+    const labeled = await ownerFetch(`${path}/${firstId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: 'Approved draft' }),
+    });
+    assert.equal((await labeled.json()).label, 'Approved draft');
+
+    await register(running.base, 'versions-reader@example.test');
+    const readerCookie = activeCookie;
+    assert.equal((await nativeFetch(`${running.base}${path}`, {
+      headers: { Cookie: readerCookie },
+    })).status, 404);
+    const granted = await ownerFetch(`/v1/files/${file.id}/access`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'versions-reader@example.test' }),
+    });
+    assert.equal(granted.status, 201);
+    assert.equal((await nativeFetch(`${running.base}/v1/files/${file.id}/content`, {
+      headers: { Cookie: readerCookie },
+    })).status, 200);
+    assert.equal((await nativeFetch(`${running.base}${path}/${firstId}/content`, {
+      headers: { Cookie: readerCookie },
+    })).status, 404);
+
+    await stop(running.server);
+    running = await start(storageRoot, 100, 30);
+    const beforeRestore = await (await ownerFetch(path)).json();
+    assert.equal(beforeRestore.versions.length, 2);
+    assert.equal(beforeRestore.versions.find((version) => version.id === firstId).label, 'Approved draft');
+    const restored = await ownerFetch(`${path}/${firstId}/restore`, { method: 'POST' });
+    assert.equal(restored.status, 201);
+    const current = await restored.json();
+    assert.equal(current.id, file.id);
+    assert.notEqual(current.currentVersionId, firstId);
+    assert.equal((await (await ownerFetch(`/v1/files/${file.id}/content`)).text()), 'first');
+    const history = await (await ownerFetch(path)).json();
+    assert.equal(history.versions.length, 3);
+    assert.equal(history.versions[0].kind, 'restored');
+    assert.equal((await (await ownerFetch(`${path}/${beforeRestore.currentVersionId}/content`)).text()), 'second');
+    assert.equal((await (await ownerFetch('/v1/storage/usage')).json()).usedBytes, 16);
+    assert.equal((await ownerFetch(`/v1/files/${file.id}`, { method: 'DELETE' })).status, 204);
+    assert.equal((await (await ownerFetch('/v1/storage/usage')).json()).usedBytes, 0);
+    assert.deepEqual(await readdir(join(storageRoot, 'originals')), []);
   } finally {
     if (running) await stop(running.server);
     await rm(storageRoot, { recursive: true, force: true });

@@ -1,0 +1,53 @@
+{
+  "experiment": "first revised-detector run on fresh-txt sources",
+  "sample_count": 5,
+  "correct": 5,
+  "label_review": "pending human review; structural checks are provisional",
+  "results": [
+    {
+      "sample_id": "gnu-gpl",
+      "source_group": "gnu-licenses",
+      "expected": "TXT",
+      "structural_check": "readable_utf8_text",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "correct": true
+    },
+    {
+      "sample_id": "python-license",
+      "source_group": "cpython",
+      "expected": "TXT",
+      "structural_check": "readable_utf8_text",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "correct": true
+    },
+    {
+      "sample_id": "node-license",
+      "source_group": "nodejs",
+      "expected": "TXT",
+      "structural_check": "readable_utf8_text",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "correct": true
+    },
+    {
+      "sample_id": "go-license",
+      "source_group": "golang-go",
+      "expected": "TXT",
+      "structural_check": "readable_utf8_text",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "correct": true
+    },
+    {
+      "sample_id": "rust-mit",
+      "source_group": "rust-lang",
+      "expected": "TXT",
+      "structural_check": "readable_utf8_text",
+      "predicted": "TXT",
+      "reason": "unstructured_utf8_text",
+      "correct": true
+    }
+  ]
+}

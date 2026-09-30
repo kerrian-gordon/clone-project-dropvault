@@ -1,0 +1,2 @@
+# Preserve the exact bytes referenced by docs/ml/file-recognition-manifest.csv.
+docs/ml/samples/** -text
