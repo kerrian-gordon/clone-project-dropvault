@@ -96,7 +96,12 @@
       "creatorName": "Alex",
       "name": "Ocean blue",
       "settings": {
-        "colors": { "background": "#eaf4ff", "surface": "#ffffff", "text": "#17324d", "accent": "#1764c0" },
+        "colors": {
+          "background": "#eaf4ff",
+          "surface": "#ffffff",
+          "text": "#17324d",
+          "accent": "#1764c0"
+        },
         "font": "Inter",
         "spacing": "comfortable"
       },
@@ -108,11 +113,67 @@
       "creatorName": "Blair",
       "name": "Midnight",
       "settings": {
-        "colors": { "background": "#141c2b", "surface": "#233148", "text": "#f2f6ff", "accent": "#5ee2c5" },
+        "colors": {
+          "background": "#141c2b",
+          "surface": "#233148",
+          "text": "#f2f6ff",
+          "accent": "#5ee2c5"
+        },
         "font": "Georgia",
         "spacing": "compact"
       },
       "createdAt": "2026-09-11T10:00:00.000Z"
+    },
+    {
+      "id": "55555555-5555-4555-8555-000000000003",
+      "creatorId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+      "creatorName": "Alex",
+      "name": "Forest",
+      "settings": {
+        "colors": {
+          "background": "#f3f6f1",
+          "surface": "#ffffff",
+          "text": "#1c2a1c",
+          "accent": "#2f6f4e"
+        },
+        "font": "Georgia",
+        "spacing": "comfortable"
+      },
+      "createdAt": "2026-09-13T10:00:00.000Z"
+    },
+    {
+      "id": "55555555-5555-4555-8555-000000000004",
+      "creatorId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2",
+      "creatorName": "Blair",
+      "name": "Clay",
+      "settings": {
+        "colors": {
+          "background": "#f6efe8",
+          "surface": "#fffaf6",
+          "text": "#3a2418",
+          "accent": "#b5472a"
+        },
+        "font": "Inter",
+        "spacing": "comfortable"
+      },
+      "createdAt": "2026-09-14T10:00:00.000Z"
+    },
+    {
+      "id": "55555555-5555-4555-8555-000000000005",
+      "creatorId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+      "creatorName": "Alex",
+      "name": "Ink",
+      "settings": {
+        "colors": {
+          "background": "#111111",
+          "surface": "#1c1c1c",
+          "text": "#f4f4f1",
+          "accent": "#e8c547"
+        },
+        "font": "Georgia",
+        "spacing": "comfortable"
+      },
+      "createdAt": "2026-09-15T10:00:00.000Z"
     }
   ],
   "appearances": [
@@ -121,7 +182,12 @@
       "sourceThemeId": "55555555-5555-4555-8555-000000000001",
       "name": "Ocean blue",
       "settings": {
-        "colors": { "background": "#eaf4ff", "surface": "#ffffff", "text": "#17324d", "accent": "#b34739" },
+        "colors": {
+          "background": "#eaf4ff",
+          "surface": "#ffffff",
+          "text": "#17324d",
+          "accent": "#b34739"
+        },
         "font": "Inter",
         "spacing": "comfortable"
       },
