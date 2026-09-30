@@ -29,19 +29,13 @@ export async function openLocalStorage(root) {
             if (error.code !== 'ENOENT') throw error;
             originalExists = false;
           }
-          if (originalExists) await rm(stagedPath);
-          else await rename(stagedPath, originalPath);
-        } else {
-          await rm(stagedPath);
+          if (originalExists) {
+            // Preserve both copies without blocking a later stageRemove for this key.
+            await rename(stagedPath, join(tmp, `review-${storageKey}-${randomUUID()}.pending`));
+          } else {
+            await rename(stagedPath, originalPath);
+          }
         }
-      }
-    },
-    async recoverOrphanUploads(referencedKeys) {
-      const referenced = new Set(referencedKeys);
-      for (const name of await readdir(originals)) {
-        if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(name)
-          || referenced.has(name)) continue;
-        await rm(join(originals, name), { force: true });
       }
     },
     async save(request, maxUploadBytes, availableBytes) {

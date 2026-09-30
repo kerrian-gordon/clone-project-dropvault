@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { Transform } from 'node:stream';
 import test from 'node:test';
 import { createApiServer } from '../src/server.js';
+import { apiListenOptions } from '../src/start.js';
 import { openLocalStorage } from '../src/services/storage/local.js';
 
 const nativeFetch = globalThis.fetch;
@@ -128,11 +129,44 @@ test('workspace snapshots bind a Git archive version and preserve its commit lab
 });
 
 async function start(storageRoot, maxUploadBytes, storageLimitBytes, options = {}) {
-  const server = await createApiServer({ storageRoot, maxUploadBytes, storageLimitBytes, ...options });
+  const server = await createApiServer({ storageRoot, maxUploadBytes, storageLimitBytes,
+    demoPlanSwitchEnabled: true, ...options });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   return { server, base: `http://127.0.0.1:${server.address().port}` };
 }
+
+test('unpaid plan changes are disabled unless the local demo opts in', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-plan-gate-test-'));
+  let running;
+  try {
+    running = await start(storageRoot, 32, 4, { demoPlanSwitchEnabled: false });
+    assert.deepEqual(await (await nativeFetch(`${running.base}/v1/capabilities`)).json(),
+      { demoPlanSwitchEnabled: false });
+    await register(running.base);
+    const blocked = await fetch(`${running.base}/v1/account/plan`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier: 'demo' }),
+    });
+    assert.equal(blocked.status, 403);
+    assert.equal((await blocked.json()).error.code, 'DEMO_PLAN_DISABLED');
+    assert.equal((await (await fetch(`${running.base}/v1/account`)).json()).tier, 'free');
+    assert.equal((await (await fetch(`${running.base}/v1/storage/usage`)).json()).limitBytes, 4);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('demo plan startup setting rejects an exposed host or S3 backend', async () => {
+  assert.throws(() => apiListenOptions({ demoPlanSetting: '1', host: '0.0.0.0' }),
+    /loopback host/u);
+  assert.throws(() => apiListenOptions({ demoPlanSetting: '1', storageBackend: 's3' }),
+    /local storage/u);
+  await assert.rejects(() => createApiServer({ storageRoot: 'unused',
+    productionStorage: { databaseUrl: 'postgres://invalid', bucket: 'test', region: 'us-east-1' },
+    demoPlanSwitchEnabled: true }), /cannot be enabled with S3/u);
+});
 
 async function stop(server) {
   server.closeAllConnections();
@@ -782,7 +816,7 @@ test('login, logout, and explicit legacy claim protect old files', async () => {
   }
 });
 
-test('startup restores interrupted deletion and removes committed staged bytes', async () => {
+test('startup restores referenced bytes and preserves bytes absent from a restored catalog', async () => {
   const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-recovery-test-'));
   let running;
   try {
@@ -809,27 +843,50 @@ test('startup restores interrupted deletion and removes committed staged bytes',
     await writeFile(orphan, 'saved before catalog commit');
     running = await start(storageRoot, 100, 100);
     assert.equal((await readFile(original, 'utf8')), 'keep me');
-    assert.deepEqual(await readdir(join(storageRoot, 'originals')), [storageKey]);
+    assert.equal(await readFile(preexisting, 'utf8'), 'preserve without a catalog');
+    assert.equal(await readFile(orphan, 'utf8'), 'saved before catalog commit');
     assert.equal((await fetch(`${running.base}/v1/files/${file.id}/content`)).status, 200);
     assert.equal((await readdir(join(storageRoot, 'tmp'))).length, 0);
     await stop(running.server);
     running = null;
 
     await rename(original, staged);
-    catalog.files = []; // Process stopped after catalog change, before byte cleanup.
+    catalog.files = []; // An older catalog backup lacks the newer file.
     catalog.versions = [];
     await writeFile(catalogPath, JSON.stringify(catalog));
     running = await start(storageRoot, 100, 100);
     assert.equal((await fetch(`${running.base}/v1/files/${file.id}`)).status, 404);
-    assert.equal((await readdir(join(storageRoot, 'tmp'))).length, 0);
-    assert.equal((await readdir(join(storageRoot, 'originals'))).length, 0);
+    assert.equal(await readFile(staged, 'utf8'), 'keep me');
+    assert.equal(await readFile(preexisting, 'utf8'), 'preserve without a catalog');
+    assert.equal(await readFile(orphan, 'utf8'), 'saved before catalog commit');
   } finally {
     if (running) await stop(running.server);
     await rm(storageRoot, { recursive: true, force: true });
   }
 });
 
-test('cleanup failure returns committed deletion and recovers on restart', async () => {
+test('startup preserves duplicate staged bytes without blocking a later delete', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-duplicate-stage-test-'));
+  const key = '11111111-1111-4111-8111-111111111111';
+  try {
+    const storage = await openLocalStorage(storageRoot);
+    const original = join(storageRoot, 'originals', key);
+    await writeFile(original, 'catalog copy');
+    await writeFile(join(storageRoot, 'tmp', `delete-${key}.pending`), 'pending copy');
+    await storage.recoverDeletes([key]);
+    assert.equal(await readFile(original, 'utf8'), 'catalog copy');
+    const [review] = await readdir(join(storageRoot, 'tmp'));
+    assert.match(review, /^review-11111111-1111-4111-8111-111111111111-[a-f0-9-]+\.pending$/u);
+    assert.equal(await readFile(join(storageRoot, 'tmp', review), 'utf8'), 'pending copy');
+    const staged = await storage.stageRemove(key);
+    await staged.commit();
+    assert.deepEqual(await readdir(join(storageRoot, 'tmp')), [review]);
+  } finally {
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('cleanup failure returns committed deletion and leaves staged bytes for review', async () => {
   const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-cleanup-test-'));
   let running;
   try {
@@ -852,7 +909,9 @@ test('cleanup failure returns committed deletion and recovers on restart', async
     assert.equal((await readdir(join(storageRoot, 'tmp'))).length, 1);
     await stop(running.server);
     running = await start(storageRoot, 100, 100);
-    assert.equal((await readdir(join(storageRoot, 'tmp'))).length, 0);
+    const pending = await readdir(join(storageRoot, 'tmp'));
+    assert.equal(pending.length, 1);
+    assert.equal(await readFile(join(storageRoot, 'tmp', pending[0]), 'utf8'), 'remove me');
   } finally {
     if (running) await stop(running.server);
     await rm(storageRoot, { recursive: true, force: true });

@@ -6,7 +6,7 @@ import { useUploads } from './UploadContext.jsx';
 
 export function UploadPanel({ folderId, usage, refreshUsage }) {
   const { jobs, enqueue, chooseDestination, retry } = useUploads();
-  const { user, changePlan } = useAuth();
+  const { user, changePlan, demoPlanSwitchEnabled } = useAuth();
   const input = useRef(null);
   const upgradeDialog = useRef(null);
   const dragDepth = useRef(0);
@@ -120,8 +120,8 @@ export function UploadPanel({ folderId, usage, refreshUsage }) {
         </p>
         {job.status === 'failed' && job.code !== 'CLIENT_VALIDATION' && <button type="button" className="btn-ghost" onClick={() => retry(job.id)}>Retry</button>}
         {job.code === 'STORAGE_CAP_EXCEEDED' && <div className="cap-actions">
-          <p className="muted">This file stays in the queue until you refresh or log out. {user.tier === 'free' ? 'Free space and retry, or switch to the demo plan.' : 'Free space, then retry.'}</p>
-          {user.tier === 'free' && <button type="button" onClick={() => { setUpgradeError(''); setUpgradeJobId(job.id); }}>Upgrade storage</button>}
+          <p className="muted">This file stays in the queue until you refresh or log out. {user.tier === 'free' && demoPlanSwitchEnabled ? 'Free space and retry, or switch to the demo plan.' : 'Free space, then retry.'}</p>
+          {user.tier === 'free' && demoPlanSwitchEnabled && <button type="button" onClick={() => { setUpgradeError(''); setUpgradeJobId(job.id); }}>Upgrade storage</button>}
         </div>}
       </li>)}</ul>
     </div>}
@@ -135,7 +135,7 @@ export function UploadPanel({ folderId, usage, refreshUsage }) {
       {upgradeError && <p className="error" role="alert">{upgradeError}</p>}
       <div className="dialog-actions">
         <button type="button" className="btn-ghost" disabled={upgradePending} onClick={closeUpgrade}>Cancel</button>
-        {user.tier === 'free' && <button type="button" disabled={upgradePending || !demoHasSpace} onClick={upgradeAndRetry}>
+        {user.tier === 'free' && demoPlanSwitchEnabled && <button type="button" disabled={upgradePending || !demoHasSpace} onClick={upgradeAndRetry}>
           {upgradePending ? 'Upgrading…' : 'Switch to demo and retry'}
         </button>}
       </div>
