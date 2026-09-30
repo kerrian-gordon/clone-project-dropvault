@@ -26,8 +26,9 @@ export function AppearanceProvider({ children }) {
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const appearance = saved?.userId === user?.id ? saved.appearance : defaultAppearance;
-  const visibleSettings = preview?.userId === user?.id ? preview.settings : appearance.settings;
+  const appearance = user && saved?.userId === user.id ? saved.appearance : defaultAppearance;
+  const activePreview = user && preview?.userId === user.id ? preview : null;
+  const visibleSettings = activePreview?.settings ?? appearance.settings;
 
   useEffect(() => {
     if (!user) return undefined;
@@ -81,7 +82,7 @@ export function AppearanceProvider({ children }) {
   });
 
   return <AppearanceContext.Provider value={{
-    appearance, loading, error, previewing: preview?.userId === user?.id ? preview : null,
+    appearance, loading, error, previewing: activePreview,
     startPreview: (theme) => setPreview({ userId: user.id, id: theme.id,
       name: theme.name, settings: theme.settings }),
     stopPreview: () => setPreview(null),
