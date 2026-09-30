@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DEFAULT_THEME_SETTINGS } from '../../../packages/shared/index.js';
-import { appearanceCacheKey, applyThemeToRoot, defaultAppearance, deriveAppearance,
-  parseCachedAppearance, previewAfterNavigation, readCachedAppearance, safeSettings,
+import { appearanceCacheKey, applyThemeToRoot, clearAllCachedAppearances, clearCachedAppearance,
+  defaultAppearance, deriveAppearance, parseCachedAppearance, previewAfterNavigation,
+  readCachedAppearance, safeSettings, shouldRefreshOnVisible, VISIBLE_REFRESH_MS,
   writeCachedAppearance } from '../src/app/appearanceState.js';
 
 const customSettings = {
@@ -21,6 +22,9 @@ function memoryStorage(initial = {}) {
   return {
     getItem(key) { return Object.hasOwn(data, key) ? data[key] : null; },
     setItem(key, value) { data[key] = String(value); },
+    removeItem(key) { delete data[key]; },
+    get length() { return Object.keys(data).length; },
+    key(index) { return Object.keys(data)[index] ?? null; },
     data,
   };
 }
@@ -108,6 +112,8 @@ test('preview clears when leaving /themes', () => {
 });
 
 test('unsafe settings are rejected before they reach CSS variables', () => {
+  assert.equal(safeSettings(customSettings), true);
+  assert.equal(safeSettings({ ...customSettings, spacing: 'huge' }), false);
   assert.equal(safeSettings({
     ...customSettings, colors: { ...customSettings.colors, background: 'red; } body { display:none' },
   }), false);
@@ -150,4 +156,44 @@ test('appearance cache ignores blocked storage and invalid JSON', () => {
   assert.equal(writeCachedAppearance('alex', customAppearance, storage), true);
   assert.equal(readCachedAppearance('alex', storage).name, 'Ocean');
   assert.equal(storage.data[appearanceCacheKey('alex')].includes('Ocean'), true);
+});
+
+test('cached appearance is keyed by user and must pass safe() before CSS', () => {
+  const storage = memoryStorage();
+  writeCachedAppearance('alex', customAppearance, storage);
+  writeCachedAppearance('blair', { ...customAppearance, name: 'Forest' }, storage);
+  assert.equal(readCachedAppearance('alex', storage).name, 'Ocean');
+  assert.equal(readCachedAppearance('blair', storage).name, 'Forest');
+  const injected = {
+    ...customAppearance,
+    settings: { ...customSettings, colors: { ...customSettings.colors, background: 'red; } body{display:none' } },
+  };
+  assert.equal(writeCachedAppearance('alex', injected, storage), false);
+  assert.equal(parseCachedAppearance(JSON.stringify(injected)), null);
+  const view = deriveAppearance({
+    user: { id: 'alex' }, saved: null, cached: injected, preview: null, error: '', pathname: '/files',
+  });
+  assert.equal(view.appearance, defaultAppearance);
+  const root = fakeRoot();
+  applyThemeToRoot(root, { followStylesheet: false, settings: injected.settings });
+  assert.equal(root.props['--paper'], DEFAULT_THEME_SETTINGS.colors.background);
+  clearCachedAppearance('alex', storage);
+  assert.equal(readCachedAppearance('alex', storage), null);
+  assert.equal(readCachedAppearance('blair', storage).name, 'Forest');
+});
+
+test('visibility refetch waits a minute between tab switches', () => {
+  assert.equal(shouldRefreshOnVisible(0, 1), true);
+  const justNow = 1_000_000;
+  assert.equal(shouldRefreshOnVisible(justNow, justNow + 1_000), false);
+  assert.equal(shouldRefreshOnVisible(justNow, justNow + VISIBLE_REFRESH_MS), true);
+});
+
+test('a 401 can clear every cached appearance on the machine', () => {
+  const storage = memoryStorage();
+  writeCachedAppearance('alex', customAppearance, storage);
+  writeCachedAppearance('blair', { ...customAppearance, name: 'Forest' }, storage);
+  clearAllCachedAppearances(storage);
+  assert.equal(readCachedAppearance('alex', storage), null);
+  assert.equal(readCachedAppearance('blair', storage), null);
 });

@@ -39,7 +39,7 @@ export function validAppearance(value) {
 export function parseCachedAppearance(raw) {
   try {
     const parsed = JSON.parse(raw);
-    return validAppearance(parsed) ? parsed : null;
+    return validAppearance(parsed) && safeSettings(parsed.settings) ? parsed : null;
   } catch {
     return null;
   }
@@ -56,7 +56,9 @@ export function readCachedAppearance(userId, storage = globalThis.localStorage) 
 
 export function writeCachedAppearance(userId, appearance, storage = globalThis.localStorage) {
   try {
-    if (!userId || !storage || !validAppearance(appearance)) return false;
+    if (!userId || !storage || !validAppearance(appearance) || !safeSettings(appearance.settings)) {
+      return false;
+    }
     storage.setItem(appearanceCacheKey(userId), JSON.stringify(appearance));
     return true;
   } catch {
@@ -64,14 +66,49 @@ export function writeCachedAppearance(userId, appearance, storage = globalThis.l
   }
 }
 
+export function clearCachedAppearance(userId, storage = globalThis.localStorage) {
+  try {
+    if (!userId || !storage) return false;
+    storage.removeItem(appearanceCacheKey(userId));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function clearAllCachedAppearances(storage = globalThis.localStorage) {
+  try {
+    if (!storage) return false;
+    const keys = [];
+    if (typeof storage.length === 'number' && typeof storage.key === 'function') {
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
+        if (typeof key === 'string' && key.startsWith('dropvault.appearance.')) keys.push(key);
+      }
+    }
+    for (const key of keys) storage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const VISIBLE_REFRESH_MS = 60_000;
+
+export function shouldRefreshOnVisible(lastRefreshAt, now = Date.now()) {
+  if (!lastRefreshAt) return true;
+  return now - lastRefreshAt >= VISIBLE_REFRESH_MS;
+}
+
 export function previewAfterNavigation(pathname, preview) {
   return typeof pathname === 'string' && pathname.startsWith('/themes') ? preview : null;
 }
 
 export function deriveAppearance({ user, saved, cached, preview, error, pathname }) {
+  const safeCached = cached && safeSettings(cached.settings) ? cached : null;
   const savedForThisUser = user && saved?.userId === user.id
     ? saved
-    : (user && cached ? { userId: user.id, appearance: cached } : null);
+    : (user && safeCached ? { userId: user.id, appearance: safeCached } : null);
   const appearance = savedForThisUser?.appearance ?? defaultAppearance;
   const previewing = user && preview?.userId === user.id
     ? previewAfterNavigation(pathname ?? '/themes', preview)

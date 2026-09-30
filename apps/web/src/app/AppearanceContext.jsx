@@ -3,8 +3,8 @@ import { useLocation } from 'react-router';
 import { routes } from '../../../../packages/shared/index.js';
 import { api } from '../shared/lib/api.js';
 import { useAuth } from './AuthContext.jsx';
-import { appearanceCacheKey, applyThemeToRoot, deriveAppearance, parseCachedAppearance,
-  readCachedAppearance, writeCachedAppearance } from './appearanceState.js';
+import { appearanceCacheKey, applyThemeToRoot, clearCachedAppearance, deriveAppearance,
+  parseCachedAppearance, readCachedAppearance, shouldRefreshOnVisible, writeCachedAppearance } from './appearanceState.js';
 
 const AppearanceContext = createContext(null);
 
@@ -13,8 +13,10 @@ export function AppearanceProvider({ children }) {
   const location = useLocation();
   const userId = user?.id;
   const userIdRef = useRef(userId);
+  const previousUserIdRef = useRef(userId);
   userIdRef.current = userId;
   const mutationRef = useRef(0);
+  const lastRefreshAtRef = useRef(0);
   const [saved, setSaved] = useState(null);
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
@@ -33,6 +35,7 @@ export function AppearanceProvider({ children }) {
       if (userIdRef.current !== accountId) return;
       setSaved({ userId: accountId, appearance: value });
       writeCachedAppearance(accountId, value);
+      lastRefreshAtRef.current = Date.now();
     } catch (caught) {
       if (userIdRef.current === accountId) setError(caught.message);
     }
@@ -49,6 +52,7 @@ export function AppearanceProvider({ children }) {
         if (!active) return;
         setSaved({ userId: accountId, appearance: value });
         writeCachedAppearance(accountId, value);
+        lastRefreshAtRef.current = Date.now();
       })
       .catch((caught) => { if (active) setError(caught.message); });
     return () => { active = false; };
@@ -65,8 +69,17 @@ export function AppearanceProvider({ children }) {
   }, [followStylesheet, visibleSettings]);
 
   useEffect(() => {
+    const previous = previousUserIdRef.current;
+    if (!userId && previous) clearCachedAppearance(previous);
+    previousUserIdRef.current = userId;
+  }, [userId]);
+
+  useEffect(() => {
     function onVisible() {
-      if (document.visibilityState === 'visible') void refresh();
+      if (document.visibilityState !== 'visible') return;
+      if (!shouldRefreshOnVisible(lastRefreshAtRef.current)) return;
+      lastRefreshAtRef.current = Date.now();
+      void refresh();
     }
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
