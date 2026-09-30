@@ -500,7 +500,7 @@ export async function openCatalog(path, persistence) {
           'This file is used by a snapshot; delete the snapshot first');
       }
     },
-    async createSnapshot(workspaceId, userId, name, note, fileIds) {
+    async createSnapshot(workspaceId, userId, name, note, fileIds, expectedVersions) {
       return write((next) => {
         const workspace = ownedWorkspace(next, workspaceId, userId);
         if (workspace.git) {
@@ -520,6 +520,10 @@ export async function openCatalog(path, persistence) {
           if (!file) throw new ApiError(404, 'FILE_NOT_FOUND', 'A selected file was not found');
           const version = next.versions.find((entry) => entry.id === file.currentVersionId && entry.fileId === id);
           if (!version) throw new ApiError(404, 'VERSION_NOT_FOUND', 'A selected version was not found');
+          if (expectedVersions && expectedVersions.get(id) !== version.id) {
+            throw new ApiError(409, 'SNAPSHOT_FILES_CHANGED',
+              'A selected file changed since review; refresh and review the versions again');
+          }
           const folderPath = [];
           let folderId = file.folderId;
           while (folderId !== ROOT_FOLDER_ID) {

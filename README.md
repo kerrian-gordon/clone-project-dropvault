@@ -87,6 +87,7 @@ DropVault is a collaboration between [@umerbashir-del](https://github.com/umerba
 ## More detail
 
 - [Local setup, configuration, and checks](docs/local-development.md)
+- [Manual Git archive and data snapshot walkthrough](docs/git-workspace-walkthrough.md)
 - [API, data model, and permissions](docs/api.md)
 - [Multi-user MVP plan](docs/multi-user-freemium-mvp.md)
 - [Offline file-recognition pilot and results](docs/ml/pilot-report.md)

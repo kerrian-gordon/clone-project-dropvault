@@ -282,6 +282,18 @@ test('workspace snapshots pin exact versions, preserve quota, and enforce live f
       method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'second result',
     });
     assert.equal(replacement.status, 201);
+    const reviewedVersionChanged = await requestJson(`/v1/workspaces/${workspace.id}/snapshots`,
+      'POST', { name: 'Stale review', note: '', fileIds: [file.id, secondFile.id],
+        expectedVersions: [
+          { fileId: file.id, versionId: file.currentVersionId },
+          { fileId: secondFile.id, versionId: secondFile.currentVersionId },
+        ] });
+    assert.equal(reviewedVersionChanged.status, 409);
+    assert.equal((await reviewedVersionChanged.json()).error.code, 'SNAPSHOT_FILES_CHANGED');
+    const mismatchedSelection = await requestJson(`/v1/workspaces/${workspace.id}/snapshots`,
+      'POST', { name: 'Invalid review', note: '', fileIds: [file.id],
+        expectedVersions: [{ fileId: secondFile.id, versionId: secondFile.currentVersionId }] });
+    assert.equal(mismatchedSelection.status, 400);
     assert.equal((await requestJson(`/v1/files/${file.id}`, 'PATCH',
       { name: 'renamed.txt' })).status, 200);
     const movedFolder = await (await requestJson('/v1/folders', 'POST', { name: 'Archive' })).json();

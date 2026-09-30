@@ -470,8 +470,19 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
             throw new ApiError(400, 'INVALID_SNAPSHOT',
               'Provide a name, note up to 1000 characters, and up to 200 selected files');
           }
+          const expected = input.expectedVersions;
+          if (expected !== undefined && (!Array.isArray(expected)
+            || expected.length !== input.fileIds.length
+            || expected.some((entry) => !entry || typeof entry.fileId !== 'string'
+              || typeof entry.versionId !== 'string' || !entry.versionId
+              || !input.fileIds.includes(entry.fileId))
+            || new Set(expected.map((entry) => entry.fileId)).size !== expected.length)) {
+            throw new ApiError(400, 'INVALID_SNAPSHOT',
+              'Expected versions must match the selected files');
+          }
           return json(response, 201, await mutate(() => catalog.createSnapshot(
-            snapshotsMatch[1], user.id, input.name.trim(), input.note.trim(), input.fileIds)));
+            snapshotsMatch[1], user.id, input.name.trim(), input.note.trim(), input.fileIds,
+            expected && new Map(expected.map((entry) => [entry.fileId, entry.versionId])))));
         }
       }
       const workspaceMatch = /^\/v1\/workspaces\/([^/]+)$/u.exec(path);

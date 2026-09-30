@@ -74,7 +74,7 @@ export function WorkspacePage() {
   const [selected, setSelected] = useState([]);
   const [name, setName] = useState('');
   const [note, setNote] = useState('');
-  const [reviewing, setReviewing] = useState(false);
+  const [reviewedItems, setReviewedItems] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
@@ -88,7 +88,12 @@ export function WorkspacePage() {
       api(routes.workspace(id)), api(routes.workspaceFiles(id)), api(routes.ownedFiles), api(routes.snapshots(id)),
     ]);
     setWorkspace(project); setFiles(members.files); setOwned(all.files); setSnapshots(saved.snapshots);
-    setSelected((previous) => previous.filter((fileId) => members.files.some((file) => file.id === fileId)));
+    setSelected((previous) => {
+      const current = previous.filter((fileId) => members.files.some((file) => file.id === fileId));
+      if (project.git && members.files.some((file) => file.id === project.git.archiveFileId)
+        && !current.includes(project.git.archiveFileId)) current.push(project.git.archiveFileId);
+      return current;
+    });
     if (project.role === 'owner') setMembers((await api(routes.workspaceAccess(id))).users);
   }, [id]);
   useEffect(() => {
@@ -104,12 +109,26 @@ export function WorkspacePage() {
   }
   const available = owned.filter((file) => !files.some((member) => member.id === file.id));
   const chosen = files.filter((file) => selected.includes(file.id));
+  const reviewing = reviewedItems !== null;
   const isOwner = workspace?.role === 'owner';
   const canContribute = isOwner || workspace?.role === 'contributor';
+  const linkedArchiveStale = workspace?.git && files.some((file) =>
+    file.id === workspace.git.archiveFileId && file.currentVersionId !== workspace.git.archiveVersionId);
   async function createSnapshot() {
     await change(async () => {
-      const snapshot = await api(routes.snapshots(id), jsonOptions('POST', { name, note, fileIds: selected }));
-      navigate(`/snapshots/${snapshot.id}`);
+      try {
+        const snapshot = await api(routes.snapshots(id), jsonOptions('POST', { name, note,
+          fileIds: reviewedItems.map((file) => file.id),
+          expectedVersions: reviewedItems.map((file) =>
+            ({ fileId: file.id, versionId: file.currentVersionId })) }));
+        navigate(`/snapshots/${snapshot.id}`);
+      } catch (caught) {
+        if (['SNAPSHOT_FILES_CHANGED', 'GIT_ARCHIVE_CHANGED'].includes(caught.code)) {
+          setReviewedItems(null);
+          await refresh().catch(() => {});
+        }
+        throw caught;
+      }
     });
   }
   return <section className="workspace-page">
@@ -130,7 +149,8 @@ export function WorkspacePage() {
       })}>Add file</button></div></>}
       {!files.length && <p className="muted">No files in this workspace yet.</p>}
       <ul className="workspace-files">{files.map((file) => <li key={file.id}>
-        <label>{isOwner && <input type="checkbox" checked={selected.includes(file.id)} disabled={reviewing}
+        <label>{isOwner && <input type="checkbox" checked={selected.includes(file.id)}
+          disabled={reviewing || workspace?.git?.archiveFileId === file.id}
           onChange={(event) => setSelected((previous) => event.target.checked
             ? [...previous, file.id] : previous.filter((fileId) => fileId !== file.id))} />}
           {isOwner ? <Link to={`/view/${file.id}`}>{file.name}</Link> : <span>{file.name}</span>}
@@ -150,11 +170,12 @@ export function WorkspacePage() {
           .map((file) => <option key={file.id} value={file.id}>{file.name}</option>)}
       </select><button disabled={!gitFileId || pending} onClick={() => void change(() =>
         api(routes.workspaceGit(id), jsonOptions('PUT', { fileId: gitFileId })))}>Link archive</button></div>
-      {workspace.git && <p>Linked commit <code>{workspace.git.commitSha}</code> from a ZIP comment.</p>}
+      {workspace.git && <p>Linked commit <code>{workspace.git.commitSha}</code> from a ZIP comment. The linked ZIP is included automatically in snapshots.</p>}
     </section>}
     {isOwner && <section className="workspace-card workspace-form">
       <h2>Save a snapshot</h2>
       <p className="muted">Choose completed files. A snapshot records their current version IDs and names. It uses no new bytes. Retained file versions count toward storage even after a snapshot is removed.</p>
+      {linkedArchiveStale && <p className="error" role="alert">The linked code ZIP has a newer version. Link it again before saving a snapshot.</p>}
       {uploadsPending && <p className="error" role="alert">Finish pending uploads before creating a snapshot. Refresh this file list after they finish.</p>}
       {selected.length > 200 && <p className="error" role="alert">Choose at most 200 files for one snapshot.</p>}
       <label>Snapshot name<input value={name} maxLength={255} disabled={reviewing}
@@ -162,14 +183,14 @@ export function WorkspacePage() {
       <label>What does this snapshot represent?<textarea value={note} maxLength={1000}
         disabled={reviewing} onChange={(event) => setNote(event.target.value)} /></label>
       {reviewing ? <div className="workspace-review">
-        {workspace.git && <p>Code archive commit: <code>{workspace.git.commitSha}</code>. Include its ZIP file in this snapshot.</p>}
+        {workspace.git && <p>Code archive commit: <code>{workspace.git.commitSha}</code>. Its ZIP is included below.</p>}
         <strong>Review “{name}” before saving</strong>
-        <p>{chosen.length} files · {formatBytes(chosen.reduce((sum, file) => sum + file.size, 0))} already counted in storage</p>
-        <ul>{chosen.map((file) => <li key={file.id}>{file.name} · {formatBytes(file.size)} · current version {file.currentVersionId}</li>)}</ul>
+        <p>{reviewedItems.length} files · {formatBytes(reviewedItems.reduce((sum, file) => sum + file.size, 0))} already counted in storage</p>
+        <ul>{reviewedItems.map((file) => <li key={file.id}>{file.name} · {formatBytes(file.size)} · current version {file.currentVersionId}</li>)}</ul>
         <div className="workspace-inline"><button disabled={pending} onClick={() => void createSnapshot()}>Create fixed snapshot</button>
-          <button className="btn-ghost" disabled={pending} onClick={() => setReviewing(false)}>Change selection</button></div>
-      </div> : <button disabled={pending || uploadsPending || !selected.length || selected.length > 200 || !name.trim()}
-        onClick={() => setReviewing(true)}>Review snapshot</button>}
+          <button className="btn-ghost" disabled={pending} onClick={() => setReviewedItems(null)}>Change selection</button></div>
+      </div> : <button disabled={pending || uploadsPending || linkedArchiveStale || !selected.length || selected.length > 200 || !name.trim()}
+        onClick={() => { setError(''); setReviewedItems(chosen.map((file) => ({ ...file }))); }}>Review snapshot</button>}
     </section>}
     <section><h2>Saved snapshots</h2>{snapshots.length ? <div className="list">{snapshots.map((snapshot) =>
       <div className="row" key={snapshot.id}><Link className="row-main" to={`/snapshots/${snapshot.id}`}>
