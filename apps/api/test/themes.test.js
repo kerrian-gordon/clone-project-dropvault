@@ -45,7 +45,7 @@ test('community theme installation and personal edits survive restart without ch
     });
 
     const settings = { colors: { background: '#151c27', surface: '#273349',
-      text: '#f5f7fa', accent: '#80b5ff' }, font: 'Georgia', spacing: 'comfortable' };
+      text: '#f5f7fa', accent: '#80b5ff' }, font: 'Georgia', spacing: 'comfortable', texture: 'none' };
     const published = await request(alex, '/v1/themes', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: '  Night study  ', creatorName: 'Blair',
@@ -78,7 +78,7 @@ test('community theme installation and personal edits survive restart without ch
     assert.equal(installed.status, 200);
     assert.deepEqual((await installed.json()).settings, settings);
     const personal = { ...settings, colors: { ...settings.colors, accent: '#ff91bc' },
-      font: 'Inter', spacing: 'compact' };
+      font: 'Inter', spacing: 'compact', texture: 'none' };
     const saved = await request(blair, '/v1/account/appearance/settings', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ settings: personal }),
@@ -149,7 +149,7 @@ test('deleting another account\'s theme returns 404 like a missing theme', async
     const alex = await register('alex@example.test');
     const blair = await register('blair@example.test');
     const settings = { colors: { background: '#151c27', surface: '#273349',
-      text: '#f5f7fa', accent: '#80b5ff' }, font: 'Georgia', spacing: 'comfortable' };
+      text: '#f5f7fa', accent: '#80b5ff' }, font: 'Georgia', spacing: 'comfortable', texture: 'none' };
     const published = await request(alex, '/v1/themes', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'Night study', settings }),
@@ -183,7 +183,7 @@ test('theme and appearance writes reject a foreign Origin and allow a missing Or
     });
     const cookie = register.headers.get('set-cookie').split(';', 1)[0];
     const settings = { colors: { background: '#151c27', surface: '#273349',
-      text: '#f5f7fa', accent: '#80b5ff' }, font: 'Georgia', spacing: 'comfortable' };
+      text: '#f5f7fa', accent: '#80b5ff' }, font: 'Georgia', spacing: 'comfortable', texture: 'none' };
     const foreign = { Origin: 'https://other.example', 'Content-Type': 'application/json' };
     const publish = await request(cookie, '/v1/themes', {
       method: 'POST', headers: foreign, body: JSON.stringify({ name: 'Night study', settings }),
@@ -229,7 +229,7 @@ test('theme publishing is rate limited per account', async () => {
     });
     const cookie = register.headers.get('set-cookie').split(';', 1)[0];
     const settings = { colors: { background: '#151c27', surface: '#273349',
-      text: '#f5f7fa', accent: '#80b5ff' }, font: 'Georgia', spacing: 'comfortable' };
+      text: '#f5f7fa', accent: '#80b5ff' }, font: 'Georgia', spacing: 'comfortable', texture: 'none' };
     for (let index = 0; index < 10; index += 1) {
       const published = await request(cookie, '/v1/themes', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -273,7 +273,7 @@ test('display names are unique and snapshotted even if the body sends another cr
     assert.equal(second.account.displayName, 'Alex-2');
     const named = await register('ava@example.test', 'Ava Chen');
     const settings = { colors: { background: '#151c27', surface: '#273349',
-      text: '#f5f7fa', accent: '#80b5ff' }, font: 'Georgia', spacing: 'comfortable' };
+      text: '#f5f7fa', accent: '#80b5ff' }, font: 'Georgia', spacing: 'comfortable', texture: 'none' };
     const published = await request(named.cookie, '/v1/themes', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'Studio', creatorName: 'Blair', settings }),

@@ -20,7 +20,7 @@ These screenshots were captured from the running app with an isolated fake accou
 - **Ownership and sharing:** Register and sign in; grant a named account access to a file; create and revoke seven-day bearer links; delete owned files; and see used storage against an account limit.
 - **Version history:** Upload a replacement, label versions, compare text revisions, preview or download older bytes, and restore an earlier version as a new current revision. Retained versions count toward storage.
 - **Project workspaces:** Group selected files, invite viewers or contributors, and save snapshots of exact file versions. Members can download a snapshot as a TAR archive; an authorized account can copy it into a new workspace under its own quota. A manually uploaded Git archive ZIP can carry a commit label alongside the data snapshot.
-- **Themes:** Browse community themes, install one, customize your saved appearance, and publish a theme with a public creator name.
+- **Themes:** Browse community themes, install one, customize colors, texture, font, and spacing, and publish a theme with a public creator name.
 
 Workspaces currently list files without a nested folder tree. Snapshots record each selected file's existing folder path, and copying a snapshot recreates those paths in **My files**. The Git archive label is uploader supplied; DropVault does not connect to GitHub or verify that commit.
 

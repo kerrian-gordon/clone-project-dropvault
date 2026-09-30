@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { DEFAULT_THEME_SETTINGS, THEME_FONTS, THEME_SPACINGS, routes,
+import { DEFAULT_THEME_SETTINGS, THEME_FONTS, THEME_SPACINGS, THEME_TEXTURES, routes,
   themeContrastIssues } from '../../../../../packages/shared/index.js';
 import { useAuth } from '../../app/AuthContext.jsx';
 import { useAppearance } from '../../app/AppearanceContext.jsx';
@@ -156,6 +156,9 @@ export function ThemesPage() {
         </select></label>
         <label>Spacing<select value={draft.spacing} onChange={(event) => setDraft((current) => ({ ...current, spacing: event.target.value }))}>
           {THEME_SPACINGS.map((spacing) => <option key={spacing} value={spacing}>{spacing}</option>)}
+        </select></label>
+        <label>Texture<select value={draft.texture} onChange={(event) => setDraft((current) => ({ ...current, texture: event.target.value }))}>
+          {THEME_TEXTURES.map((texture) => <option key={texture} value={texture}>{texture}</option>)}
         </select></label>
       </div>
       <ThemeSample settings={draft} />

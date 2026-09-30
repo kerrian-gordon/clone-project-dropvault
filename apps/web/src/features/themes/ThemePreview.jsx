@@ -1,10 +1,13 @@
+import { THEME_TEXTURES } from '../../../../../packages/shared/index.js';
+
 export const colorLabels = {
   background: 'Background', surface: 'Cards', text: 'Text', accent: 'Accent',
 };
 
 export function ThemeSample({ settings }) {
-  return <div className="theme-sample" style={{
-    background: settings.colors.background, color: settings.colors.text,
+  const texture = THEME_TEXTURES.includes(settings.texture) ? settings.texture : 'none';
+  return <div className="theme-sample" data-theme-texture={texture} style={{
+    backgroundColor: settings.colors.background, color: settings.colors.text,
     fontFamily: `${settings.font}, sans-serif`,
     padding: settings.spacing === 'compact' ? '0.7rem' : '1.15rem',
   }} aria-hidden="true">

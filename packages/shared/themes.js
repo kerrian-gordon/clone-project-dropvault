@@ -1,5 +1,6 @@
 export const THEME_FONTS = Object.freeze(['Inter', 'Arial', 'Georgia']);
 export const THEME_SPACINGS = Object.freeze(['compact', 'comfortable']);
+export const THEME_TEXTURES = Object.freeze(['none', 'paper', 'linen', 'grain', 'dots']);
 export const DEFAULT_THEME_SETTINGS = Object.freeze({
   colors: Object.freeze({
     background: '#f7f5f2',
@@ -9,9 +10,10 @@ export const DEFAULT_THEME_SETTINGS = Object.freeze({
   }),
   font: 'Inter',
   spacing: 'comfortable',
+  texture: 'none',
 });
 
-const settingKeys = ['colors', 'font', 'spacing'];
+const settingKeys = ['colors', 'font', 'spacing', 'texture'];
 const colorKeys = ['background', 'surface', 'text', 'accent'];
 
 function exactKeys(value, keys) {
@@ -25,7 +27,8 @@ export function validThemeSettings(settings) {
     && colorKeys.every((key) => typeof settings.colors[key] === 'string'
       && /^#[0-9a-fA-F]{6}$/u.test(settings.colors[key]))
     && THEME_FONTS.includes(settings.font)
-    && THEME_SPACINGS.includes(settings.spacing);
+    && THEME_SPACINGS.includes(settings.spacing)
+    && THEME_TEXTURES.includes(settings.texture);
 }
 
 export function validThemeName(name) {

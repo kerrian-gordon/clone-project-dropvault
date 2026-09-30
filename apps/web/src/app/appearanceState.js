@@ -1,4 +1,4 @@
-import { DEFAULT_THEME_SETTINGS, THEME_FONTS, THEME_SPACINGS,
+import { DEFAULT_THEME_SETTINGS, THEME_FONTS, THEME_SPACINGS, THEME_TEXTURES,
   validThemeSettings } from '../../../../packages/shared/index.js';
 
 export const HEX = /^#[0-9a-f]{6}$/i;
@@ -18,11 +18,13 @@ export function safeSettings(settings) {
   return HEX.test(settings?.colors?.background) && HEX.test(settings?.colors?.surface)
     && HEX.test(settings?.colors?.text) && HEX.test(settings?.colors?.accent)
     && THEME_FONTS.includes(settings?.font)
-    && THEME_SPACINGS.includes(settings?.spacing);
+    && THEME_SPACINGS.includes(settings?.spacing)
+    && THEME_TEXTURES.includes(settings?.texture);
 }
 
 export function sameSettings(left, right) {
   return left?.font === right?.font && left?.spacing === right?.spacing
+    && left?.texture === right?.texture
     && left?.colors?.background === right?.colors?.background
     && left?.colors?.surface === right?.colors?.surface
     && left?.colors?.text === right?.colors?.text
@@ -132,6 +134,7 @@ function accentTextColor(hex) {
 export function clearThemeOnRoot(root) {
   for (const property of STYLE_PROPERTIES) root.style.removeProperty(property);
   delete root.dataset.themeSpacing;
+  delete root.dataset.themeTexture;
 }
 
 export function applyThemeToRoot(root, { followStylesheet, settings }) {
@@ -140,7 +143,7 @@ export function applyThemeToRoot(root, { followStylesheet, settings }) {
     return;
   }
   const applied = safeSettings(settings) ? settings : DEFAULT_THEME_SETTINGS;
-  const { colors, font, spacing } = applied;
+  const { colors, font, spacing, texture } = applied;
   root.style.setProperty('--paper', colors.background);
   root.style.setProperty('--card', colors.surface);
   root.style.setProperty('--ink', colors.text);
@@ -148,4 +151,5 @@ export function applyThemeToRoot(root, { followStylesheet, settings }) {
   root.style.setProperty('--accent-contrast', accentTextColor(colors.accent));
   root.style.setProperty('--app-font', `${font}, "Segoe UI", system-ui, sans-serif`);
   root.dataset.themeSpacing = spacing;
+  root.dataset.themeTexture = texture;
 }
