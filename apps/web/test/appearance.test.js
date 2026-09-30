@@ -196,6 +196,18 @@ test('display names stay unique with a short suffix', () => {
   assert.equal(uniqueDisplayName('alex', ['Alex']), 'alex-2');
 });
 
+test('clearing the signed-in cache leaves first paint on the default look', () => {
+  const storage = memoryStorage();
+  writeCachedAppearance('alex', customAppearance, storage);
+  clearCachedAppearance('alex', storage);
+  const view = deriveAppearance({
+    user: { id: 'alex' }, saved: null, cached: readCachedAppearance('alex', storage),
+    preview: null, error: '', pathname: '/files',
+  });
+  assert.equal(view.appearance, defaultAppearance);
+  assert.equal(view.loading, true);
+});
+
 test('a 401 can clear every cached appearance on the machine', () => {
   const storage = memoryStorage();
   writeCachedAppearance('alex', customAppearance, storage);

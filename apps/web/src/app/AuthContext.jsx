@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { routes } from '../../../../packages/shared/index.js';
 import { api } from '../shared/lib/api.js';
+import { clearCachedAppearance } from './appearanceState.js';
 
 const AuthContext = createContext(null);
 
@@ -24,6 +25,7 @@ export function AuthProvider({ children }) {
       body: JSON.stringify(mode === 'register'
         ? { email, password, displayName } : { email, password }),
     });
+    clearCachedAppearance(account.id);
     setUser(account);
   }
 
