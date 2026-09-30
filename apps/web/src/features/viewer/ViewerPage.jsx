@@ -5,6 +5,7 @@ import { useAuth } from '../../app/AuthContext.jsx';
 import { formatBytes } from '../../shared/components/StorageMeter.jsx';
 import { api } from '../../shared/lib/api.js';
 import { readTextPreview, TEXT_PREVIEW_MAX_BYTES } from './readTextPreview.js';
+import { ShareLinks } from './ShareLinks.jsx';
 
 const TEXT_MIME_TYPES = new Set(['text/plain', 'text/csv', 'application/json']);
 
@@ -345,6 +346,7 @@ export function ViewerPage() {
           ? <FilePreview key={file.currentVersionId} file={file} />
           : <p className="muted">Preview not available for this file type.</p>}
         <a className="button-link" href={`${routes.content(id)}?download=1`} style={{ marginTop: '1.25rem', display: 'inline-block' }}>Download file</a>
+        {owned && <ShareLinks key={file.id} file={file} />}
       </div>
       {owned && <VersionHistory file={file} onChanged={refreshFile} />}
       {owned && <section className="access-panel" aria-label="File access">

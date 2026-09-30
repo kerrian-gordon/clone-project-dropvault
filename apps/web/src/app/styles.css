@@ -255,6 +255,18 @@ h1 { margin: 0.4rem 0 0.75rem; font-size: 1.6rem; letter-spacing: -0.02em; font-
 }
 .upgrade-dialog::backdrop { background: #0f172a66; }
 .upgrade-dialog h2 { margin-top: 0; font-size: 1.2rem; letter-spacing: -0.01em; }
+.share-link-dialog { width: min(36rem, calc(100% - 2rem)); max-height: calc(100% - 2rem); overflow: auto; }
+.share-link-dialog h3 { margin: 1.35rem 0 0.5rem; font-size: 1rem; }
+.viewer-placeholder > .btn-ghost { margin: 1.25rem 0 0 0.65rem; }
+.created-share-link { margin-top: 1rem; padding: 0.8rem; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-ctl); }
+.created-share-link label { display: block; margin-bottom: 0.4rem; font-weight: 650; }
+.share-link-copy { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.share-link-copy input { flex: 1; min-width: 12rem; padding: 0.5rem; border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--card); color: var(--ink); }
+.created-share-link p { margin-bottom: 0; overflow-wrap: anywhere; }
+.share-link-list { list-style: none; padding: 0; margin: 0; }
+.share-link-list li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; padding: 0.65rem 0; border-top: 1px solid var(--line); }
+.share-link-list li > span:first-child { font-size: 0.85rem; }
+.share-link-revoke { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.65rem; flex-wrap: wrap; margin-top: 1.25rem; }
 .preview-image { max-width: 100%; height: auto; border-radius: var(--r-ctl); display: block; margin-bottom: 1rem; }
 .preview-pdf { width: 100%; height: 600px; border: 0; border-radius: var(--r-ctl); display: block; margin-bottom: 1rem; }

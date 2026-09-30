@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "test": "node --test test/*.test.js",
-    "test:browser": "node --test test/drag-drop.browser.js"
+    "test:browser": "node --test test/*.browser.js"
   },
   "dependencies": {
     "react": "^19.2.0",
