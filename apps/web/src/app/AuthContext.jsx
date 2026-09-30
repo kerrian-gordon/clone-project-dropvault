@@ -17,11 +17,12 @@ export function AuthProvider({ children }) {
     return () => { active = false; };
   }, []);
 
-  async function signIn(mode, email, password) {
+  async function signIn(mode, email, password, displayName) {
     const account = await api(`/v1/auth/${mode}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(mode === 'register'
+        ? { email, password, displayName } : { email, password }),
     });
     setUser(account);
   }

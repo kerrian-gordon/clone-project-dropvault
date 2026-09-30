@@ -25,7 +25,13 @@ export function ThemeDetailPage() {
     setError('');
     api(routes.theme(id))
       .then((data) => { if (active) setTheme(data); })
-      .catch((caught) => { if (active) setError(caught.message); });
+      .catch((caught) => {
+        if (active) {
+          setError(caught.code === 'THEME_NOT_FOUND'
+            ? 'This gallery theme is no longer listed.'
+            : caught.message);
+        }
+      });
     return () => { active = false; };
   }, [id]);
 

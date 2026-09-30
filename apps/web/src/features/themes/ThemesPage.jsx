@@ -27,7 +27,8 @@ export function ThemesPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [draft, setDraft] = useState(DEFAULT_THEME_SETTINGS);
   const [name, setName] = useState('');
-  const [creatorName, setCreatorName] = useState('');
+  const [sourceTheme, setSourceTheme] = useState(null);
+  const [sourceMissing, setSourceMissing] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -35,6 +36,21 @@ export function ThemesPage() {
   const savedIssues = themeContrastIssues(appearance.settings);
 
   useEffect(() => { setDraft(structuredClone(appearance.settings)); }, [appearance]);
+
+  useEffect(() => {
+    if (!appearance.sourceThemeId) {
+      setSourceTheme(null);
+      setSourceMissing(false);
+      return undefined;
+    }
+    let active = true;
+    setSourceTheme(null);
+    setSourceMissing(false);
+    api(routes.theme(appearance.sourceThemeId))
+      .then((theme) => { if (active) setSourceTheme(theme); })
+      .catch(() => { if (active) setSourceMissing(true); });
+    return () => { active = false; };
+  }, [appearance.sourceThemeId]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 250);
@@ -89,12 +105,11 @@ export function ThemesPage() {
     await run(async () => {
       const theme = await api(routes.themes, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, creatorName, settings: appearance.settings }),
+        body: JSON.stringify({ name, settings: appearance.settings }),
       });
       setThemes((current) => [theme, ...current]);
       setNextOffset((current) => current === null ? null : current + 1);
       setName('');
-      setCreatorName('');
     }, 'Your current appearance is published in the gallery.');
   }
 
@@ -123,7 +138,13 @@ export function ThemesPage() {
 
     <section className="theme-section" aria-labelledby="current-theme-title">
       <h2 id="current-theme-title">Your appearance</h2>
-      <p>{loading ? 'Loading your appearance…' : <>Using <strong>{appearance.name}</strong>{appearance.sourceThemeId ? ' (personal copy)' : ''}</>}</p>
+      <p>{loading ? 'Loading your appearance…' : <>Using <strong>{appearance.name}</strong>{
+        appearance.sourceThemeId && (sourceMissing
+          ? ' (based on a gallery theme that is no longer listed)'
+          : sourceTheme
+            ? <> (based on <Link to={`/themes/${encodeURIComponent(sourceTheme.id)}`}>{sourceTheme.name}</Link>)</>
+            : ' (personal copy)')
+      }</>}</p>
       <ThemeSample settings={appearance.settings} />
       <div className="theme-actions"><button className="btn-ghost" type="button" disabled={busy || loading || saving} onClick={() => run(reset, 'Default appearance restored.')}>Use default</button></div>
     </section>
@@ -149,9 +170,8 @@ export function ThemesPage() {
 
     <section className="theme-section" aria-labelledby="publish-title">
       <h2 id="publish-title">Share your design</h2>
-      <p className="muted">Publishing makes a snapshot of your saved appearance available to other signed-in users.</p>
+      <p className="muted">Publishing lists a snapshot as <strong>{user.displayName}</strong>. Changing accounts later does not rewrite themes already in the gallery.</p>
       <form className="theme-publish" onSubmit={publish}>
-        <label>Public creator name<input value={creatorName} onChange={(event) => setCreatorName(event.target.value)} maxLength={50} required /></label>
         <label>Theme name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} required /></label>
         <button type="submit" disabled={busy || loading || saving || savedIssues.length > 0}>Publish theme</button>
       </form>

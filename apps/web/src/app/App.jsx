@@ -60,7 +60,7 @@ function AuthPage({ mode }) {
     setPending(true);
     const data = new FormData(event.currentTarget);
     try {
-      await signIn(mode, data.get('email'), data.get('password'));
+      await signIn(mode, data.get('email'), data.get('password'), data.get('displayName'));
       navigate(destination, { replace: true });
     } catch (caught) {
       setError(caught.message);
@@ -76,6 +76,8 @@ function AuthPage({ mode }) {
       <h1>{registering ? 'Create an account' : 'Log in'}</h1>
       <form onSubmit={submit}>
         <label>Email<input name="email" type="email" autoComplete="email" required /></label>
+        {registering && <label>Display name<input name="displayName" maxLength={50} autoComplete="nickname" required />
+          <span className="muted">Public on themes you publish. Pick something you are willing to show.</span></label>}
         <label>Password<input name="password" type="password" minLength={registering ? 12 : undefined} autoComplete={registering ? 'new-password' : 'current-password'} required /></label>
         {error && <p className="error" role="alert">{error}</p>}
         <button type="submit" disabled={pending}>{pending ? 'Please wait…' : registering ? 'Create account' : 'Log in'}</button>
