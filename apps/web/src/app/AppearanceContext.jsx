@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 import { routes } from '../../../../packages/shared/index.js';
 import { api } from '../shared/lib/api.js';
@@ -12,9 +12,13 @@ export function AppearanceProvider({ children }) {
   const { user } = useAuth();
   const location = useLocation();
   const userId = user?.id;
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
+  const mutationRef = useRef(0);
   const [saved, setSaved] = useState(null);
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const cached = useMemo(() => readCachedAppearance(userId), [userId]);
   const { appearance, previewing, visibleSettings, loading } = deriveAppearance({
     user, saved, cached, preview, error, pathname: location.pathname,
@@ -47,13 +51,26 @@ export function AppearanceProvider({ children }) {
   }, [visibleSettings]);
 
   async function update(path, options) {
-    const accountId = user.id;
-    const value = await api(path, options);
-    setSaved({ userId: accountId, appearance: value });
-    writeCachedAppearance(accountId, value);
-    setPreview(null);
-    setError('');
-    return value;
+    const accountId = userIdRef.current;
+    if (!accountId) throw new Error('Sign in to continue');
+    const requestId = mutationRef.current += 1;
+    setSaving(true);
+    try {
+      const value = await api(path, options);
+      if (requestId !== mutationRef.current || userIdRef.current !== accountId) return value;
+      setSaved({ userId: accountId, appearance: value });
+      writeCachedAppearance(accountId, value);
+      setPreview(null);
+      setError('');
+      return value;
+    } catch (caught) {
+      if (requestId === mutationRef.current && userIdRef.current === accountId) {
+        setError(caught.message);
+      }
+      throw caught;
+    } finally {
+      if (requestId === mutationRef.current) setSaving(false);
+    }
   }
 
   const jsonPut = (body) => ({
@@ -61,9 +78,12 @@ export function AppearanceProvider({ children }) {
   });
 
   return <AppearanceContext.Provider value={{
-    appearance, loading, error, previewing,
-    startPreview: (theme) => setPreview({ userId: user.id, id: theme.id,
-      name: theme.name, settings: theme.settings }),
+    appearance, loading, error, saving, previewing,
+    startPreview: (theme) => {
+      const accountId = userIdRef.current;
+      if (!accountId) return;
+      setPreview({ userId: accountId, id: theme.id, name: theme.name, settings: theme.settings });
+    },
     stopPreview: () => setPreview(null),
     install: (themeId) => update(routes.appearance, jsonPut({ themeId })),
     saveSettings: (settings) => update(routes.appearanceSettings, jsonPut({ settings })),

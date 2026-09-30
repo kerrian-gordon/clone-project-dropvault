@@ -16,7 +16,7 @@ function galleryPath(offset, search) {
 
 export function ThemesPage() {
   const { user } = useAuth();
-  const { appearance, loading, error: appearanceError, install, saveSettings, reset,
+  const { appearance, loading, error: appearanceError, saving, install, saveSettings, reset,
     previewing, startPreview, stopPreview } = useAppearance();
   const [themes, setThemes] = useState([]);
   const [nextOffset, setNextOffset] = useState(null);
@@ -114,7 +114,7 @@ export function ThemesPage() {
     {appearanceError && <p className="error" role="alert">Could not load your saved appearance: {appearanceError}</p>}
     {actionError && <p className="error" role="alert">{actionError}</p>}
     {notice && <p className="success" role="status">{notice}</p>}
-    {previewing && <ThemePreviewBanner previewing={previewing} busy={busy}
+    {previewing && <ThemePreviewBanner previewing={previewing} busy={busy || saving}
       onInstall={() => run(() => install(previewing.id), `${previewing.name} is now your appearance.`)}
       onCancel={stopPreview} />}
 
@@ -122,7 +122,7 @@ export function ThemesPage() {
       <h2 id="current-theme-title">Your appearance</h2>
       <p>{loading ? 'Loading your appearance…' : <>Using <strong>{appearance.name}</strong>{appearance.sourceThemeId ? ' (personal copy)' : ''}</>}</p>
       <ThemeSample settings={appearance.settings} />
-      <div className="theme-actions"><button className="btn-ghost" type="button" disabled={busy || loading} onClick={() => run(reset, 'Default appearance restored.')}>Use default</button></div>
+      <div className="theme-actions"><button className="btn-ghost" type="button" disabled={busy || loading || saving} onClick={() => run(reset, 'Default appearance restored.')}>Use default</button></div>
     </section>
 
     <section className="theme-section" aria-labelledby="customize-title">
@@ -141,7 +141,7 @@ export function ThemesPage() {
       </div>
       <ThemeSample settings={draft} />
       {draftIssues.length > 0 && <p className="error" role="alert">{draftIssues.join('; ')}. Adjust the colors before saving.</p>}
-      <div className="theme-actions"><button type="button" disabled={busy || loading || draftIssues.length > 0} onClick={() => run(() => saveSettings(draft), 'Your appearance has been saved.')}>Save my changes</button></div>
+      <div className="theme-actions"><button type="button" disabled={busy || loading || saving || draftIssues.length > 0} onClick={() => run(() => saveSettings(draft), 'Your appearance has been saved.')}>Save my changes</button></div>
     </section>
 
     <section className="theme-section" aria-labelledby="publish-title">
@@ -150,7 +150,7 @@ export function ThemesPage() {
       <form className="theme-publish" onSubmit={publish}>
         <label>Public creator name<input value={creatorName} onChange={(event) => setCreatorName(event.target.value)} maxLength={50} required /></label>
         <label>Theme name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} required /></label>
-        <button type="submit" disabled={busy || loading || savedIssues.length > 0}>Publish theme</button>
+        <button type="submit" disabled={busy || loading || saving || savedIssues.length > 0}>Publish theme</button>
       </form>
       {savedIssues.length > 0 && <p className="error">Update your saved colors before publishing: {savedIssues.join('; ')}.</p>}
     </section>
@@ -172,8 +172,8 @@ export function ThemesPage() {
         <h3>{theme.name}</h3>
         <p className="muted">By {theme.creatorName || 'Community member'} · {new Date(theme.createdAt).toLocaleDateString()}</p>
         <p><Link to={`/themes/${encodeURIComponent(theme.id)}`}>View details</Link></p>
-        <div className="theme-card-actions"><button type="button" className="btn-ghost" disabled={busy || loading} onClick={() => startPreview(theme)}>Preview</button>
-        <button type="button" disabled={busy || loading} onClick={() => run(() => install(theme.id), `${theme.name} is now your appearance.`)}>
+        <div className="theme-card-actions"><button type="button" className="btn-ghost" disabled={busy || loading || saving} onClick={() => startPreview(theme)}>Preview</button>
+        <button type="button" disabled={busy || loading || saving} onClick={() => run(() => install(theme.id), `${theme.name} is now your appearance.`)}>
           {appearance.sourceThemeId === theme.id ? 'Install again' : 'Install theme'}
         </button></div>
         {theme.creatorId === user.id && (confirmDeleteId === theme.id

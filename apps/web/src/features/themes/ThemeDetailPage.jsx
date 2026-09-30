@@ -13,7 +13,7 @@ const surfaceCopy = [
 
 export function ThemeDetailPage() {
   const { id } = useParams();
-  const { appearance, loading, install, previewing, startPreview, stopPreview } = useAppearance();
+  const { appearance, loading, saving, install, previewing, startPreview, stopPreview } = useAppearance();
   const [theme, setTheme] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -50,7 +50,7 @@ export function ThemeDetailPage() {
     {notice && <p className="success" role="status">{notice}</p>}
     {!theme && !error && <p>Loading theme…</p>}
     {theme && <>
-      <ThemePreviewBanner previewing={previewing} busy={busy}
+      <ThemePreviewBanner previewing={previewing} busy={busy || saving}
         onInstall={runInstall} onCancel={stopPreview} />
       <h1>{theme.name}</h1>
       <p className="muted">By {theme.creatorName || 'Community member'} · {new Date(theme.createdAt).toLocaleDateString()}</p>
@@ -71,8 +71,8 @@ export function ThemeDetailPage() {
         </dl>
       </section>
       <div className="theme-actions">
-        <button type="button" className="btn-ghost" disabled={busy || loading} onClick={() => startPreview(theme)}>Preview</button>
-        <button type="button" disabled={busy || loading} onClick={runInstall}>
+        <button type="button" className="btn-ghost" disabled={busy || loading || saving} onClick={() => startPreview(theme)}>Preview</button>
+        <button type="button" disabled={busy || loading || saving} onClick={runInstall}>
           {appearance.sourceThemeId === theme.id ? 'Install again' : 'Install theme'}
         </button>
       </div>
