@@ -40,11 +40,6 @@ export async function createApiServer({ storageRoot, maxUploadBytes = MAX_UPLOAD
       ? await openS3Storage(productionStorage) : await storageFactory(storageRoot);
     const referencedStorageKeys = catalog.referencedStorageKeys();
     await storage.recoverDeletes(referencedStorageKeys);
-    // A restored PostgreSQL catalog may be older than its S3 bucket. Never infer
-    // that an S3 object is safe to delete merely because this catalog lacks it.
-    if (catalog.loadedFromDisk && !productionStorage) {
-      await storage.recoverOrphanUploads?.(referencedStorageKeys);
-    }
     const server = createServer(createHandler({ catalog, storage, maxUploadBytes, storageLimitBytes,
       legacyClaimToken, publicBaseUrl, demoPlanSwitchEnabled }));
     server.on('close', () => { void catalog.close?.(); });

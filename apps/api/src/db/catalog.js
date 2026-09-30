@@ -16,14 +16,12 @@ function defaultAppearance() {
 export async function openCatalog(path, persistence) {
   if (!persistence) await mkdir(dirname(path), { recursive: true });
   let state;
-  let loadedFromDisk = true;
   try {
     const raw = persistence ? await persistence.load() : await readFile(path, 'utf8');
     if (raw === null) { const missing = new Error('Catalog does not exist'); missing.code = 'ENOENT'; throw missing; }
     state = typeof raw === 'string' ? JSON.parse(raw) : raw;
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
-    loadedFromDisk = false;
     state = { schemaVersion: 1, folders: [], files: [], shares: [] };
   }
   if (state.schemaVersion !== 1 || !Array.isArray(state.folders) || !Array.isArray(state.files)) {
@@ -141,7 +139,6 @@ export async function openCatalog(path, persistence) {
   }
 
   return {
-    loadedFromDisk,
     close: () => persistence?.close(),
     referencedStorageKeys() {
       return [...new Set([...state.files.map((file) => file.storageKey),
