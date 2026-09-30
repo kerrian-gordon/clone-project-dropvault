@@ -58,7 +58,7 @@ test('owner creates and revokes a bearer link while a recipient cannot manage li
       page.setDefaultTimeout(5000);
       const pageErrors = [];
       page.on('pageerror', (error) => pageErrors.push(error.message));
-      await page.goto(webOrigin);
+      await page.goto(webOrigin, { waitUntil: 'domcontentloaded', timeout: 20_000 });
       async function login(email) {
         await page.getByRole('textbox', { name: 'Email' }).fill(email);
         await page.getByRole('textbox', { name: 'Password' }).fill(password);

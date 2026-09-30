@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Transform } from 'node:stream';
 import test from 'node:test';
+import { openCatalog } from '../src/db/catalog.js';
 import { createApiServer } from '../src/server.js';
 import { apiListenOptions } from '../src/start.js';
 import { openLocalStorage } from '../src/services/storage/local.js';
@@ -63,7 +64,7 @@ test('workspace snapshots bind a Git archive version and preserve its commit lab
   let running;
   try {
     running = await start(storageRoot, 1000);
-    await register(running.base);
+    const owner = await register(running.base);
     const commit = 'a'.repeat(40);
     const zip = emptyZip(['README.md'], commit);
     const uploaded = await fetch(`${running.base}/v1/files?name=code.zip`, {
@@ -90,19 +91,29 @@ test('workspace snapshots bind a Git archive version and preserve its commit lab
       { fileId: file.id })).status, 200);
     const linked = await jsonRequest(`/v1/workspaces/${workspace.id}/git`, 'PUT', { fileId: file.id });
     assert.equal(linked.status, 200);
-    assert.equal((await linked.json()).commitSha, commit);
+    assert.deepEqual(await linked.json(), { archiveFileId: file.id,
+      archiveVersionId: file.currentVersionId, commitSha: commit,
+      verification: 'zip-comment', commitVerified: false });
     const snapshot = await jsonRequest(`/v1/workspaces/${workspace.id}/snapshots`, 'POST',
       { name: 'Run one', note: '', fileIds: [file.id] });
     assert.equal(snapshot.status, 201);
     const saved = await snapshot.json();
     assert.equal(saved.git.archiveVersionId, file.currentVersionId);
     assert.equal(saved.git.commitSha, commit);
+    assert.equal(saved.git.commitVerified, false);
+    assert.equal(saved.createdById, owner.id);
+    assert.equal(saved.createdByName, owner.displayName);
+    assert.equal(saved.items[0].versionId, file.currentVersionId);
     assert.deepEqual(saved.items[0].folderPath, ['Code']);
     const archive = await fetch(`${running.base}/v1/snapshots/${saved.id}/archive`);
     const tar = Buffer.from(await archive.arrayBuffer());
     const manifestLength = Number.parseInt(tar.subarray(124, 136).toString('ascii').trim(), 8);
     const manifest = JSON.parse(tar.subarray(512, 512 + manifestLength).toString('utf8'));
     assert.equal(manifest.git.commitSha, commit);
+    assert.equal(manifest.git.commitVerified, false);
+    assert.equal(manifest.createdById, owner.id);
+    assert.equal(manifest.createdByName, owner.displayName);
+    assert.equal(manifest.files[0].versionId, file.currentVersionId);
     assert.match(manifest.files[0].path, /^files\/Code\//u);
     const replacement = await fetch(`${running.base}/v1/files/${file.id}/versions`, {
       method: 'POST', headers: { 'Content-Type': 'application/zip' },
@@ -117,6 +128,7 @@ test('workspace snapshots bind a Git archive version and preserve its commit lab
     assert.equal(copied.status, 201);
     const copy = await copied.json();
     assert.equal(copy.git.commitSha, commit);
+    assert.equal(copy.git.commitVerified, false);
     assert.notEqual(copy.git.archiveFileId, file.id);
     const copiedFiles = await (await fetch(`${running.base}/v1/workspaces/${copy.id}/files`)).json();
     const allFolders = await (await fetch(`${running.base}/v1/folders`)).json();
@@ -124,6 +136,30 @@ test('workspace snapshots bind a Git archive version and preserve its commit lab
     assert.equal(copiedFolder.name, 'Code');
   } finally {
     if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('older snapshot catalogs get creator provenance without trusting ZIP comments', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-snapshot-legacy-test-'));
+  const catalogPath = join(storageRoot, 'catalog.json');
+  const git = { archiveFileId: 'zip-file', archiveVersionId: 'zip-version',
+    commitSha: 'a'.repeat(40), verification: 'zip-comment', commitVerified: true };
+  try {
+    await writeFile(catalogPath, JSON.stringify({ schemaVersion: 1, folders: [], files: [],
+      users: [{ id: 'owner', email: 'owner@example.test', displayName: 'Researcher' }],
+      workspaces: [{ id: 'project', ownerId: 'owner', fileIds: [], git }],
+      snapshots: [{ id: 'snapshot', workspaceId: 'project', ownerId: 'owner',
+        name: 'First run', note: '', items: [], git }],
+    }));
+    const catalog = await openCatalog(catalogPath);
+    assert.equal(catalog.getWorkspace('project', 'owner').git.commitVerified, false);
+    const snapshot = catalog.getSnapshot('snapshot', 'owner');
+    assert.equal(snapshot.createdById, 'owner');
+    assert.equal(snapshot.createdByName, 'Researcher');
+    assert.equal(snapshot.git.commitVerified, false);
+    await catalog.close();
+  } finally {
     await rm(storageRoot, { recursive: true, force: true });
   }
 });

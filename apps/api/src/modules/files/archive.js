@@ -53,7 +53,9 @@ export function snapshotArchive(snapshot, versions, storage) {
   const entries = snapshot.items.map((item, index) => ({ item, version: versions[index],
     path: safeEntryName(item, index) }));
   const manifest = Buffer.from(JSON.stringify({ format: 'dropvault-snapshot-v1',
-    snapshotId: snapshot.id, workspaceId: snapshot.workspaceId, name: snapshot.name,
+    snapshotId: snapshot.id, workspaceId: snapshot.workspaceId,
+    createdById: snapshot.createdById, createdByName: snapshot.createdByName,
+    name: snapshot.name,
     note: snapshot.note, createdAt: snapshot.createdAt, git: snapshot.git ?? null,
     files: entries.map(({ item, path }) => ({ path, ...item })) }, null, 2));
   return Readable.from((async function* () {

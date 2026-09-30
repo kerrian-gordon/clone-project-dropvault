@@ -1,10 +1,10 @@
 /** @typedef {{ id: string, name: string, parentId: string, ownerId: string, createdAt: string }} Folder */
 /** @typedef {{ id: string, name: string, folderId: string, ownerId: string, mimeType: string, size: number, createdAt: string }} FileRecord */
 /** @typedef {{ id: string, fileId: string, name: string, mimeType: string, size: number, createdAt: string, kind: 'uploaded' | 'replaced' | 'restored' | 'copied', restoredFrom?: string, copiedFromVersionId?: string, copiedFromSnapshotId?: string, label: string }} FileVersion */
-/** @typedef {{ archiveFileId: string, archiveVersionId: string, commitSha: string, verification: 'zip-comment' }} GitArchiveLink */
+/** @typedef {{ archiveFileId: string, archiveVersionId: string, commitSha: string, verification: 'zip-comment', commitVerified: false }} GitArchiveLink */
 /** @typedef {{ id: string, ownerId: string, name: string, description: string, fileIds: string[], git?: GitArchiveLink, createdAt: string }} Workspace */
 /** @typedef {{ fileId: string, versionId: string, name: string, folderId: string, folderPath: string[], mimeType: string, size: number }} SnapshotItem */
-/** @typedef {{ id: string, workspaceId: string, ownerId: string, name: string, note: string, items: SnapshotItem[], git: GitArchiveLink | null, createdAt: string }} Snapshot */
+/** @typedef {{ id: string, workspaceId: string, ownerId: string, createdById: string, createdByName: string, name: string, note: string, items: SnapshotItem[], git: GitArchiveLink | null, createdAt: string }} Snapshot */
 /** @typedef {{ id: string, email: string, displayName: string, tier: 'free' | 'demo', createdAt: string }} User */
 /** @typedef {{ usedBytes: number, limitBytes: number, tier: 'free' | 'demo' }} StorageUsage */
 /** @typedef {{ colors: { background: string, surface: string, text: string, accent: string }, font: 'Inter' | 'Arial' | 'Georgia', spacing: 'compact' | 'comfortable' }} ThemeSettings */

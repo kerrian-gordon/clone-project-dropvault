@@ -170,7 +170,8 @@ export function WorkspacePage() {
           .map((file) => <option key={file.id} value={file.id}>{file.name}</option>)}
       </select><button disabled={!gitFileId || pending} onClick={() => void change(() =>
         api(routes.workspaceGit(id), jsonOptions('PUT', { fileId: gitFileId })))}>Link archive</button></div>
-      {workspace.git && <p>Linked commit <code>{workspace.git.commitSha}</code> from a ZIP comment. The linked ZIP is included automatically in snapshots.</p>}
+      {workspace.git && <p>Linked code archive: {files.find((file) =>
+        file.id === workspace.git.archiveFileId)?.name ?? 'ZIP file'}. Claimed commit <code>{workspace.git.commitSha}</code> from its ZIP comment. Not verified against GitHub. The linked ZIP is included automatically in snapshots.</p>}
     </section>}
     {isOwner && <section className="workspace-card workspace-form">
       <h2>Save a snapshot</h2>
@@ -183,7 +184,8 @@ export function WorkspacePage() {
       <label>What does this snapshot represent?<textarea value={note} maxLength={1000}
         disabled={reviewing} onChange={(event) => setNote(event.target.value)} /></label>
       {reviewing ? <div className="workspace-review">
-        {workspace.git && <p>Code archive commit: <code>{workspace.git.commitSha}</code>. Its ZIP is included below.</p>}
+        {workspace.git && <p>Code archive: {files.find((file) =>
+          file.id === workspace.git.archiveFileId)?.name ?? 'ZIP file'} (claimed commit <code>{workspace.git.commitSha}</code>; not verified against GitHub). Its ZIP is included below.</p>}
         <strong>Review “{name}” before saving</strong>
         <p>{reviewedItems.length} files · {formatBytes(reviewedItems.reduce((sum, file) => sum + file.size, 0))} already counted in storage</p>
         <ul>{reviewedItems.map((file) => <li key={file.id}>{file.name} · {formatBytes(file.size)} · current version {file.currentVersionId}</li>)}</ul>
@@ -257,9 +259,10 @@ export function SnapshotPage() {
     <Link to={owned ? `/workspaces/${snapshot.workspaceId}` : '/workspaces'}>← Workspaces</Link>
     {error && <p className="error" role="alert">{error}</p>}
     {snapshot ? <><h1>{snapshot.name}</h1>
-      <p className="muted">Saved {new Date(snapshot.createdAt).toLocaleString()} · {snapshot.items.length} exact file versions</p>
+      <p className="muted">Saved by {snapshot.createdByName} on {new Date(snapshot.createdAt).toLocaleString()} · {snapshot.items.length} exact file versions</p>
       <p>{snapshot.note || 'No note.'}</p>
-      {snapshot.git && <p>Code archive commit: <code>{snapshot.git.commitSha}</code> (ZIP comment supplied by uploader)</p>}
+      {snapshot.git && <p>Code archive: {snapshot.items.find((item) =>
+        item.fileId === snapshot.git.archiveFileId)?.name ?? 'ZIP file'} · version {snapshot.git.archiveVersionId}. Claimed commit <code>{snapshot.git.commitSha}</code> from its ZIP comment. Not verified against GitHub.</p>}
       <p className="muted">This snapshot is fixed. Later replacements, restores, renames, and folder moves do not change it.</p>
       <div className="workspace-inline">
         <a className="button-link" href={routes.snapshotArchive(id)}>Download all (.tar)</a>
@@ -270,7 +273,7 @@ export function SnapshotPage() {
       </div>
       <p className="muted">Restoring copies every file into your account and requires enough free storage. Your current files stay as they are.</p>
       <div className="list">{snapshot.items.map((item) => <div className="row" key={item.fileId}>
-        <div className="row-main"><strong>{item.name}</strong><span className="muted">{formatBytes(item.size)}</span></div>
+        <div className="row-main"><strong>{item.name}</strong><span className="muted">{snapshot.git?.archiveFileId === item.fileId ? 'Code archive' : 'Project file'} · version {item.versionId} · {formatBytes(item.size)}</span></div>
         <div className="row-actions">{openableTypes.has(item.mimeType) && <a
           href={routes.snapshotContent(id, item.fileId)} target="_blank" rel="noopener noreferrer">Open</a>}
           <a className="button-link" href={`${routes.snapshotContent(id, item.fileId)}?download=1`}>Download</a></div>

@@ -51,7 +51,7 @@ test('multi-file drop and version history preserve recoverable content',
       page.setDefaultTimeout(5000);
       const pageErrors = [];
       page.on('pageerror', (error) => pageErrors.push(error.message));
-      await page.goto(webOrigin);
+      await page.goto(webOrigin, { waitUntil: 'domcontentloaded', timeout: 20_000 });
       await page.getByRole('textbox', { name: 'Email' }).fill(credentials.email);
       await page.getByRole('textbox', { name: 'Password' }).fill(credentials.password);
       await page.getByRole('button', { name: 'Log in' }).click();

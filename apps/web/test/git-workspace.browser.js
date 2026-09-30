@@ -92,7 +92,7 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
       await page.getByText('results.csv: success').waitFor();
       await page.getByRole('combobox', { name: 'Git code archive' }).selectOption({ label: 'code.zip' });
       await page.getByRole('button', { name: 'Link archive' }).click();
-      await page.getByText(new RegExp(`Linked commit ${commit} from a ZIP comment`, 'u')).waitFor();
+      await page.getByText(new RegExp(`Claimed commit ${commit} from its ZIP comment. Not verified against GitHub`, 'u')).waitFor();
       const checks = page.locator('.workspace-files input[type="checkbox"]');
       assert.equal(await checks.count(), 2);
       const codeCheck = page.locator('.workspace-files li').filter({ hasText: 'code.zip' })
@@ -119,6 +119,8 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
       await page.getByRole('button', { name: 'Create fixed snapshot' }).click();
       await page.getByRole('heading', { name: 'Trial one' }).waitFor();
       assert.match(await page.locator('.workspace-page').innerText(), new RegExp(commit, 'u'));
+      await page.getByText('Not verified against GitHub.', { exact: false }).waitFor();
+      await page.getByText('Code archive · version', { exact: false }).waitFor();
 
       const downloadPromise = page.waitForEvent('download');
       await page.getByRole('link', { name: 'Download all (.tar)' }).click();
@@ -128,6 +130,9 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
       const entries = tarEntries(await readFile(tarPath));
       const manifest = JSON.parse(entries.get('manifest.json').toString('utf8'));
       assert.equal(manifest.git.commitSha, commit);
+      assert.equal(manifest.git.commitVerified, false);
+      assert.equal(typeof manifest.createdById, 'string');
+      assert.equal(typeof manifest.createdByName, 'string');
       assert.deepEqual(manifest.files.map((file) => file.name).sort(), ['code.zip', 'results.csv']);
       const code = manifest.files.find((file) => file.name === 'code.zip');
       const data = manifest.files.find((file) => file.name === 'results.csv');

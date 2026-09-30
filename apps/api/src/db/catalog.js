@@ -73,6 +73,17 @@ export async function openCatalog(path, persistence) {
       ?? 'Community member';
     takenNames.push(user.displayName);
   }
+  // Existing links all came from uploaded ZIP comments. They are labels, not
+  // proof that the archive matches a commit in any repository.
+  for (const workspace of state.workspaces) {
+    if (workspace.git) workspace.git.commitVerified = false;
+  }
+  for (const snapshot of state.snapshots) {
+    snapshot.createdById ??= snapshot.ownerId;
+    snapshot.createdByName ??= state.users.find((user) => user.id === snapshot.createdById)
+      ?.displayName ?? 'Community member';
+    if (snapshot.git) snapshot.git.commitVerified = false;
+  }
 
   let pending = Promise.resolve();
   function write(change) {
@@ -392,7 +403,7 @@ export async function openCatalog(path, persistence) {
           throw new ApiError(409, 'GIT_ARCHIVE_CHANGED', 'Choose a current ZIP file in this workspace');
         }
         workspace.git = { archiveFileId: fileId, archiveVersionId: versionId,
-          commitSha, verification: 'zip-comment' };
+          commitSha, verification: 'zip-comment', commitVerified: false };
         return workspace.git;
       });
     },
@@ -536,7 +547,10 @@ export async function openCatalog(path, persistence) {
             folderPath,
             mimeType: version.mimeType, size: version.size };
         });
-        const snapshot = { id: randomUUID(), workspaceId, ownerId: userId, name, note,
+        const snapshot = { id: randomUUID(), workspaceId, ownerId: userId,
+          createdById: userId,
+          createdByName: next.users.find((user) => user.id === userId)?.displayName
+            ?? 'Community member', name, note,
           items, git: workspace.git ? { ...workspace.git } : null,
           createdAt: new Date().toISOString() };
         next.snapshots.push(snapshot);
