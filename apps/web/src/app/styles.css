@@ -26,7 +26,8 @@
   --danger-text: color-mix(in srgb, #c81e1e 50%, var(--ink));
   --warn-text: color-mix(in srgb, #c2410c 50%, var(--ink));
   --success-text: color-mix(in srgb, #15803d 50%, var(--ink));
-  --top-h: 3.75rem;
+  --top-pad: 0.7rem;
+  --top-h: calc(var(--top-pad) * 2 + 2.5rem);
   --r-card: 12px;  /* cards, panels, dialogs */
   --r-ctl: 8px;    /* inputs, nav items, chips */
   --r-btn: 8px;    /* set to 100px for pill buttons like the marketing site */
@@ -90,7 +91,7 @@ button[aria-busy="true"] { cursor: wait; }
 .shell-top {
   position: sticky; top: 0; z-index: 3;
   display: flex; align-items: center; gap: 1rem;
-  padding: 0.7rem 1.5rem;
+  padding: var(--top-pad) 1.5rem;
   background: var(--paper);
   border-bottom: 1px solid var(--line);
 }
@@ -284,16 +285,15 @@ h1 { margin: 0.4rem 0 0.75rem; font-size: 1.6rem; letter-spacing: -0.02em; font-
 .theme-swatch { width: 1rem; height: 1rem; border-radius: 4px; border: 1px solid var(--line); display: inline-block; }
 
 /* ---------- 9. Spacing modes (unchanged contract) ---------- */
+:root[data-theme-spacing="compact"] { --top-pad: 0.45rem; }
 :root[data-theme-spacing="compact"] .content { margin-top: 1rem; }
 :root[data-theme-spacing="compact"] .row-main { padding: 0.4rem 0.7rem; }
 :root[data-theme-spacing="compact"] .theme-section { padding: 0.7rem; margin: 0.7rem 0; }
 :root[data-theme-spacing="compact"] .sidebar nav a { padding: 0.35rem 0.75rem; }
-:root[data-theme-spacing="compact"] .shell-top { padding: 0.45rem 1.5rem; }
 :root[data-theme-spacing="comfortable"] .content { margin-top: 1.75rem; }
 :root[data-theme-spacing="comfortable"] .row-main { padding: 0.65rem 1rem; }
 :root[data-theme-spacing="comfortable"] .theme-section { padding: 1.1rem; margin: 1.2rem 0; }
 :root[data-theme-spacing="comfortable"] .sidebar nav a { padding: 0.5rem 0.75rem; }
-:root[data-theme-spacing="comfortable"] .shell-top { padding: 0.7rem 1.5rem; }
 
 /* ---------- 10. Responsive and motion ---------- */
 @media (max-width: 800px) {
