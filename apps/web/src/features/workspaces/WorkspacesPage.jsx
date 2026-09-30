@@ -85,6 +85,9 @@ export function WorkspacePage() {
   const [memberRole, setMemberRole] = useState('viewer');
   const [gitFileId, setGitFileId] = useState('');
   const [githubRepository, setGithubRepository] = useState('');
+  const [githubChoices, setGithubChoices] = useState(null);
+  const [githubCommitSha, setGithubCommitSha] = useState('');
+  const [githubManualSha, setGithubManualSha] = useState('');
   const [githubNotice, setGithubNotice] = useState('');
   const [fileQuery, setFileQuery] = useState('');
   const uploadsPending = jobs.some((job) => ['checking', 'suggested', 'queued', 'uploading'].includes(job.status));
@@ -112,6 +115,15 @@ export function WorkspacePage() {
     catch (caught) { setError(caught.message); }
     finally { setPending(false); }
   }
+  async function loadGithubCommits() {
+    setPending(true); setError(''); setGithubNotice(''); setGithubChoices(null);
+    try {
+      const choices = await api(routes.githubCommits,
+        jsonOptions('POST', { repository: githubRepository }));
+      setGithubChoices(choices); setGithubCommitSha(''); setGithubManualSha('');
+    } catch (caught) { setError(caught.message); }
+    finally { setPending(false); }
+  }
   const available = owned.filter((file) => !files.some((member) => member.id === file.id));
   const chosen = files.filter((file) => selected.includes(file.id));
   const visibleFiles = files.filter((file) => file.name.toLocaleLowerCase()
@@ -122,6 +134,7 @@ export function WorkspacePage() {
   const linkedArchive = files.find((file) => file.id === workspace?.git?.archiveFileId);
   const linkedArchiveStale = workspace?.git && files.some((file) =>
     file.id === workspace.git.archiveFileId && file.currentVersionId !== workspace.git.archiveVersionId);
+  const chosenGithubSha = githubManualSha.trim() || githubCommitSha;
   const selectedSize = chosen.reduce((sum, file) => sum + file.size, 0);
   async function createSnapshot() {
     await change(async () => {
@@ -208,20 +221,44 @@ export function WorkspacePage() {
         <span className="workspace-count">{workspace.git ? 'Linked' : 'Optional'}</span></div>
       {workspace.git && <p className="workspace-archive-status">Linked code archive: <strong>{linkedArchive?.name ?? 'ZIP file'}</strong>.{' '}
         {workspace.git.verification === 'github-api'
-          ? <>Imported from <strong>{workspace.git.repositoryFullName}</strong> at <code>{workspace.git.commitSha}</code> on {workspace.git.ref}. The archive is tied to this GitHub commit.</>
+          ? <>Imported from <strong>{workspace.git.repositoryFullName}</strong> at <code>{workspace.git.commitSha}</code>.{' '}
+            <a href={workspace.git.sourceUrl} target="_blank" rel="noopener noreferrer">View source at this commit</a>.</>
           : <>Claimed commit <code>{workspace.git.commitSha}</code> from its ZIP comment. Not verified against GitHub.</>}{' '}
         The linked ZIP is included automatically in snapshots.</p>}
       {!workspace.git && <form className="workspace-inline" onSubmit={(event) => { event.preventDefault();
+        if (!githubChoices) { void loadGithubCommits(); return; }
+        if (!/^[a-f0-9]{40}$/iu.test(chosenGithubSha)) return;
         void change(async () => {
           const result = await api(routes.workspaceGitHubImport(id), jsonOptions('POST',
-            { repository: githubRepository }));
+            { repository: githubChoices.repositoryFullName, commitSha: chosenGithubSha }));
           setGithubNotice(`Imported ${result.git.repositoryFullName} at ${result.git.commitSha.slice(0, 12)}.`);
         });
       }}>
         <input aria-label="Public GitHub repository" value={githubRepository}
           placeholder="owner/repo or GitHub URL" required disabled={pending}
-          onChange={(event) => setGithubRepository(event.target.value)} />
-        <button disabled={pending}>Import public repository</button>
+          onChange={(event) => { setGithubRepository(event.target.value); setGithubChoices(null);
+            setGithubCommitSha(''); setGithubManualSha(''); }} />
+        <button type="button" disabled={pending || !githubRepository.trim()}
+          onClick={() => void loadGithubCommits()}>Load commits</button>
+        {githubChoices && <>
+          {!githubChoices.commits.length && <span className="muted">No recent commits found. Paste a full commit SHA below.</span>}
+          <label>Recent commits on {githubChoices.defaultBranch}
+            <select aria-label="GitHub commit" value={githubCommitSha} disabled={pending || !!githubManualSha}
+              onChange={(event) => setGithubCommitSha(event.target.value)}>
+              <option value="">Choose a commit</option>
+              {githubChoices.commits.map((commit) => <option key={commit.sha} value={commit.sha}>
+                {commit.sha.slice(0, 12)} · {commit.message || 'No message'}
+              </option>)}
+            </select>
+          </label>
+          <label>Or paste an older full commit SHA
+            <input aria-label="Older GitHub commit SHA" value={githubManualSha} maxLength={40}
+              disabled={pending} onChange={(event) => setGithubManualSha(event.target.value)} />
+          </label>
+          <button disabled={pending || !/^[a-f0-9]{40}$/iu.test(chosenGithubSha)}>
+            Import selected commit
+          </button>
+        </>}
       </form>}
       {workspace.git?.verification === 'github-api' && <div className="workspace-inline">
         <button disabled={pending} onClick={() => void change(async () => {
@@ -232,7 +269,7 @@ export function WorkspacePage() {
         <span className="muted">Checks the default branch when you click. No automatic sync.</span>
       </div>}
       {githubNotice && <p role="status">{githubNotice}</p>}
-      <p className="muted">Public repositories only. Each imported ZIP and refresh uses your storage quota.</p>
+      <p className="muted">Public repositories only. Choose a commit before import. Each imported ZIP and refresh uses your storage quota.</p>
       <div className="workspace-inline"><select aria-label="Git code archive" value={gitFileId}
         onChange={(event) => setGitFileId(event.target.value)}>
         <option value="">Choose a ZIP file</option>{files.filter((file) => file.name.toLowerCase().endsWith('.zip'))
@@ -259,7 +296,8 @@ export function WorkspacePage() {
         disabled={reviewing} onChange={(event) => setNote(event.target.value)} /></label>
       {reviewing ? <div className="workspace-review">
         {workspace.git && <p>Code archive: {files.find((file) =>
-          file.id === workspace.git.archiveFileId)?.name ?? 'ZIP file'} ({workspace.git.verification === 'github-api' ? 'GitHub commit' : 'claimed commit'} <code>{workspace.git.commitSha}</code>{workspace.git.verification === 'github-api' ? '' : '; not verified against GitHub'}). Its ZIP is included below.</p>}
+          file.id === workspace.git.archiveFileId)?.name ?? 'ZIP file'} ({workspace.git.verification === 'github-api' ? 'GitHub commit' : 'claimed commit'} <code>{workspace.git.commitSha}</code>{workspace.git.verification === 'github-api' ? '' : '; not verified against GitHub'}).{' '}
+          {workspace.git.sourceUrl && <><a href={workspace.git.sourceUrl} target="_blank" rel="noopener noreferrer">Source at this commit</a>. </>}Its ZIP is included below.</p>}
         <strong>Review “{name}” before saving</strong>
         <p>{reviewedItems.length} files · {formatBytes(reviewedItems.reduce((sum, file) => sum + file.size, 0))} already counted in storage</p>
         <ul>{reviewedItems.map((file) => <li key={file.id}>{file.name} · {formatBytes(file.size)} · current version {file.currentVersionId}</li>)}</ul>
@@ -339,7 +377,8 @@ export function SnapshotPage() {
       {snapshot.git && <p>Code archive: {snapshot.items.find((item) =>
         item.fileId === snapshot.git.archiveFileId)?.name ?? 'ZIP file'} · version {snapshot.git.archiveVersionId}.{' '}
         {snapshot.git.verification === 'github-api'
-          ? <>Imported from {snapshot.git.repositoryFullName} at GitHub commit <code>{snapshot.git.commitSha}</code> on {snapshot.git.ref}.</>
+          ? <>Imported from {snapshot.git.repositoryFullName} at GitHub commit <code>{snapshot.git.commitSha}</code>.{' '}
+            <a href={snapshot.git.sourceUrl} target="_blank" rel="noopener noreferrer">View source at this commit</a>.</>
           : <>Claimed commit <code>{snapshot.git.commitSha}</code> from its ZIP comment. Not verified against GitHub.</>}</p>}
       <p className="muted">This snapshot is fixed. Later replacements, restores, renames, and folder moves do not change it.</p>
       <div className="workspace-inline">

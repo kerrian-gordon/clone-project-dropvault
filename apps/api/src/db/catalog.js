@@ -77,6 +77,9 @@ export async function openCatalog(path, persistence) {
   for (const workspace of state.workspaces) {
     if (workspace.git?.verification !== 'github-api' && workspace.git) {
       workspace.git.commitVerified = false;
+    } else if (workspace.git?.verification === 'github-api') {
+      workspace.git.repositoryUrl ??= `https://github.com/${workspace.git.repositoryFullName}`;
+      workspace.git.sourceUrl ??= `${workspace.git.repositoryUrl}/tree/${workspace.git.commitSha}`;
     }
   }
   for (const snapshot of state.snapshots) {
@@ -85,6 +88,9 @@ export async function openCatalog(path, persistence) {
       ?.displayName ?? 'Community member';
     if (snapshot.git?.verification !== 'github-api' && snapshot.git) {
       snapshot.git.commitVerified = false;
+    } else if (snapshot.git?.verification === 'github-api') {
+      snapshot.git.repositoryUrl ??= `https://github.com/${snapshot.git.repositoryFullName}`;
+      snapshot.git.sourceUrl ??= `${snapshot.git.repositoryUrl}/tree/${snapshot.git.commitSha}`;
     }
   }
 
@@ -430,7 +436,11 @@ export async function openCatalog(path, persistence) {
         workspace.fileIds.push(file.id);
         workspace.git = { archiveFileId: file.id, archiveVersionId: file.currentVersionId,
           commitSha: source.commitSha, verification: 'github-api', commitVerified: true,
-          repositoryFullName: source.repositoryFullName, ref: source.ref, importedAt: createdAt };
+          repositoryFullName: source.repositoryFullName, repositoryUrl: source.repositoryUrl
+            ?? `https://github.com/${source.repositoryFullName}`,
+          sourceUrl: source.sourceUrl
+            ?? `https://github.com/${source.repositoryFullName}/tree/${source.commitSha}`,
+          ref: source.ref, importedAt: createdAt };
         return { file: publicFile(file), git: workspace.git, unchanged: false };
       });
     },
@@ -461,7 +471,10 @@ export async function openCatalog(path, persistence) {
         file.size = version.size;
         file.currentVersionId = version.id;
         workspace.git = { ...workspace.git, archiveVersionId: version.id,
-          commitSha: source.commitSha, ref: source.ref, importedAt: createdAt };
+          commitSha: source.commitSha, ref: source.ref,
+          sourceUrl: source.sourceUrl
+            ?? `https://github.com/${source.repositoryFullName}/tree/${source.commitSha}`,
+          importedAt: createdAt };
         return { file: publicFile(file), git: workspace.git, unchanged: false };
       });
     },

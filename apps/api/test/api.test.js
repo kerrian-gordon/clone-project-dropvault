@@ -181,10 +181,15 @@ test('public GitHub import refreshes the current archive and preserves saved sna
   const archives = new Map([[first, emptyZip(['first/README.md'])],
     [second, emptyZip(['second/README.md'])]]);
   const githubClient = {
-    async resolve(repository) {
+    async listCommits(repository) {
+      assert.equal(repository, 'sample/project');
+      return { repositoryFullName: 'sample/project', defaultBranch: 'main',
+        commits: [{ sha: first, message: 'First run', date: '2026-01-01T00:00:00Z' }] };
+    },
+    async resolve(repository, selectedSha) {
       assert.equal(repository, 'sample/project');
       return { owner: 'sample', repo: 'project', repositoryFullName: 'sample/project',
-        ref: 'main', commitSha: sha };
+        ref: selectedSha ?? 'main', commitSha: selectedSha ?? sha };
     },
     async download(source) {
       downloads += 1;
@@ -202,15 +207,22 @@ test('public GitHub import refreshes the current archive and preserves saved sna
       body: JSON.stringify({ name: 'Research', description: '' }),
     })).json();
     const base = `${running.base}/v1/workspaces/${workspace.id}`;
-    const imported = await fetch(`${base}/github/import`, {
+    const choices = await fetch(`${running.base}/v1/github/commits`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ repository: 'sample/project' }),
+    });
+    assert.equal(choices.status, 200);
+    assert.equal((await choices.json()).commits[0].sha, first);
+    const imported = await fetch(`${base}/github/import`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repository: 'sample/project', commitSha: first }),
     });
     assert.equal(imported.status, 201);
     const initial = await imported.json();
     assert.equal(initial.git.commitSha, first);
     assert.equal(initial.git.commitVerified, true);
     assert.equal(initial.git.repositoryFullName, 'sample/project');
+    assert.equal(initial.git.sourceUrl, `https://github.com/sample/project/tree/${first}`);
     const directReplace = await fetch(`${base}/files/${initial.file.id}/versions`, {
       method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: archives.get(second),
     });
@@ -224,6 +236,12 @@ test('public GitHub import refreshes the current archive and preserves saved sna
     const saved = await snapshot.json();
     assert.equal(saved.git.archiveVersionId, initial.file.currentVersionId);
     assert.equal(saved.git.commitVerified, true);
+    assert.equal(saved.git.sourceUrl, initial.git.sourceUrl);
+    const tar = Buffer.from(await (await fetch(`${running.base}/v1/snapshots/${saved.id}/archive`))
+      .arrayBuffer());
+    const manifestLength = Number.parseInt(tar.subarray(124, 136).toString('ascii').trim(), 8);
+    const manifest = JSON.parse(tar.subarray(512, 512 + manifestLength).toString('utf8'));
+    assert.equal(manifest.git.sourceUrl, initial.git.sourceUrl);
     const unchanged = await fetch(`${base}/github/refresh`, { method: 'POST' });
     assert.equal(unchanged.status, 200);
     assert.equal((await unchanged.json()).unchanged, true);
@@ -233,6 +251,7 @@ test('public GitHub import refreshes the current archive and preserves saved sna
     assert.equal(refreshed.status, 200);
     const current = await refreshed.json();
     assert.equal(current.git.commitSha, second);
+    assert.equal(current.git.sourceUrl, `https://github.com/sample/project/tree/${second}`);
     assert.notEqual(current.file.currentVersionId, initial.file.currentVersionId);
     assert.deepEqual(Buffer.from(await (await fetch(`${base}/files/${initial.file.id}/content`)).arrayBuffer()),
       archives.get(second));
@@ -251,6 +270,7 @@ test('public GitHub import refreshes the current archive and preserves saved sna
     const savedAgain = await (await fetch(`${running.base}/v1/snapshots/${saved.id}`)).json();
     assert.equal(savedAgain.git.commitVerified, true);
     assert.equal(savedAgain.git.commitSha, first);
+    assert.equal(savedAgain.git.sourceUrl, initial.git.sourceUrl);
   } finally {
     if (running) await stop(running.server);
     await rm(storageRoot, { recursive: true, force: true });

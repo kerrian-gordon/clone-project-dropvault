@@ -56,10 +56,15 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
       let githubSha = commit;
 
       api = await createApiServer({ storageRoot, githubClient: {
-        async resolve(repository) {
+        async listCommits(repository) {
+          assert.equal(repository, 'sample/project');
+          return { repositoryFullName: repository, defaultBranch: 'main',
+            commits: [{ sha: githubSha, message: 'Save trial code', date: null }] };
+        },
+        async resolve(repository, selectedSha) {
           assert.equal(repository, 'sample/project');
           return { owner: 'sample', repo: 'project', repositoryFullName: 'sample/project',
-            ref: 'main', commitSha: githubSha };
+            ref: selectedSha ?? 'main', commitSha: selectedSha ?? githubSha };
         },
         async download() { return { stream: Readable.from([zip]), contentLength: zip.length }; },
       } });
@@ -185,8 +190,12 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
       await page.getByRole('textbox', { name: 'Name' }).fill('GitHub import');
       await page.getByRole('button', { name: 'Create workspace' }).click();
       await page.getByRole('textbox', { name: 'Public GitHub repository' }).fill('sample/project');
-      await page.getByRole('button', { name: 'Import public repository' }).click();
+      await page.getByRole('button', { name: 'Load commits' }).click();
+      await page.getByRole('combobox', { name: 'GitHub commit' }).selectOption(commit);
+      await page.getByRole('button', { name: 'Import selected commit' }).click();
       await page.getByText(`Imported from sample/project at ${commit}`, { exact: false }).waitFor();
+      assert.equal(await page.getByRole('link', { name: 'View source at this commit' })
+        .getAttribute('href'), `https://github.com/sample/project/tree/${commit}`);
       await page.getByRole('button', { name: 'Refresh from GitHub' }).click();
       await page.getByText('Already at the latest commit on the default branch.').waitFor();
       githubSha = 'b'.repeat(40);
@@ -198,6 +207,8 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
       await page.getByRole('button', { name: 'Create fixed snapshot' }).click();
       await page.getByText(`Imported from sample/project at GitHub commit ${githubSha}`,
         { exact: false }).waitFor();
+      assert.equal(await page.getByRole('link', { name: 'View source at this commit' })
+        .getAttribute('href'), `https://github.com/sample/project/tree/${githubSha}`);
       assert.deepEqual(pageErrors, []);
     } finally {
       if (browser) await browser.close();

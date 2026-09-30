@@ -385,13 +385,17 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         return json(response, 200, await mutate(() => catalog.setWorkspaceGitArchive(
           workspace.id, user.id, file.id, file.currentVersionId, commit)));
       }
+      if (request.method === 'POST' && path === '/v1/github/commits') {
+        const input = await readJson(request);
+        return json(response, 200, await githubClient.listCommits(input?.repository));
+      }
       const githubImportMatch = /^\/v1\/workspaces\/([^/]+)\/github\/import$/u.exec(path);
       if (request.method === 'POST' && githubImportMatch) {
         const input = await readJson(request);
         const workspace = catalog.getWorkspace(githubImportMatch[1], user.id, 'manage');
         if (workspace.git) throw new ApiError(409, 'GIT_ARCHIVE_ALREADY_LINKED',
           'Remove the current code archive from the workspace before importing a repository');
-        const source = await githubClient.resolve(input?.repository);
+        const source = await githubClient.resolve(input?.repository, input?.commitSha);
         return json(response, 201, await saveGitHubArchive(workspace.id, user.id, source));
       }
       const githubRefreshMatch = /^\/v1\/workspaces\/([^/]+)\/github\/refresh$/u.exec(path);
