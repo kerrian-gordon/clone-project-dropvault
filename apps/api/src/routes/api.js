@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
-import { MAX_UPLOAD_BYTES, ROOT_FOLDER_ID, validName } from '../../../../packages/shared/index.js';
+import { MAX_UPLOAD_BYTES, ROOT_FOLDER_ID, SUPPORTED_UPLOAD_TYPES, validName } from '../../../../packages/shared/index.js';
 import { publicFile } from '../db/catalog.js';
 import { checkRequestOrigin, clearSessionCookie, createAuthLimiter, createSession, hashPassword,
   requireUser, sessionCookie, sessionToken, validEmail, validPassword,
@@ -265,11 +265,39 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       if (request.method === 'GET' && path === '/v1/storage/usage') {
         return json(response, 200, catalog.usage(user.id, storageLimitBytes));
       }
+      if (request.method === 'POST' && path === '/v1/organization/suggestions') {
+        const input = await readJson(request);
+        const extension = typeof input?.name === 'string' ? input.name.split('.').at(-1)?.toLowerCase() : '';
+        if (!validName(input?.name) || !Object.hasOwn(SUPPORTED_UPLOAD_TYPES, extension)) {
+          throw new ApiError(400, 'INVALID_FILE_NAME', 'Provide a supported file name');
+        }
+        if (typeof input.currentFolderId !== 'string' || !input.currentFolderId) {
+          throw new ApiError(400, 'INVALID_FOLDER', 'Provide the current folder');
+        }
+        return json(response, 200, await mutate(() => catalog.createOrganizationSuggestion(
+          user.id, input.name, input.currentFolderId)));
+      }
+      const suggestionDecisionMatch = /^\/v1\/organization\/suggestions\/([^/]+)\/decision$/u.exec(path);
+      if (request.method === 'POST' && suggestionDecisionMatch) {
+        const input = await readJson(request);
+        if (typeof input?.accept !== 'boolean') {
+          throw new ApiError(400, 'INVALID_DECISION', 'Choose whether to use the suggested folder');
+        }
+        await mutate(() => catalog.decideOrganizationSuggestion(user.id, suggestionDecisionMatch[1], input.accept));
+        response.writeHead(204);
+        return response.end();
+      }
+      if (request.method === 'GET' && path === '/v1/organization/stats') {
+        return json(response, 200, catalog.organizationStats(user.id));
+      }
       if (request.method === 'POST' && path === '/v1/folders') {
         const input = await readJson(request);
         if (!validName(input?.name)) throw new ApiError(400, 'INVALID_NAME', 'Provide a valid folder name');
         const folder = await catalog.createFolder(input.name, input.parentId || ROOT_FOLDER_ID, user.id);
         return json(response, 201, folder);
+      }
+      if (request.method === 'GET' && path === '/v1/folders') {
+        return json(response, 200, { folders: catalog.listFolders(user.id) });
       }
 
       const childrenMatch = /^\/v1\/folders\/([^/]+)\/children$/u.exec(path);
@@ -277,6 +305,20 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         return json(response, 200, catalog.listChildren(childrenMatch[1], user.id));
       }
       const folderMatch = /^\/v1\/folders\/([^/]+)$/u.exec(path);
+      if (request.method === 'PATCH' && folderMatch) {
+        const input = await readJson(request);
+        if (!input || typeof input !== 'object' || Array.isArray(input)
+          || !Object.keys(input).length || Object.keys(input).some((key) => !['name', 'parentId'].includes(key))) {
+          throw new ApiError(400, 'INVALID_UPDATE', 'Provide a folder name or destination');
+        }
+        if ('name' in input && !validName(input.name)) {
+          throw new ApiError(400, 'INVALID_NAME', 'Provide a valid folder name');
+        }
+        if ('parentId' in input && (typeof input.parentId !== 'string' || !input.parentId)) {
+          throw new ApiError(400, 'INVALID_FOLDER', 'Provide a valid destination folder');
+        }
+        return json(response, 200, await mutate(() => catalog.updateFolder(folderMatch[1], user.id, input)));
+      }
       if (request.method === 'DELETE' && folderMatch) {
         await mutate(() => catalog.deleteFolder(folderMatch[1], user.id));
         response.writeHead(204);
@@ -366,6 +408,20 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       const fileMatch = /^\/v1\/files\/([^/]+)$/u.exec(path);
       if (request.method === 'GET' && fileMatch) {
         return json(response, 200, publicFile(catalog.getFile(fileMatch[1], user.id)));
+      }
+      if (request.method === 'PATCH' && fileMatch) {
+        const input = await readJson(request);
+        if (!input || typeof input !== 'object' || Array.isArray(input)
+          || !Object.keys(input).length || Object.keys(input).some((key) => !['name', 'folderId'].includes(key))) {
+          throw new ApiError(400, 'INVALID_UPDATE', 'Provide a file name or destination');
+        }
+        if ('name' in input && !validName(input.name)) {
+          throw new ApiError(400, 'INVALID_NAME', 'Provide a valid file name');
+        }
+        if ('folderId' in input && (typeof input.folderId !== 'string' || !input.folderId)) {
+          throw new ApiError(400, 'INVALID_FOLDER', 'Provide a valid destination folder');
+        }
+        return json(response, 200, await mutate(() => catalog.updateFile(fileMatch[1], user.id, input)));
       }
       if (request.method === 'DELETE' && fileMatch) {
         await mutate(async () => {

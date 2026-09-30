@@ -46,11 +46,17 @@ The API uses Node.js 24 built-in modules, local file storage, and a JSON metadat
 | `PUT /v1/account/appearance/settings` | JSON `{ "settings": ThemeSettings }` | `200 Appearance`; replaces the account's saved settings |
 | `DELETE /v1/account/appearance` | None | `200 Appearance`; resets to the default |
 | `POST /v1/folders` | JSON `{ "name": "Projects", "parentId": "root" }`; `parentId` defaults to `root` | `201 Folder` |
+| `GET /v1/folders` | Signed-in account | `200 { "folders": Folder[] }` for all owned folders, for choosing a move destination |
+| `POST /v1/organization/suggestions` | JSON `{ "name": "trip.jpg", "currentFolderId": "root" }` | `200 { "suggestion": null }` or `{ "suggestion": { "id", "folderId", "folderName", "rule", "reason" } }`; considers owned existing folders only |
+| `POST /v1/organization/suggestions/:id/decision` | JSON `{ "accept": true }` or `{ "accept": false }` | `204`; records the signed-in account's choice once; suggestion expires after 24 hours |
+| `GET /v1/organization/stats` | Signed-in account | `200 { "shown", "accepted", "keptCurrent" }` for that account |
 | `GET /v1/folders/:id/children` | Use `root` for top-level owned items | `200 { "folderId", "folders": Folder[], "files": FileRecord[] }` |
+| `PATCH /v1/folders/:id` | Owner only; JSON with `name`, `parentId`, or both | `200 Folder`; rejects root, a missing destination, sibling name conflict, and moves into itself or a descendant |
 | `DELETE /v1/folders/:id` | Owner only; folder must be empty | `204` |
 | `POST /v1/files?name=:name&folderId=:id` | Raw file bytes; `Content-Type` should match extension; `folderId` defaults to `root` | `201 FileRecord` |
 | `GET /v1/files/shared` | None | `200 { "files": FileRecord[] }` granted to the signed-in account |
 | `GET /v1/files/:id` | Owner or recipient | `200 FileRecord` |
+| `PATCH /v1/files/:id` | Owner only; JSON with `name`, `folderId`, or both | `200 FileRecord`; the original file extension must be kept |
 | `DELETE /v1/files/:id` | Owner only | `204`; removes bytes, grants, and bearer links |
 | `GET /v1/files/:id/content` | Owner or recipient; add `?download=1` for attachment | `200` file bytes |
 | `GET /v1/storage/usage` | None | `200 { "usedBytes", "limitBytes", "tier" }` for the signed-in account |
@@ -65,6 +71,8 @@ The API uses Node.js 24 built-in modules, local file storage, and a JSON metadat
 | `GET /v1/shares/:token` | Anyone holding an unexpired token | `200` file bytes; add `?download=1` for attachment |
 
 Bearer links expire seven days after creation and can be revoked by their owner. The returned `url` is a relative `/v1/shares/...` path by default. Set `DROPVAULT_PUBLIC_BASE_URL` to an HTTP(S) origin (for example `https://files.example.com`) to return absolute links usable from another device. The API still binds to `127.0.0.1` by default; use a trusted reverse proxy or set `DROPVAULT_HOST` for an appropriate local network binding. Anyone holding a valid link can download its file, so use named-account access when the recipient must be identified. Content is rendered inline only for a small set of browser-safe MIME types; other types download as attachments. Responses include `X-Content-Type-Options: nosniff`.
+
+Folder suggestions use file names, extensions, and existing folder names only. A unique best match is offered before upload; the file stays in its current folder unless the user chooses the suggested destination. When there is no clear match, upload continues in the current folder. The choice counters do not store file names or contents. The rules are deterministic and do not use the experimental ML classifier.
 
 ## Errors and local use
 
