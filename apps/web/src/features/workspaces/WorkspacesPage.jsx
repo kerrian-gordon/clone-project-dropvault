@@ -37,23 +37,25 @@ export function WorkspacesPage() {
     finally { setPending(false); }
   }
   return <section className="workspace-page">
-    <h1>Workspaces</h1>
-    <p className="muted">Collect files for a project, then save exact versions in a snapshot.</p>
-    <form className="workspace-card workspace-form" onSubmit={create}>
+    <div className="workspace-index-header"><div><h1>Workspaces</h1>
+      <p className="muted">Keep code, data, and other project files together. Save exact versions when a milestone is ready.</p></div>
+      <a className="button-link" href="#new-workspace">New workspace</a></div>
+    {error && <p className="error" role="alert">{error}</p>}
+    <section aria-labelledby="my-workspaces"><div className="workspace-section-heading"><h2 id="my-workspaces">Workspaces I can access</h2>
+      {workspaces && <span className="workspace-count">{workspaces.length}</span>}</div>
+    {workspaces === null ? <p>Loading…</p> : workspaces.length ? <div className="list">
+      {workspaces.map((workspace) => <div className="row" key={workspace.id}>
+        <Link className="row-main" to={`/workspaces/${workspace.id}`}><strong>{workspace.name}</strong>
+          <span className="muted">{workspace.fileIds.length} files · {workspace.role}</span></Link>
+      </div>)}
+    </div> : <p className="workspace-empty">No workspaces yet. Create one below to start a project.</p>}</section>
+    <form className="workspace-card workspace-form" id="new-workspace" onSubmit={create}>
       <h2>New workspace</h2>
       <label>Name<input value={name} maxLength={255} required onChange={(event) => setName(event.target.value)} /></label>
       <label>Description<textarea value={description} maxLength={1000}
         onChange={(event) => setDescription(event.target.value)} /></label>
       <button disabled={pending}>{pending ? 'Creating…' : 'Create workspace'}</button>
     </form>
-    {error && <p className="error" role="alert">{error}</p>}
-    <h2>Workspaces I can access</h2>
-    {workspaces === null ? <p>Loading…</p> : workspaces.length ? <div className="list">
-      {workspaces.map((workspace) => <div className="row" key={workspace.id}>
-        <Link className="row-main" to={`/workspaces/${workspace.id}`}><strong>{workspace.name}</strong>
-          <span className="muted">{workspace.fileIds.length} files · {workspace.role}</span></Link>
-      </div>)}
-    </div> : <p className="muted">No workspaces yet.</p>}
     <h2>Snapshots shared with me</h2>
     {shared.length ? <div className="list">{shared.map((snapshot) => <div className="row" key={snapshot.id}>
       <Link className="row-main" to={`/snapshots/${snapshot.id}`}><strong>{snapshot.name}</strong>
@@ -82,6 +84,7 @@ export function WorkspacePage() {
   const [memberEmail, setMemberEmail] = useState('');
   const [memberRole, setMemberRole] = useState('viewer');
   const [gitFileId, setGitFileId] = useState('');
+  const [fileQuery, setFileQuery] = useState('');
   const uploadsPending = jobs.some((job) => ['checking', 'suggested', 'queued', 'uploading'].includes(job.status));
   const refresh = useCallback(async () => {
     const [project, members, all, saved] = await Promise.all([
@@ -109,11 +112,15 @@ export function WorkspacePage() {
   }
   const available = owned.filter((file) => !files.some((member) => member.id === file.id));
   const chosen = files.filter((file) => selected.includes(file.id));
+  const visibleFiles = files.filter((file) => file.name.toLocaleLowerCase()
+    .includes(fileQuery.trim().toLocaleLowerCase()));
   const reviewing = reviewedItems !== null;
   const isOwner = workspace?.role === 'owner';
   const canContribute = isOwner || workspace?.role === 'contributor';
+  const linkedArchive = files.find((file) => file.id === workspace?.git?.archiveFileId);
   const linkedArchiveStale = workspace?.git && files.some((file) =>
     file.id === workspace.git.archiveFileId && file.currentVersionId !== workspace.git.archiveVersionId);
+  const selectedSize = chosen.reduce((sum, file) => sum + file.size, 0);
   async function createSnapshot() {
     await change(async () => {
       try {
@@ -132,14 +139,31 @@ export function WorkspacePage() {
     });
   }
   return <section className="workspace-page">
-    <Link to="/workspaces">← Workspaces</Link>
-    {workspace ? <><h1>{workspace.name}</h1><p>{workspace.description || 'No description.'}</p>
-      <p className="muted">Your role: {workspace.role}. Workspace uploads use the owner's quota.</p></> : <p>Loading workspace…</p>}
+    <Link className="workspace-back" to="/workspaces">← All workspaces</Link>
+    {workspace ? <header className="workspace-hero">
+      <div className="workspace-hero-main"><div><span className="workspace-eyebrow">Project workspace</span>
+        <h1>{workspace.name}</h1><p>{workspace.description || 'Keep your project files and fixed snapshots together.'}</p></div>
+        <span className="workspace-role">{workspace.role}</span></div>
+      <div className="workspace-stats" aria-label="Workspace summary">
+        <div><strong>{files.length}</strong><span>Current files</span></div>
+        <div><strong>{snapshots.length}</strong><span>Snapshots</span></div>
+        <div><strong>{workspace.git ? 'Linked' : 'None'}</strong><span>Code archive</span></div>
+      </div>
+      <nav className="workspace-jump" aria-label="On this page">
+        <a href="#workspace-files">Files</a><a href="#workspace-snapshots">Snapshots</a>
+        {isOwner && <a href="#workspace-team">Team</a>}
+      </nav>
+      <p className="workspace-owner-note">Workspace uploads use the owner's storage quota.</p>
+    </header> : <p>Loading workspace…</p>}
     {error && <p className="error" role="alert">{error}</p>}
     {canContribute && <WorkspaceUploader workspaceId={id} onDone={refresh} />}
-    <section className="workspace-card">
-      <h2>Current project files</h2>
-      {isOwner && <><p className="muted">Add files already in My files. Workspace members can open and download them. Removing one here does not delete the file or an earlier snapshot.</p>
+    <section className="workspace-card" id="workspace-files">
+      <div className="workspace-section-heading"><div><h2>Current project files</h2>
+        <p className="muted">{isOwner ? 'Upload new files or add files from My files. Removing one here keeps the original and saved snapshots.'
+          : canContribute ? 'Upload files above or replace current versions here. The owner chooses what enters a snapshot.'
+            : 'Browse and download files shared through this workspace.'}</p></div>
+        <span className="workspace-count">{files.length} {files.length === 1 ? 'file' : 'files'}</span></div>
+      {isOwner && <>
       <div className="workspace-inline"><select aria-label="File to add" value={addId}
         onChange={(event) => setAddId(event.target.value)}>
         <option value="">Choose a file</option>{available.map((file) =>
@@ -147,35 +171,55 @@ export function WorkspacePage() {
       </select><button disabled={!addId || pending} onClick={() => void change(async () => {
         await api(routes.workspaceFiles(id), jsonOptions('POST', { fileId: addId })); setAddId('');
       })}>Add file</button></div></>}
-      {!files.length && <p className="muted">No files in this workspace yet.</p>}
-      <ul className="workspace-files">{files.map((file) => <li key={file.id}>
-        <label>{isOwner && <input type="checkbox" checked={selected.includes(file.id)}
+      {files.length > 0 && <div className="workspace-file-tools">
+        <label>Search project files<input type="search" value={fileQuery} placeholder="Search by file name"
+          onChange={(event) => setFileQuery(event.target.value)} /></label>
+        {isOwner && <div className="workspace-selection-tools" aria-live="polite">
+          <span>{selected.length} selected for next snapshot · {formatBytes(selectedSize)}</span>
+          <button className="btn-ghost" disabled={reviewing || files.length > 200 || selected.length === files.length}
+            onClick={() => setSelected(files.map((file) => file.id))}>Select all</button>
+          <button className="btn-ghost" disabled={reviewing || selected.length <= (workspace.git ? 1 : 0)}
+            onClick={() => setSelected(workspace.git ? [workspace.git.archiveFileId] : [])}>Clear other files</button>
+        </div>}
+      </div>}
+      {!files.length && <p className="workspace-empty">{canContribute ? 'No files yet. Upload a file above to start this project.'
+        : 'No files yet. Ask the workspace owner to add project files.'}</p>}
+      {files.length > 0 && !visibleFiles.length && <p className="workspace-empty">No files match “{fileQuery}”.</p>}
+      <ul className="workspace-files">{visibleFiles.map((file) => <li key={file.id}>
+        <label>{isOwner && <input type="checkbox" aria-label={`Include ${file.name} in snapshot`} checked={selected.includes(file.id)}
           disabled={reviewing || workspace?.git?.archiveFileId === file.id}
           onChange={(event) => setSelected((previous) => event.target.checked
             ? [...previous, file.id] : previous.filter((fileId) => fileId !== file.id))} />}
-          {isOwner ? <Link to={`/view/${file.id}`}>{file.name}</Link> : <span>{file.name}</span>}
-          <span className="muted">{formatBytes(file.size)}</span></label>
-        <span className="workspace-inline"><a href={`${routes.workspaceContent(id, file.id)}?download=1`}>Download</a>
+          <span className="workspace-file-info">{isOwner ? <Link to={`/view/${file.id}`}>{file.name}</Link> : <strong>{file.name}</strong>}
+            <small>{workspace?.git?.archiveFileId === file.id ? 'Linked code archive · ' : ''}{formatBytes(file.size)}</small></span></label>
+        <span className="workspace-inline workspace-file-actions"><a href={`${routes.workspaceContent(id, file.id)}?download=1`}>Download</a>
           {canContribute && <WorkspaceReplacement workspaceId={id} file={file} onDone={refresh} />}
           {isOwner && <button className="btn-ghost" disabled={pending || reviewing} onClick={() => void change(() =>
             api(routes.workspaceFile(id, file.id), { method: 'DELETE' }))}>Remove</button>}</span>
       </li>)}</ul>
     </section>
-    {isOwner && <section className="workspace-card workspace-form">
-      <h2>Link a Git code archive</h2>
-      <p className="muted">From your code repository, run <code>git archive --format=zip --output=code.zip HEAD</code>, upload code.zip here, then link it. The ZIP comment supplies a commit label; DropVault does not verify that label against GitHub.</p>
+    {isOwner && <section className="workspace-card workspace-form" id="workspace-code">
+      <div className="workspace-section-heading"><div><h2>Code archive</h2>
+        <p className="muted">Link a Git ZIP to save the code and project files in the same snapshot.</p></div>
+        <span className="workspace-count">{workspace.git ? 'Linked' : 'Optional'}</span></div>
+      {workspace.git && <p className="workspace-archive-status">Linked code archive: <strong>{linkedArchive?.name ?? 'ZIP file'}</strong>. Claimed commit <code>{workspace.git.commitSha}</code> from its ZIP comment. Not verified against GitHub. The linked ZIP is included automatically in snapshots.</p>}
       <div className="workspace-inline"><select aria-label="Git code archive" value={gitFileId}
         onChange={(event) => setGitFileId(event.target.value)}>
         <option value="">Choose a ZIP file</option>{files.filter((file) => file.name.toLowerCase().endsWith('.zip'))
           .map((file) => <option key={file.id} value={file.id}>{file.name}</option>)}
       </select><button disabled={!gitFileId || pending} onClick={() => void change(() =>
         api(routes.workspaceGit(id), jsonOptions('PUT', { fileId: gitFileId })))}>Link archive</button></div>
-      {workspace.git && <p>Linked code archive: {files.find((file) =>
-        file.id === workspace.git.archiveFileId)?.name ?? 'ZIP file'}. Claimed commit <code>{workspace.git.commitSha}</code> from its ZIP comment. Not verified against GitHub. The linked ZIP is included automatically in snapshots.</p>}
+      {!files.some((file) => file.name.toLowerCase().endsWith('.zip')) && <p className="muted">Upload a ZIP file to this workspace before linking it.</p>}
+      <details className="workspace-help"><summary>How to make a Git ZIP</summary>
+        <p>From your code repository, run <code>git archive --format=zip --output=code.zip HEAD</code>, then upload code.zip here. The ZIP comment supplies a commit label that DropVault does not verify against GitHub.</p>
+      </details>
     </section>}
-    {isOwner && <section className="workspace-card workspace-form">
-      <h2>Save a snapshot</h2>
-      <p className="muted">Choose completed files. A snapshot records their current version IDs and names. It uses no new bytes. Retained file versions count toward storage even after a snapshot is removed.</p>
+    {isOwner && <section className="workspace-card workspace-form" id="workspace-snapshots">
+      <div className="workspace-section-heading"><div><h2>Save a snapshot</h2>
+        <p className="muted">Freeze the selected file versions so this project can be downloaded or copied later.</p></div>
+        <span className="workspace-count">{selected.length} selected</span></div>
+      <p className="workspace-selection-summary">{selected.length ? <>{selected.length} {selected.length === 1 ? 'file' : 'files'} · {formatBytes(selectedSize)} · current versions</>
+        : 'Select files in Current project files above to continue.'}</p>
       {linkedArchiveStale && <p className="error" role="alert">The linked code ZIP has a newer version. Link it again before saving a snapshot.</p>}
       {uploadsPending && <p className="error" role="alert">Finish pending uploads before creating a snapshot. Refresh this file list after they finish.</p>}
       {selected.length > 200 && <p className="error" role="alert">Choose at most 200 files for one snapshot.</p>}
@@ -193,12 +237,13 @@ export function WorkspacePage() {
           <button className="btn-ghost" disabled={pending} onClick={() => setReviewedItems(null)}>Change selection</button></div>
       </div> : <button disabled={pending || uploadsPending || linkedArchiveStale || !selected.length || selected.length > 200 || !name.trim()}
         onClick={() => { setError(''); setReviewedItems(chosen.map((file) => ({ ...file }))); }}>Review snapshot</button>}
+      <p className="muted workspace-footnote">Snapshots use no new storage. Retained file versions still count toward storage after a snapshot is removed.</p>
     </section>}
-    <section><h2>Saved snapshots</h2>{snapshots.length ? <div className="list">{snapshots.map((snapshot) =>
+    <section id={isOwner ? undefined : 'workspace-snapshots'}><h2>Saved snapshots</h2>{snapshots.length ? <div className="list">{snapshots.map((snapshot) =>
       <div className="row" key={snapshot.id}><Link className="row-main" to={`/snapshots/${snapshot.id}`}>
-        <strong>{snapshot.name}</strong><span className="muted">{snapshot.items.length} files · {new Date(snapshot.createdAt).toLocaleString()}</span>
+        <strong>{snapshot.name}</strong><span className="muted">{snapshot.items.length} files · {snapshot.git ? 'Code linked · ' : ''}{new Date(snapshot.createdAt).toLocaleString()}</span>
       </Link></div>)}</div> : <p className="muted">No snapshots yet.</p>}</section>
-    {isOwner && <section className="workspace-card workspace-form"><h2>Team access</h2>
+    {isOwner && <section className="workspace-card workspace-form" id="workspace-team"><h2>Team access</h2>
       <p className="muted">Viewers can browse and download. Contributors can also upload files and replace current versions. You choose which files enter a fixed snapshot.</p>
       <form className="workspace-inline" onSubmit={(event) => { event.preventDefault(); void change(async () => {
         await api(routes.workspaceAccess(id), jsonOptions('POST', { email: memberEmail, role: memberRole }));

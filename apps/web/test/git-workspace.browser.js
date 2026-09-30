@@ -33,7 +33,6 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
     const repo = join(tempRoot, 'sample-repo');
     const storageRoot = join(tempRoot, 'storage');
     const archivePath = join(tempRoot, 'code.zip');
-    const dataPath = join(tempRoot, 'results.csv');
     const readme = '# Trial project\n\nRun `python analysis.py` with results.csv.\n';
     const csv = 'trial,score\n1,82\n2,91\n';
     const revisedCsv = 'trial,score\n1,83\n2,93\n';
@@ -45,7 +44,6 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
       await mkdir(repo);
       await writeFile(join(repo, 'README.md'), readme);
       await writeFile(join(repo, 'analysis.py'), 'print("trial analysis")\n');
-      await writeFile(dataPath, csv);
       execFileSync('git', ['-C', repo, 'init', '-q']);
       execFileSync('git', ['-C', repo, 'config', 'core.autocrlf', 'false']);
       execFileSync('git', ['-C', repo, 'add', '.']);
@@ -87,12 +85,21 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
       await page.getByRole('button', { name: 'Create workspace' }).click();
       await page.getByRole('heading', { name: 'Trial project' }).waitFor();
       await page.locator('input[aria-label="Choose workspace files"]')
-        .setInputFiles([archivePath, dataPath]);
+        .setInputFiles(archivePath);
       await page.getByText('code.zip: success').waitFor();
+      const dataTransfer = await page.evaluateHandle((content) => {
+        const transfer = new DataTransfer();
+        transfer.items.add(new File([content], 'results.csv', { type: 'text/csv' }));
+        return transfer;
+      }, csv);
+      await page.locator('.workspace-drop-zone').dispatchEvent('drop', { dataTransfer });
       await page.getByText('results.csv: success').waitFor();
       await page.getByRole('combobox', { name: 'Git code archive' }).selectOption({ label: 'code.zip' });
       await page.getByRole('button', { name: 'Link archive' }).click();
       await page.getByText(new RegExp(`Claimed commit ${commit} from its ZIP comment. Not verified against GitHub`, 'u')).waitFor();
+      await page.setViewportSize({ width: 390, height: 844 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+      await page.setViewportSize({ width: 1280, height: 720 });
       const checks = page.locator('.workspace-files input[type="checkbox"]');
       assert.equal(await checks.count(), 2);
       const codeCheck = page.locator('.workspace-files li').filter({ hasText: 'code.zip' })
@@ -101,6 +108,15 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
         .locator('input[type="checkbox"]');
       assert.equal(await codeCheck.isChecked(), true);
       assert.equal(await codeCheck.isDisabled(), true);
+      const search = page.getByRole('searchbox', { name: 'Search project files' });
+      await search.fill('results');
+      assert.equal(await page.locator('.workspace-files li').count(), 1);
+      await page.getByRole('button', { name: 'Select all' }).click();
+      await search.fill('');
+      assert.equal(await dataCheck.isChecked(), true);
+      await page.getByRole('button', { name: 'Clear other files' }).click();
+      assert.equal(await codeCheck.isChecked(), true);
+      assert.equal(await dataCheck.isChecked(), false);
       await dataCheck.check();
       await page.getByRole('textbox', { name: 'Snapshot name' }).fill('Trial one');
       await page.getByRole('button', { name: 'Review snapshot' }).click();
