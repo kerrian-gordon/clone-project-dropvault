@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { routes } from '../../../../../packages/shared/index.js';
 import { api } from './api.js';
 
 export const WARN_THRESHOLD = 0.9;
 
-export function useStorage() {
+const StorageContext = createContext(null);
+
+export function StorageProvider({ children }) {
   const [usage, setUsage] = useState(null);
   const [error, setError] = useState('');
   const refreshUsage = useCallback(async () => {
@@ -19,5 +21,11 @@ export function useStorage() {
     }
   }, []);
   useEffect(() => { refreshUsage(); }, [refreshUsage]);
-  return { usage, error, refreshUsage };
+  return <StorageContext.Provider value={{ usage, error, refreshUsage }}>{children}</StorageContext.Provider>;
+}
+
+export function useStorage() {
+  const value = useContext(StorageContext);
+  if (!value) throw new Error('useStorage requires StorageProvider');
+  return value;
 }

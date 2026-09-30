@@ -94,7 +94,7 @@ export function UploadPanel({ folderId, usage, refreshUsage }) {
       onDragEnd={resetDragState}
       onDrop={onDrop}>
       <p><strong>Drop files here</strong> or choose them from your device.</p>
-      <button type="button" onClick={() => input.current?.click()}>Choose files</button>
+      <button type="button" className="btn-ghost" onClick={() => input.current?.click()}>Choose files</button>
       <input ref={input} className="visually-hidden" type="file" multiple accept={accept}
         aria-label="Choose files to upload" onChange={(event) => { addFiles(event.target.files); event.target.value = ''; }} />
       <p className="muted">PDF, Office documents, text, images, audio, video and archives · 100 MiB per file</p>

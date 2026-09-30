@@ -1,21 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router';
+import { ROOT_FOLDER_ID, SUPPORTED_UPLOAD_TYPES } from '../../../../packages/shared/index.js';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
 import { AppearanceProvider } from './AppearanceContext.jsx';
 import { FilesPage } from '../features/file-browser/FilesPage.jsx';
 import { SharedPage } from '../features/file-browser/SharedPage.jsx';
 import { ViewerPage } from '../features/viewer/ViewerPage.jsx';
-import { UploadProvider } from '../features/upload/UploadContext.jsx';
+import { UploadProvider, useUploads } from '../features/upload/UploadContext.jsx';
 import { ThemesPage } from '../features/themes/ThemesPage.jsx';
 import { ThemeDetailPage } from '../features/themes/ThemeDetailPage.jsx';
 import { WorkspacesPage, WorkspacePage, SnapshotPage } from '../features/workspaces/WorkspacesPage.jsx';
+import { StorageMeter } from '../shared/components/StorageMeter.jsx';
+import { StorageProvider, useStorage } from '../shared/lib/useStorage.jsx';
+import { filesNavCurrent, workspacesNavCurrent } from './navCurrent.js';
 
 function ProtectedLayout() {
   const { user, loading, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const inFolder = Boolean(useMatch('/folders/*'));
-  const filesActive = Boolean(useMatch('/files')) || inFolder;
+  const filesActive = filesNavCurrent(location.pathname);
+  const workspacesActive = workspacesNavCurrent(location.pathname);
 
   if (loading) return <main className="centered">Checking your session…</main>;
   if (!user) return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
@@ -31,40 +35,105 @@ function ProtectedLayout() {
 
   return (
     <UploadProvider>
-      <div className="shell">
-        <aside className="sidebar">
-          <Link className="brand" to="/files">Dropvault</Link>
-          {/* No Upload control yet. UploadProvider has no "open picker" action, and a link to
-              /files is a no-op on Files and leaves the folder on /folders/:id. Later: a <button>
-              that opens a hidden file input and calls enqueue for the current folder, and then
-              demote the drop zone's Choose files to secondary (one blue button per area). */}
-          <nav aria-label="Main navigation">
-            <Link
-              to="/files"
-              className={filesActive ? 'active' : undefined}
-              aria-current={filesActive ? 'page' : undefined}
-            >My files</Link>
-            <NavLink to="/shared">Shared with me</NavLink>
-            <NavLink to="/themes">Themes</NavLink>
-            <NavLink to="/workspaces">Workspaces</NavLink>
-          </nav>
-          {/* Storage meter: leave it out until there is ONE usage context. Files also calls
-              useStorage() for the 507 upgrade retry, so a second copy here would go stale after
-              an upgrade. Then render <StorageMeter /> here; .sidebar .storage-meter pins it. */}
-        </aside>
-        <div className="shell-main">
-          <header className="shell-top">
-            {/* Add <form role="search" className="shell-search"> only when search works;
-                a dead input is worse than none in a demo. */}
-            <div className="account">
-              <span>{user.email}</span>
-              <button type="button" onClick={handleLogout}>Log out</button>
-            </div>
-          </header>
-          <main className="content"><Outlet /></main>
-        </div>
-      </div>
+      <StorageProvider>
+        <SignedInShell user={user} filesActive={filesActive} workspacesActive={workspacesActive}
+          onLogout={handleLogout} />
+      </StorageProvider>
     </UploadProvider>
+  );
+}
+
+function searchTarget(pathname) {
+  if (pathname === '/themes' || pathname.startsWith('/themes/')) return '/themes';
+  if (pathname === '/files' || pathname.startsWith('/folders/')) return pathname;
+  return '/files';
+}
+
+function ShellSearch() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [value, setValue] = useState(() => new URLSearchParams(location.search).get('q') || '');
+  const onThemes = location.pathname === '/themes' || location.pathname.startsWith('/themes/');
+
+  useEffect(() => {
+    setValue(new URLSearchParams(location.search).get('q') || '');
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const trimmed = value.trim();
+      const current = new URLSearchParams(location.search).get('q') || '';
+      if (trimmed === current) return;
+      const path = searchTarget(location.pathname);
+      navigate(trimmed ? `${path}?q=${encodeURIComponent(trimmed)}` : path, { replace: true });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [value, location.pathname, location.search, navigate]);
+
+  return <form role="search" className="shell-search" onSubmit={(event) => event.preventDefault()}>
+    <label className="visually-hidden" htmlFor="shell-search">
+      {onThemes ? 'Search themes by name or creator' : 'Search files and folders'}
+    </label>
+    <input id="shell-search" type="search" maxLength={80} value={value}
+      placeholder={onThemes ? 'Ocean, Alex…' : 'Search files and folders'}
+      onChange={(event) => setValue(event.target.value)} />
+  </form>;
+}
+
+function SignedInShell({ user, filesActive, workspacesActive, onLogout }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { enqueue } = useUploads();
+  const { usage, error } = useStorage();
+  const input = useRef(null);
+  const folderMatch = useMatch('/folders/:id');
+  const folderId = folderMatch?.params.id || ROOT_FOLDER_ID;
+  const accept = Object.keys(SUPPORTED_UPLOAD_TYPES).map((extension) => `.${extension}`).join(',');
+
+  function pickFiles(event) {
+    const files = event.target.files;
+    event.target.value = '';
+    if (!files?.length) return;
+    enqueue(files, folderId);
+    if (!filesNavCurrent(location.pathname) || location.pathname.startsWith('/view/')) {
+      navigate(folderMatch ? `/folders/${folderMatch.params.id}` : '/files');
+    }
+  }
+
+  return (
+    <div className="shell">
+      <aside className="sidebar">
+        <Link className="brand" to="/files">Dropvault</Link>
+        <button type="button" className="create" onClick={() => input.current?.click()}>Upload</button>
+        <input ref={input} className="visually-hidden" type="file" multiple accept={accept}
+          aria-label="Upload files" onChange={pickFiles} />
+        <nav aria-label="Main navigation">
+          <Link
+            to="/files"
+            className={filesActive ? 'active' : undefined}
+            aria-current={filesActive ? 'page' : undefined}
+          >My files</Link>
+          <NavLink to="/shared">Shared with me</NavLink>
+          <NavLink to="/themes">Themes</NavLink>
+          <Link
+            to="/workspaces"
+            className={workspacesActive ? 'active' : undefined}
+            aria-current={workspacesActive ? 'page' : undefined}
+          >Workspaces</Link>
+        </nav>
+        <StorageMeter usage={usage} error={error} />
+      </aside>
+      <div className="shell-main">
+        <header className="shell-top">
+          <ShellSearch />
+          <div className="account">
+            <span>{user.email}</span>
+            <button type="button" onClick={onLogout}>Log out</button>
+          </div>
+        </header>
+        <main className="content"><Outlet /></main>
+      </div>
+    </div>
   );
 }
 

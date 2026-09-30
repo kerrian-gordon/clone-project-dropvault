@@ -75,7 +75,7 @@ button[aria-busy="true"] { cursor: wait; }
   border-right: 1px solid var(--line);
 }
 .sidebar .brand { padding: 0.25rem 0.75rem 1rem; font-size: 1.15rem; }
-.sidebar .create { margin: 0 0.25rem 1rem; text-align: center; }
+.sidebar .create { margin: 0 0.25rem 1rem; width: calc(100% - 0.5rem); text-align: center; }
 .sidebar nav { display: grid; gap: 2px; }
 .sidebar nav a {
   display: flex; align-items: center; gap: 0.65rem;
@@ -242,6 +242,8 @@ h1 { margin: 0.4rem 0 0.75rem; font-size: 1.6rem; letter-spacing: -0.02em; font-
 .share-form { display: flex; align-items: end; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
 .share-form label { width: 100%; font-size: 0.85rem; color: var(--muted); }
 .share-form input { padding: 0.55rem 0.7rem; border: 1px solid var(--line); border-radius: var(--r-ctl); flex: 1; min-width: 12rem; background: var(--card); color: var(--ink); }
+.sidebar .storage-meter { font-size: 0.8rem; }
+.sidebar .storage-meter .meter-label { margin: 0.4rem 0 0; }
 .cap-actions { margin-top: 0.5rem; }
 .cap-actions button { margin-top: 0.2rem; }
 .upgrade-dialog {

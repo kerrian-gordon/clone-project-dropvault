@@ -4,9 +4,9 @@ import { ROOT_FOLDER_ID, routes } from '../../../../../packages/shared/index.js'
 import { useAuth } from '../../app/AuthContext.jsx';
 import { UploadPanel } from '../upload/UploadPanel.jsx';
 import { useUploads } from '../upload/UploadContext.jsx';
-import { StorageMeter, formatBytes } from '../../shared/components/StorageMeter.jsx';
+import { formatBytes } from '../../shared/components/StorageMeter.jsx';
 import { api } from '../../shared/lib/api.js';
-import { useStorage } from '../../shared/lib/useStorage.js';
+import { useStorage } from '../../shared/lib/useStorage.jsx';
 
 function folderPath(folder, byId) {
   const names = [folder.name];
@@ -129,9 +129,10 @@ export function FilesPage() {
   const { user } = useAuth();
   const folderId = id || ROOT_FOLDER_ID;
   const { completedVersion } = useUploads();
-  const { usage, error: usageError, refreshUsage } = useStorage();
+  const { usage, refreshUsage } = useStorage();
   const [listing, setListing] = useState(null);
   const [error, setError] = useState('');
+  const [stats, setStats] = useState(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [folderPending, setFolderPending] = useState(false);
@@ -156,6 +157,13 @@ export function FilesPage() {
     void refresh();
     return () => { refreshVersion.current += 1; };
   }, [refresh]);
+  useEffect(() => {
+    let active = true;
+    api(routes.organizationStats)
+      .then((result) => { if (active) setStats(result); })
+      .catch(() => { if (active) setStats(null); });
+    return () => { active = false; };
+  }, [completedVersion]);
   useEffect(() => {
     if (!completedVersion) return;
     void refresh();
@@ -192,10 +200,13 @@ export function FilesPage() {
   }
 
   const title = id ? location.state?.folderName || 'Folder' : 'My files';
+  const query = (new URLSearchParams(location.search).get('q') || '').trim().toLowerCase();
+  const folders = listing?.folders.filter((folder) => !query || folder.name.toLowerCase().includes(query)) || [];
+  const files = listing?.files.filter((file) => !query || file.name.toLowerCase().includes(query)) || [];
   return <section>
     {id && <Link to="/files">← My files</Link>}
     <h1>{title}</h1>
-    <StorageMeter usage={usage} error={usageError} />
+    {stats && stats.shown > 0 && <p className="muted">Folder suggestions: {stats.shown} shown · {stats.accepted} used · {stats.keptCurrent} kept here.</p>}
     {creatingFolder ? <form className="item-edit-form" onSubmit={createFolder}>
       <label><span>Folder name</span><input autoFocus value={newFolderName} maxLength={255}
         onChange={(event) => setNewFolderName(event.target.value)} disabled={folderPending} required /></label>
@@ -208,19 +219,21 @@ export function FilesPage() {
     {error && <p className="error" role="alert">{error}</p>}
     {!listing && !error && <p>Loading files…</p>}
     {listing && <div className="list" aria-label="Folder contents">
-      {listing.folders.map((folder) => <div className="row" key={folder.id}>
+      {folders.map((folder) => <div className="row" key={folder.id}>
         <Link className="row-main" to={`/folders/${encodeURIComponent(folder.id)}`} state={{ folderName: folder.name }}>
           <span className="item-icon" aria-hidden="true">📁</span><strong>{folder.name}</strong><span className="muted">Folder</span>
         </Link>
         {folder.ownerId === user.id && <ItemActions item={folder} type="folder" onDeleted={onDeleted} onChanged={refresh} />}
       </div>)}
-      {listing.files.map((file) => <div className="row" key={file.id}>
+      {files.map((file) => <div className="row" key={file.id}>
         <Link className="row-main" to={`/view/${encodeURIComponent(file.id)}`}>
           <span className="item-icon" aria-hidden="true">📄</span><strong>{file.name}</strong><span className="muted">{formatBytes(file.size)} · {file.ownerId === user.id ? 'Owned by you' : 'Shared with you'}</span>
         </Link>
         {file.ownerId === user.id && <ItemActions item={file} type="file" onDeleted={onDeleted} onChanged={refresh} />}
       </div>)}
-      {!listing.folders.length && !listing.files.length && <p className="empty">This folder is empty.</p>}
+      {!folders.length && !files.length && <p className="empty">{query
+        ? 'No files or folders match that search.'
+        : 'This folder is empty.'}</p>}
     </div>}
   </section>;
 }

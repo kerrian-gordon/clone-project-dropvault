@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { DEFAULT_THEME_SETTINGS, THEME_FONTS, THEME_SPACINGS, routes,
   themeContrastIssues } from '../../../../../packages/shared/index.js';
 import { useAuth } from '../../app/AuthContext.jsx';
@@ -30,8 +30,8 @@ export function ThemesPage() {
   const [sourceTheme, setSourceTheme] = useState(null);
   const [sourceMissing, setSourceMissing] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchParams] = useSearchParams();
+  const search = searchParams.get('q') || '';
   const draftIssues = themeContrastIssues(draft);
   const savedIssues = themeContrastIssues(appearance.settings);
 
@@ -53,20 +53,15 @@ export function ThemesPage() {
   }, [appearance.sourceThemeId]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 250);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  useEffect(() => {
     let active = true;
     setGalleryError('');
-    api(galleryPath(0, debouncedSearch))
+    api(galleryPath(0, search))
       .then((page) => {
         if (active) { setThemes(page.themes); setNextOffset(page.nextOffset); }
       })
       .catch((caught) => { if (active) setGalleryError(caught.message); });
     return () => { active = false; };
-  }, [debouncedSearch]);
+  }, [search]);
 
   async function run(action, success) {
     setBusy(true);
@@ -86,7 +81,7 @@ export function ThemesPage() {
     setLoadingMore(true);
     setGalleryError('');
     try {
-      const page = await api(galleryPath(nextOffset, debouncedSearch));
+      const page = await api(galleryPath(nextOffset, search));
       setThemes((current) => [...current, ...page.themes]);
       setNextOffset(page.nextOffset);
     } catch (caught) {
@@ -180,14 +175,8 @@ export function ThemesPage() {
 
     <section className="theme-section" aria-labelledby="gallery-title">
       <h2 id="gallery-title">Community gallery</h2>
-      <form className="theme-search" onSubmit={(event) => event.preventDefault()}>
-        <label htmlFor="theme-search">Search by name or creator</label>
-        <input id="theme-search" type="search" value={search} maxLength={80}
-          placeholder="Ocean, Alex…"
-          onChange={(event) => setSearch(event.target.value)} />
-      </form>
       {galleryError && <p className="error" role="alert">{galleryError}</p>}
-      {themes.length === 0 && !galleryError && <p className="muted">{debouncedSearch.trim()
+      {themes.length === 0 && !galleryError && <p className="muted">{search.trim()
         ? 'No themes match that search.'
         : 'No themes published yet. Share yours to start the gallery.'}</p>}
       <div className="theme-grid">{themes.map((theme) => <article className="theme-card" key={theme.id}>
