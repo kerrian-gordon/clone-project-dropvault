@@ -44,13 +44,13 @@ If you use a different storage directory, set the same `DROPVAULT_STORAGE_DIR` w
 In one Terminal window, from the repo root:
 
 ```bash
-DROPVAULT_STORAGE_LIMIT_BYTES=104857600 npm run dev:api
+DROPVAULT_STORAGE_LIMIT_BYTES=104857600 DROPVAULT_ENABLE_DEMO_PLAN_SWITCH=1 npm run dev:api
 ```
 
 If you seeded the separate directory, use:
 
 ```bash
-DROPVAULT_STORAGE_DIR="$HOME/dropvault-demo-data" DROPVAULT_STORAGE_LIMIT_BYTES=104857600 npm run dev:api
+DROPVAULT_STORAGE_DIR="$HOME/dropvault-demo-data" DROPVAULT_STORAGE_LIMIT_BYTES=104857600 DROPVAULT_ENABLE_DEMO_PLAN_SWITCH=1 npm run dev:api
 ```
 
 Leave this Terminal window open. You should see `Dropvault API listening on 127.0.0.1:3000`. To check it, open another Terminal window and run `curl http://127.0.0.1:3000/v1/health`; it should return `{"status":"ok"}`. The API restarts when its source files change.

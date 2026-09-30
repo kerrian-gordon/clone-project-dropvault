@@ -50,7 +50,11 @@ From the repository root, run `npm install`, then `npm run dev:api` while develo
 
 Set `DROPVAULT_STORAGE_LIMIT_BYTES` to change the storage cap (default 1 GiB). For example, in PowerShell run `$env:DROPVAULT_STORAGE_LIMIT_BYTES='104857600'` before starting the API to set a 100 MiB cap.
 
-For AWS deployment, set `DROPVAULT_STORAGE_BACKEND=s3`, `DROPVAULT_DATABASE_URL`, `DROPVAULT_S3_BUCKET`, and `DROPVAULT_AWS_REGION`; optionally set `DROPVAULT_S3_PREFIX` (default `dropvault/`). Use AWS's normal credential provider chain and keep the S3 bucket private. The database catalog is still loaded into one API process, with a PostgreSQL advisory lock preventing a second process from starting on the same database. See [storage details and limits](docs/api.md#file-model-and-limits).
+For AWS deployment, set `DROPVAULT_STORAGE_BACKEND=s3`, `DROPVAULT_DATABASE_URL`, `DROPVAULT_S3_BUCKET`, and `DROPVAULT_AWS_REGION`; optionally set `DROPVAULT_S3_PREFIX` (default `dropvault/`). Use AWS's normal credential provider chain and keep the S3 bucket private. The database catalog is still loaded into one API process, with a PostgreSQL advisory lock preventing a second process from starting on the same database. S3 startup preserves objects absent from the catalog so an older database restore cannot erase newer file bytes. See [storage details and limits](docs/api.md#file-model-and-limits).
+
+The unpaid Demo plan switch is disabled by default and cannot be enabled with S3 storage or `NODE_ENV=production`. To test the local upgrade flow, set `DROPVAULT_ENABLE_DEMO_PLAN_SWITCH=1` before starting the API. Public deployments need a real entitlement or billing flow before offering upgrades.
+
+To verify the S3/PostgreSQL path before deployment, run `npm run smoke:production-storage` against a **fresh, dedicated** PostgreSQL database and a private test bucket. Set `DROPVAULT_SMOKE_DATABASE_URL` (database name must contain `smoke` or `test`), `DROPVAULT_SMOKE_S3_BUCKET`, `DROPVAULT_SMOKE_AWS_REGION`, `DROPVAULT_SMOKE_S3_PREFIX` (for example `smoke/`), and `DROPVAULT_SMOKE_CONFIRM=isolated-test-resources`. The command uses the normal AWS credential chain, refuses a database that already has a DropVault catalog, and creates a unique subprefix. It checks upload, download, replacement, snapshot export, and readback after restart. It leaves test data in those dedicated resources for inspection; remove the database and test prefix deliberately after reviewing the results. This command has not yet been run against live AWS from this repository.
 
 ### Seed a local demo
 
@@ -61,6 +65,7 @@ Set `DROPVAULT_STORAGE_LIMIT_BYTES=104857600` when starting the API to reproduce
 ```powershell
 npm.cmd run seed:demo
 $env:DROPVAULT_STORAGE_LIMIT_BYTES='104857600'
+$env:DROPVAULT_ENABLE_DEMO_PLAN_SWITCH='1'
 npm.cmd run dev:api
 ```
 
@@ -78,9 +83,9 @@ From the repository root, run `npm --prefix apps/web install` once. Start the AP
 
 Run `npm --prefix apps/web run test:browser` to check the drag-and-drop upload flow in headless Chrome. The test starts its own API and Vite server with isolated temporary storage; Google Chrome must be installed.
 
-React Router uses browser history. `/` redirects to `/files`; `/files` lists the root, `/folders/:id` lists a folder, `/shared` lists files granted to the account, and `/view/:id` shows file details, download, ownership, and owner-only access controls. `/login` and `/register` are public; the file routes require a session and return to the requested URL after sign-in. Unknown URLs show a not-found page. The upload queue lives above the file routes so transfers continue while navigating within a signed-in session. The browser sends one raw request per queued file. On a storage-cap error, the user can switch to the local demo tier and retry the same selected file after the new allowance is confirmed. Selected files remain in memory only until the tab reloads or the user logs out. A production web server must serve `index.html` for direct visits and refreshes on SPA routes, while forwarding `/v1/*` to the API.
+React Router uses browser history. `/` redirects to `/files`; `/files` lists the root, `/folders/:id` lists a folder, `/shared` lists files granted to the account, and `/view/:id` shows file details, download, ownership, and owner-only access controls. `/login` and `/register` are public; the file routes require a session and return to the requested URL after sign-in. Unknown URLs show a not-found page. The upload queue lives above the file routes so transfers continue while navigating within a signed-in session. The browser sends one raw request per queued file. On a storage-cap error, a local demo with plan switching enabled can retry the same selected file after the new allowance is confirmed. Otherwise the browser offers only a free-space-and-retry path. Selected files remain in memory only until the tab reloads or the user logs out. A production web server must serve `index.html` for direct visits and refreshes on SPA routes, while forwarding `/v1/*` to the API.
 
-The original tracks 1 and 2 have a local implementation, extended with the MVP account and quota backend. The browser feature flows and full integration remain to be built.
+The API and browser flows described above are implemented for local use. Bearer-link sharing UI and a complete browser integration check remain to be built. The work split below is the original milestone plan, retained as a record of responsibilities.
 
 ## Suggested work split
 
@@ -98,6 +103,6 @@ Tracks 2, 3, and 4 can be assigned to different people once track 1 is agreed. T
 
 ## Next milestone
 
-The [multi-user freemium MVP plan](docs/multi-user-freemium-mvp.md) records the account, permissions, per-user quota, sharing, upload, and front-end flows proposed for the next milestone. It distinguishes the current local API from work that is still planned. A separate [two-account mock fixture](apps/web/src/shared/data/mock-multi-user-drive.json) supports the blocked-upload, upgrade, and named-user sharing prototypes; see its [usage notes](apps/web/src/shared/data/README.md).
+The [multi-user freemium MVP plan](docs/multi-user-freemium-mvp.md) records the account, permissions, per-user quota, sharing, upload, and front-end flows. A separate [two-account mock fixture](apps/web/src/shared/data/mock-multi-user-drive.json) supports the blocked-upload, upgrade, and named-user sharing prototypes; see its [usage notes](apps/web/src/shared/data/README.md).
 
 Machine-learning file classification is outside this MVP. The `feat/improved-file-uploading-and-storage-with-machine-learning` branch contains no ML work and currently matches `feat/shared-contract-api`; see the [MVP scope note](docs/multi-user-freemium-mvp.md#follow-on-work).

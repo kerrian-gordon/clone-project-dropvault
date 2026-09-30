@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { Transform } from 'node:stream';
 import test from 'node:test';
 import { createApiServer } from '../src/server.js';
+import { apiListenOptions } from '../src/start.js';
 import { openLocalStorage } from '../src/services/storage/local.js';
 
 const nativeFetch = globalThis.fetch;
@@ -128,11 +129,44 @@ test('workspace snapshots bind a Git archive version and preserve its commit lab
 });
 
 async function start(storageRoot, maxUploadBytes, storageLimitBytes, options = {}) {
-  const server = await createApiServer({ storageRoot, maxUploadBytes, storageLimitBytes, ...options });
+  const server = await createApiServer({ storageRoot, maxUploadBytes, storageLimitBytes,
+    demoPlanSwitchEnabled: true, ...options });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   return { server, base: `http://127.0.0.1:${server.address().port}` };
 }
+
+test('unpaid plan changes are disabled unless the local demo opts in', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-plan-gate-test-'));
+  let running;
+  try {
+    running = await start(storageRoot, 32, 4, { demoPlanSwitchEnabled: false });
+    assert.deepEqual(await (await nativeFetch(`${running.base}/v1/capabilities`)).json(),
+      { demoPlanSwitchEnabled: false });
+    await register(running.base);
+    const blocked = await fetch(`${running.base}/v1/account/plan`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier: 'demo' }),
+    });
+    assert.equal(blocked.status, 403);
+    assert.equal((await blocked.json()).error.code, 'DEMO_PLAN_DISABLED');
+    assert.equal((await (await fetch(`${running.base}/v1/account`)).json()).tier, 'free');
+    assert.equal((await (await fetch(`${running.base}/v1/storage/usage`)).json()).limitBytes, 4);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('demo plan startup setting rejects an exposed host or S3 backend', async () => {
+  assert.throws(() => apiListenOptions({ demoPlanSetting: '1', host: '0.0.0.0' }),
+    /loopback host/u);
+  assert.throws(() => apiListenOptions({ demoPlanSetting: '1', storageBackend: 's3' }),
+    /local storage/u);
+  await assert.rejects(() => createApiServer({ storageRoot: 'unused',
+    productionStorage: { databaseUrl: 'postgres://invalid', bucket: 'test', region: 'us-east-1' },
+    demoPlanSwitchEnabled: true }), /cannot be enabled with S3/u);
+});
 
 async function stop(server) {
   server.closeAllConnections();

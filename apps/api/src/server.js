@@ -9,7 +9,8 @@ import { openS3Storage } from './services/storage/s3.js';
 
 export async function createApiServer({ storageRoot, maxUploadBytes = MAX_UPLOAD_BYTES,
   storageLimitBytes = DEFAULT_STORAGE_LIMIT_BYTES, legacyClaimToken,
-  publicBaseUrl, storageFactory = openLocalStorage, productionStorage }) {
+  publicBaseUrl, storageFactory = openLocalStorage, productionStorage,
+  demoPlanSwitchEnabled = false }) {
   if (!Number.isSafeInteger(storageLimitBytes) || storageLimitBytes < 0
     || storageLimitBytes > Math.floor(Number.MAX_SAFE_INTEGER / 10)) {
     throw new Error('storageLimitBytes must be a non-negative safe integer that supports the demo tier');
@@ -28,6 +29,9 @@ export async function createApiServer({ storageRoot, maxUploadBytes = MAX_UPLOAD
   }
   if (productionStorage && (!productionStorage.databaseUrl || !productionStorage.bucket
     || !productionStorage.region)) throw new Error('PostgreSQL URL, S3 bucket, and S3 region are required');
+  if (productionStorage && demoPlanSwitchEnabled) {
+    throw new Error('The unpaid demo plan switch cannot be enabled with S3 production storage');
+  }
   const persistence = productionStorage
     ? await openPostgresCatalog(productionStorage.databaseUrl) : undefined;
   try {
@@ -42,7 +46,7 @@ export async function createApiServer({ storageRoot, maxUploadBytes = MAX_UPLOAD
       await storage.recoverOrphanUploads?.(referencedStorageKeys);
     }
     const server = createServer(createHandler({ catalog, storage, maxUploadBytes, storageLimitBytes,
-      legacyClaimToken, publicBaseUrl }));
+      legacyClaimToken, publicBaseUrl, demoPlanSwitchEnabled }));
     server.on('close', () => { void catalog.close?.(); });
     return server;
   } catch (error) {

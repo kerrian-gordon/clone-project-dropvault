@@ -1,6 +1,6 @@
 # Dropvault local API contract
 
-The API uses Node.js 24. Local development stores file bytes on disk and metadata in a JSON catalog. Production mode targets AWS S3 for bytes and PostgreSQL for catalog metadata. It listens on `127.0.0.1:3000` by default. The demo plan switch does not charge money. The catalog remains an in-memory document with a PostgreSQL advisory lock, so only one API process may run against a database at a time.
+The API uses Node.js 24. Local development stores file bytes on disk and metadata in a JSON catalog. Production mode targets AWS S3 for bytes and PostgreSQL for catalog metadata. It listens on `127.0.0.1:3000` by default. The unpaid demo plan switch is disabled by default and can be enabled only for local storage on a loopback host outside `NODE_ENV=production`. The catalog remains an in-memory document with a PostgreSQL advisory lock, so only one API process may run against a database at a time.
 
 ## Accounts and permissions
 
@@ -9,7 +9,7 @@ The API uses Node.js 24. Local development stores file bytes on disk and metadat
 - `POST /v1/auth/login` accepts the same JSON and returns `200 User` with a new session cookie. `POST /v1/auth/logout` revokes the current session and returns `204`. `GET /v1/account` returns the signed-in `User`.
 - Session cookies are `HttpOnly` and `SameSite=Strict`. They use `Secure` when the API itself receives HTTPS. Browser writes must come from the API origin; use a same-origin `/v1` proxy for local web development. `checkRequestOrigin` runs on every write. Browsers send `Origin` for those requests; if `Origin` is omitted (CLI tools), the check is skipped and `SameSite=Strict` still blocks cross-site cookie sends. A link opened from another site therefore arrives logged out, which is expected for this local demo. Production deployment needs HTTPS and an explicit trusted-proxy/cookie configuration.
 - Registration is limited to 10 attempts per source IP and login to 5 failed attempts per source IP and email (also 30 total login attempts per source IP) within 15 minutes. These counters live in one API process and reset on restart; production hosting needs shared, proxy-aware throttling.
-- All routes except health, registration, login, and bearer-link redemption require a valid session. File and folder listings show only owned items. A named recipient may read and download a granted file, but only its owner may delete it, grant access, or create a bearer link. Private and forbidden IDs return `404`.
+- All routes except health, capabilities, registration, login, and bearer-link redemption require a valid session. File and folder listings show only owned items. A named recipient may read and download a granted file, but only its owner may delete it, grant access, or create a bearer link. Private and forbidden IDs return `404`.
 - `User`: `{ id, email, displayName, tier, createdAt }`, where `tier` is `free` or `demo`. `displayName` is a public gallery label chosen at registration. If omitted, the API uses the email local part and appends `-2`, `-3`, and so on when that label is taken. Password hashes and session tokens never appear in `User` responses.
 
 ## Themes and saved appearance
@@ -44,6 +44,7 @@ Set `DROPVAULT_STORAGE_BACKEND=s3`, `DROPVAULT_DATABASE_URL`, `DROPVAULT_S3_BUCK
 | Method and path | Request | Success response |
 | --- | --- | --- |
 | `GET /v1/health` | None | `200 { "status": "ok" }` |
+| `GET /v1/capabilities` | None | `200 { "demoPlanSwitchEnabled": boolean }`; lets the web app hide local-only upgrade controls |
 | `GET /v1/themes?offset=0&limit=20&q=` | Signed-in gallery; `offset` is non-negative and `limit` is 1–50; optional `q` (max 80 chars) matches theme name or creator name | `200 { "themes": Theme[], "total", "nextOffset" }` |
 | `GET /v1/themes/:id` | Signed-in account | `200 Theme` |
 | `POST /v1/themes` | JSON `{ "name": "Night study", "settings": ThemeSettings }`. A `creatorName` in the body is ignored. | `201 Theme`; `creatorName` is the account `displayName` snapshotted at publish. 20 themes per account (`409 THEME_LIMIT_REACHED`); 10 publishes per account per 15 minutes (`429 RATE_LIMITED`). |
@@ -74,7 +75,7 @@ Set `DROPVAULT_STORAGE_BACKEND=s3`, `DROPVAULT_DATABASE_URL`, `DROPVAULT_S3_BUCK
 | `POST /v1/files/:id/versions/:versionId/restore` | Owner only; no body | `201 FileRecord`; copies the selected bytes into a new current version, preserving the version being replaced |
 | `GET /v1/storage/usage` | None | `200 { "usedBytes", "limitBytes", "tier" }` for the signed-in account |
 | `POST /v1/account/claim-legacy` | Signed-in account; JSON `{ "token": "..." }`; requires server setting | `200 { "filesClaimed", "foldersClaimed" }` |
-| `POST /v1/account/plan` | JSON `{ "tier": "free" }` or `{ "tier": "demo" }` | `200 User`; local demo switch without payment |
+| `POST /v1/account/plan` | JSON `{ "tier": "free" }` or `{ "tier": "demo" }` | `200 User` only when `DROPVAULT_ENABLE_DEMO_PLAN_SWITCH=1` in local mode; otherwise `403 DEMO_PLAN_DISABLED` |
 | `GET /v1/files/:id/access` | Owner only | `200 { "users": [{ "userId", "email", "createdAt" }] }` |
 | `POST /v1/files/:id/access` | Owner only; JSON `{ "email": "recipient@example.com" }` | `201 { "userId", "email" }` |
 | `DELETE /v1/files/:id/access/:userId` | Owner only | `204` |

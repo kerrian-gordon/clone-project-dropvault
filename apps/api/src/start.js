@@ -23,6 +23,16 @@ export function apiListenOptions(overrides = {}) {
   if (!['local', 's3'].includes(storageBackend)) {
     throw new Error('DROPVAULT_STORAGE_BACKEND must be local or s3');
   }
+  const demoPlanSetting = overrides.demoPlanSetting ?? process.env.DROPVAULT_ENABLE_DEMO_PLAN_SWITCH ?? '0';
+  if (!['0', '1'].includes(demoPlanSetting)) {
+    throw new Error('DROPVAULT_ENABLE_DEMO_PLAN_SWITCH must be 0 or 1');
+  }
+  if (demoPlanSetting === '1' && (storageBackend !== 'local'
+    || process.env.NODE_ENV === 'production'
+    || !['127.0.0.1', '::1', 'localhost'].includes(host))) {
+    throw new Error('The demo plan switch requires local storage, a loopback host, and non-production mode');
+  }
+  const demoPlanSwitchEnabled = demoPlanSetting === '1';
   const productionStorage = storageBackend === 's3'
     ? { databaseUrl: overrides.databaseUrl ?? process.env.DROPVAULT_DATABASE_URL,
       bucket: overrides.s3Bucket ?? process.env.DROPVAULT_S3_BUCKET,
@@ -33,7 +43,7 @@ export function apiListenOptions(overrides = {}) {
     throw new Error('PORT must be an integer from 1 to 65535');
   }
   return { storageRoot, port, storageLimitBytes, legacyClaimToken, publicBaseUrl, host,
-    productionStorage };
+    productionStorage, demoPlanSwitchEnabled };
 }
 
 export async function listenApi(overrides = {}) {
@@ -44,6 +54,7 @@ export async function listenApi(overrides = {}) {
     legacyClaimToken: options.legacyClaimToken,
     publicBaseUrl: options.publicBaseUrl,
     productionStorage: options.productionStorage,
+    demoPlanSwitchEnabled: options.demoPlanSwitchEnabled,
   });
   await new Promise((resolveListen, reject) => {
     server.once('error', reject);

@@ -22,7 +22,8 @@ test('demo seed creates usable accounts, downloads, grants, and quota flow', asy
     assert.equal(catalog.users.every((user) => user.passwordHash !== password), true);
     await assert.rejects(() => seedDemoData({ storageRoot, password }), /Catalog already exists/);
 
-    server = await createApiServer({ storageRoot, storageLimitBytes: 104857600 });
+    server = await createApiServer({ storageRoot, storageLimitBytes: 104857600,
+      demoPlanSwitchEnabled: true });
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const base = `http://127.0.0.1:${server.address().port}`;

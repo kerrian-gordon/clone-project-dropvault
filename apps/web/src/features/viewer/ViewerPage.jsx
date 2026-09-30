@@ -129,7 +129,7 @@ function uploadVersion(fileId, file, mimeType, onProgress) {
 }
 
 function VersionHistory({ file, onChanged }) {
-  const { user, changePlan } = useAuth();
+  const { user, changePlan, demoPlanSwitchEnabled } = useAuth();
   const input = useRef(null);
   const [versions, setVersions] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -230,7 +230,7 @@ function VersionHistory({ file, onChanged }) {
       aria-label={`Choose a .${extension} replacement`} onChange={replace} />
     {progress !== null && <progress max="100" value={progress} aria-label="New version upload progress" />}
     {error && <p className="error" role="alert">{error}</p>}
-    {errorCode === 'STORAGE_CAP_EXCEEDED' && user.tier === 'free' && <button type="button"
+    {errorCode === 'STORAGE_CAP_EXCEEDED' && user.tier === 'free' && demoPlanSwitchEnabled && <button type="button"
       disabled={pending} onClick={upgrade}>Switch to demo plan</button>}
     {versions === null && !error && <p>Loading versions…</p>}
     {versions && <ol className="version-list">{versions.map((version) => <li key={version.id}>
