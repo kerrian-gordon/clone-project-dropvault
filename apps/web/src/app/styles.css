@@ -27,7 +27,7 @@
   --warn-text: color-mix(in srgb, #c2410c 50%, var(--ink));
   --success-text: color-mix(in srgb, #15803d 50%, var(--ink));
   --top-pad: 0.7rem;
-  --top-h: calc(var(--top-pad) * 2 + 2.5rem);
+  --top-h: calc(var(--top-pad) * 2 + 2.75rem);
   --r-card: 12px;  /* cards, panels, dialogs */
   --r-ctl: 8px;    /* inputs, nav items, chips */
   --r-btn: 8px;    /* set to 100px for pill buttons like the marketing site */
@@ -91,6 +91,7 @@ button[aria-busy="true"] { cursor: wait; }
 .shell-top {
   position: sticky; top: 0; z-index: 3;
   display: flex; align-items: center; gap: 1rem;
+  min-height: var(--top-h);
   padding: var(--top-pad) 1.5rem;
   background: var(--paper);
   border-bottom: 1px solid var(--line);
@@ -301,7 +302,7 @@ h1 { margin: 0.4rem 0 0.75rem; font-size: 1.6rem; letter-spacing: -0.02em; font-
   .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; border-right: 0; border-bottom: 1px solid var(--line); }
   .sidebar nav { display: flex; flex-wrap: wrap; }
   .sidebar .storage-meter { flex: 1 0 100%; margin: 0; padding: 0.25rem 0.75rem; }
-  .shell-top { padding: 0.6rem 1rem; }
+  .shell-top { padding: var(--top-pad) 1rem; }
 }
 @media (max-width: 650px) {
   .row { align-items: flex-start; flex-wrap: wrap; }

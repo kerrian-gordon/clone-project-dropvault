@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router';
+import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
 import { AppearanceProvider } from './AppearanceContext.jsx';
 import { FilesPage } from '../features/file-browser/FilesPage.jsx';
@@ -13,6 +13,8 @@ function ProtectedLayout() {
   const { user, loading, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const inFolder = Boolean(useMatch('/folders/*'));
+  const filesActive = Boolean(useMatch('/files')) || inFolder;
 
   if (loading) return <main className="centered">Checking your session…</main>;
   if (!user) return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
@@ -27,18 +29,40 @@ function ProtectedLayout() {
   }
 
   return (
-    <UploadProvider><div className="app-shell">
-      <header className="topbar">
-        <Link className="brand" to="/files">Dropvault</Link>
-        <nav aria-label="Main navigation">
-          <NavLink to="/files">My files</NavLink>
-          <NavLink to="/shared">Shared with me</NavLink>
-          <NavLink to="/themes">Themes</NavLink>
-        </nav>
-        <div className="account"><span>{user.email}</span><button type="button" onClick={handleLogout}>Log out</button></div>
-      </header>
-      <main className="content"><Outlet /></main>
-    </div></UploadProvider>
+    <UploadProvider>
+      <div className="shell">
+        <aside className="sidebar">
+          <Link className="brand" to="/files">Dropvault</Link>
+          {/* No Upload control yet. UploadProvider has no "open picker" action, and a link to
+              /files is a no-op on Files and leaves the folder on /folders/:id. Later: a <button>
+              that opens a hidden file input and calls enqueue for the current folder, and then
+              demote the drop zone's Choose files to secondary (one blue button per area). */}
+          <nav aria-label="Main navigation">
+            <Link
+              to="/files"
+              className={filesActive ? 'active' : undefined}
+              aria-current={filesActive ? 'page' : undefined}
+            >My files</Link>
+            <NavLink to="/shared">Shared with me</NavLink>
+            <NavLink to="/themes">Themes</NavLink>
+          </nav>
+          {/* Storage meter: leave it out until there is ONE usage context. Files also calls
+              useStorage() for the 507 upgrade retry, so a second copy here would go stale after
+              an upgrade. Then render <StorageMeter /> here; .sidebar .storage-meter pins it. */}
+        </aside>
+        <div className="shell-main">
+          <header className="shell-top">
+            {/* Add <form role="search" className="shell-search"> only when search works;
+                a dead input is worse than none in a demo. */}
+            <div className="account">
+              <span>{user.email}</span>
+              <button type="button" onClick={handleLogout}>Log out</button>
+            </div>
+          </header>
+          <main className="content"><Outlet /></main>
+        </div>
+      </div>
+    </UploadProvider>
   );
 }
 
