@@ -4,13 +4,14 @@ import { DEFAULT_STORAGE_LIMIT_BYTES, MAX_UPLOAD_BYTES } from '../../../packages
 import { openCatalog } from './db/catalog.js';
 import { openPostgresCatalog } from './db/postgres.js';
 import { createHandler } from './routes/api.js';
+import { createGitHubClient } from './services/github/public-import.js';
 import { openLocalStorage } from './services/storage/local.js';
 import { openS3Storage } from './services/storage/s3.js';
 
 export async function createApiServer({ storageRoot, maxUploadBytes = MAX_UPLOAD_BYTES,
   storageLimitBytes = DEFAULT_STORAGE_LIMIT_BYTES, legacyClaimToken,
   publicBaseUrl, storageFactory = openLocalStorage, productionStorage,
-  demoPlanSwitchEnabled = false }) {
+  demoPlanSwitchEnabled = false, githubClient = createGitHubClient() }) {
   if (!Number.isSafeInteger(storageLimitBytes) || storageLimitBytes < 0
     || storageLimitBytes > Math.floor(Number.MAX_SAFE_INTEGER / 10)) {
     throw new Error('storageLimitBytes must be a non-negative safe integer that supports the demo tier');
@@ -41,7 +42,7 @@ export async function createApiServer({ storageRoot, maxUploadBytes = MAX_UPLOAD
     const referencedStorageKeys = catalog.referencedStorageKeys();
     await storage.recoverDeletes(referencedStorageKeys);
     const server = createServer(createHandler({ catalog, storage, maxUploadBytes, storageLimitBytes,
-      legacyClaimToken, publicBaseUrl, demoPlanSwitchEnabled }));
+      legacyClaimToken, publicBaseUrl, demoPlanSwitchEnabled, githubClient }));
     server.on('close', () => { void catalog.close?.(); });
     return server;
   } catch (error) {

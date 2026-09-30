@@ -1,0 +1,8 @@
+# Public GitHub repository import
+
+1. Sign in and open an owned workspace. Under **Code archive**, enter a public repository as `owner/repo` or paste its GitHub URL, then choose **Import public repository**.
+2. DropVault asks GitHub for the repository's default branch commit and downloads a ZIP for that exact commit. It stores the ZIP as a workspace file and shows the repository, branch, and commit. The ZIP is automatically selected when you review a snapshot.
+3. Add datasets and other project files, then save a snapshot. The snapshot pins the current code ZIP and every selected file version.
+4. When the repository advances, choose **Refresh from GitHub**. If the default branch still points to the same commit, no ZIP is downloaded or saved. Otherwise, the new ZIP becomes a new file version. Earlier snapshots keep the earlier code version.
+
+Only the workspace owner can import or refresh. The repository must be public; there is no GitHub account connection or token. A linked GitHub ZIP cannot be replaced or restored through normal file-version actions; use Refresh so its commit metadata stays in step with its bytes. Imports and retained refresh versions use the owner's storage quota and must fit the per-file upload limit. GitHub may rate-limit requests, and a repository archive that exceeds the limit cannot be imported. This is an archive of source files at one commit, not the repository's Git history or a Git remote. Changes are fetched only when someone presses **Refresh from GitHub**. The manual ZIP workflow remains available in the [Git workspace walkthrough](git-workspace-walkthrough.md).

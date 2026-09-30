@@ -4,6 +4,7 @@ import { once } from 'node:events';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
+import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { chromium } from 'playwright-core';
@@ -52,8 +53,16 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
       const commit = execFileSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
       execFileSync('git', ['-C', repo, 'archive', '--format=zip', `--output=${archivePath}`, 'HEAD']);
       const zip = await readFile(archivePath);
+      let githubSha = commit;
 
-      api = await createApiServer({ storageRoot });
+      api = await createApiServer({ storageRoot, githubClient: {
+        async resolve(repository) {
+          assert.equal(repository, 'sample/project');
+          return { owner: 'sample', repo: 'project', repositoryFullName: 'sample/project',
+            ref: 'main', commitSha: githubSha };
+        },
+        async download() { return { stream: Readable.from([zip]), contentLength: zip.length }; },
+      } });
       api.listen(0, '127.0.0.1');
       await once(api, 'listening');
       const apiOrigin = `http://127.0.0.1:${api.address().port}`;
@@ -172,6 +181,23 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
         const bytes = Buffer.from(await response.arrayBuffer());
         assert.deepEqual(bytes, file.name === 'code.zip' ? zip : Buffer.from(revisedCsv));
       }
+      await page.getByRole('link', { name: 'Workspaces', exact: true }).click();
+      await page.getByRole('textbox', { name: 'Name' }).fill('GitHub import');
+      await page.getByRole('button', { name: 'Create workspace' }).click();
+      await page.getByRole('textbox', { name: 'Public GitHub repository' }).fill('sample/project');
+      await page.getByRole('button', { name: 'Import public repository' }).click();
+      await page.getByText(`Imported from sample/project at ${commit}`, { exact: false }).waitFor();
+      await page.getByRole('button', { name: 'Refresh from GitHub' }).click();
+      await page.getByText('Already at the latest commit on the default branch.').waitFor();
+      githubSha = 'b'.repeat(40);
+      await page.getByRole('button', { name: 'Refresh from GitHub' }).click();
+      await page.getByText('Earlier snapshots keep their saved code version.', { exact: false }).waitFor();
+      await page.getByText(`Imported from sample/project at ${githubSha}`, { exact: false }).waitFor();
+      await page.getByRole('textbox', { name: 'Snapshot name' }).fill('Imported code');
+      await page.getByRole('button', { name: 'Review snapshot' }).click();
+      await page.getByRole('button', { name: 'Create fixed snapshot' }).click();
+      await page.getByText(`Imported from sample/project at GitHub commit ${githubSha}`,
+        { exact: false }).waitFor();
       assert.deepEqual(pageErrors, []);
     } finally {
       if (browser) await browser.close();

@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:f
 import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Transform } from 'node:stream';
+import { Readable, Transform } from 'node:stream';
 import test from 'node:test';
 import { openCatalog } from '../src/db/catalog.js';
 import { createApiServer } from '../src/server.js';
@@ -171,6 +171,119 @@ async function start(storageRoot, maxUploadBytes, storageLimitBytes, options = {
   await once(server, 'listening');
   return { server, base: `http://127.0.0.1:${server.address().port}` };
 }
+
+test('public GitHub import refreshes the current archive and preserves saved snapshots', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-github-test-'));
+  const first = 'a'.repeat(40);
+  const second = 'b'.repeat(40);
+  let sha = first;
+  let downloads = 0;
+  const archives = new Map([[first, emptyZip(['first/README.md'])],
+    [second, emptyZip(['second/README.md'])]]);
+  const githubClient = {
+    async resolve(repository) {
+      assert.equal(repository, 'sample/project');
+      return { owner: 'sample', repo: 'project', repositoryFullName: 'sample/project',
+        ref: 'main', commitSha: sha };
+    },
+    async download(source) {
+      downloads += 1;
+      const bytes = archives.get(source.commitSha);
+      return { stream: Readable.from([bytes]), contentLength: bytes.length };
+    },
+  };
+  let running;
+  try {
+    running = await start(storageRoot, 1000, 5000, { githubClient });
+    await register(running.base);
+    const ownerCookie = activeCookie;
+    const workspace = await (await fetch(`${running.base}/v1/workspaces`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Research', description: '' }),
+    })).json();
+    const base = `${running.base}/v1/workspaces/${workspace.id}`;
+    const imported = await fetch(`${base}/github/import`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repository: 'sample/project' }),
+    });
+    assert.equal(imported.status, 201);
+    const initial = await imported.json();
+    assert.equal(initial.git.commitSha, first);
+    assert.equal(initial.git.commitVerified, true);
+    assert.equal(initial.git.repositoryFullName, 'sample/project');
+    const directReplace = await fetch(`${base}/files/${initial.file.id}/versions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: archives.get(second),
+    });
+    assert.equal(directReplace.status, 409);
+    assert.equal((await directReplace.json()).error.code, 'GITHUB_ARCHIVE_MANAGED');
+    const snapshot = await fetch(`${base}/snapshots`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'First run', note: '', fileIds: [initial.file.id] }),
+    });
+    assert.equal(snapshot.status, 201);
+    const saved = await snapshot.json();
+    assert.equal(saved.git.archiveVersionId, initial.file.currentVersionId);
+    assert.equal(saved.git.commitVerified, true);
+    const unchanged = await fetch(`${base}/github/refresh`, { method: 'POST' });
+    assert.equal(unchanged.status, 200);
+    assert.equal((await unchanged.json()).unchanged, true);
+    assert.equal(downloads, 1);
+    sha = second;
+    const refreshed = await fetch(`${base}/github/refresh`, { method: 'POST' });
+    assert.equal(refreshed.status, 200);
+    const current = await refreshed.json();
+    assert.equal(current.git.commitSha, second);
+    assert.notEqual(current.file.currentVersionId, initial.file.currentVersionId);
+    assert.deepEqual(Buffer.from(await (await fetch(`${base}/files/${initial.file.id}/content`)).arrayBuffer()),
+      archives.get(second));
+    assert.deepEqual(Buffer.from(await (await fetch(`${running.base}/v1/snapshots/${saved.id}`
+      + `/files/${initial.file.id}/content`)).arrayBuffer()), archives.get(first));
+    await stop(running.server);
+    running = await start(storageRoot, 1000, 5000, { githubClient });
+    activeCookie = null;
+    await register(running.base, 'other@example.test');
+    assert.equal((await fetch(`${running.base}/v1/workspaces/${workspace.id}/github/refresh`,
+      { method: 'POST' })).status, 404);
+    activeCookie = ownerCookie;
+    const persisted = await (await fetch(`${running.base}/v1/workspaces/${workspace.id}`)).json();
+    assert.equal(persisted.git.commitVerified, true);
+    assert.equal(persisted.git.commitSha, second);
+    const savedAgain = await (await fetch(`${running.base}/v1/snapshots/${saved.id}`)).json();
+    assert.equal(savedAgain.git.commitVerified, true);
+    assert.equal(savedAgain.git.commitSha, first);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('GitHub imports obey the workspace owner quota without creating a file', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-github-quota-test-'));
+  const bytes = emptyZip(['source/README.md']);
+  let running;
+  try {
+    running = await start(storageRoot, 1000, bytes.length - 1, { githubClient: {
+      async resolve() { return { owner: 'sample', repo: 'project',
+        repositoryFullName: 'sample/project', ref: 'main', commitSha: 'a'.repeat(40) }; },
+      async download() { return { stream: Readable.from([bytes]), contentLength: null }; },
+    } });
+    await register(running.base);
+    const workspace = await (await fetch(`${running.base}/v1/workspaces`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Research', description: '' }),
+    })).json();
+    const blocked = await fetch(`${running.base}/v1/workspaces/${workspace.id}/github/import`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repository: 'sample/project' }),
+    });
+    assert.equal(blocked.status, 507);
+    assert.equal((await blocked.json()).error.code, 'STORAGE_CAP_EXCEEDED');
+    assert.deepEqual((await (await fetch(`${running.base}/v1/workspaces/${workspace.id}/files`)).json()).files, []);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
 
 test('unpaid plan changes are disabled unless the local demo opts in', async () => {
   const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-plan-gate-test-'));

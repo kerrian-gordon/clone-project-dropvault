@@ -1,7 +1,7 @@
 /** @typedef {{ id: string, name: string, parentId: string, ownerId: string, createdAt: string }} Folder */
 /** @typedef {{ id: string, name: string, folderId: string, ownerId: string, mimeType: string, size: number, createdAt: string }} FileRecord */
 /** @typedef {{ id: string, fileId: string, name: string, mimeType: string, size: number, createdAt: string, kind: 'uploaded' | 'replaced' | 'restored' | 'copied', restoredFrom?: string, copiedFromVersionId?: string, copiedFromSnapshotId?: string, label: string }} FileVersion */
-/** @typedef {{ archiveFileId: string, archiveVersionId: string, commitSha: string, verification: 'zip-comment', commitVerified: false }} GitArchiveLink */
+/** @typedef {{ archiveFileId: string, archiveVersionId: string, commitSha: string, verification: 'zip-comment', commitVerified: false } | { archiveFileId: string, archiveVersionId: string, commitSha: string, verification: 'github-api', commitVerified: true, repositoryFullName: string, ref: string, importedAt: string }} GitArchiveLink */
 /** @typedef {{ id: string, ownerId: string, name: string, description: string, fileIds: string[], git?: GitArchiveLink, createdAt: string }} Workspace */
 /** @typedef {{ fileId: string, versionId: string, name: string, folderId: string, folderPath: string[], mimeType: string, size: number }} SnapshotItem */
 /** @typedef {{ id: string, workspaceId: string, ownerId: string, createdById: string, createdByName: string, name: string, note: string, items: SnapshotItem[], git: GitArchiveLink | null, createdAt: string }} Snapshot */
@@ -67,6 +67,8 @@ export const routes = Object.freeze({
   workspaceVersion: (workspaceId, fileId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/files/${encodeURIComponent(fileId)}/versions`,
   workspaceAccess: (workspaceId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/access`,
   workspaceGit: (workspaceId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/git`,
+  workspaceGitHubImport: (workspaceId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/github/import`,
+  workspaceGitHubRefresh: (workspaceId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/github/refresh`,
   workspaceRecipient: (workspaceId, userId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/access/${encodeURIComponent(userId)}`,
   snapshots: (workspaceId) => `/v1/workspaces/${encodeURIComponent(workspaceId)}/snapshots`,
   sharedSnapshots: '/v1/snapshots/shared',

@@ -44,7 +44,8 @@ async function readJson(request) {
 }
 
 export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BYTES,
-  storageLimitBytes, legacyClaimToken, publicBaseUrl, demoPlanSwitchEnabled = false }) {
+  storageLimitBytes, legacyClaimToken, publicBaseUrl, demoPlanSwitchEnabled = false,
+  githubClient }) {
   let pendingMutation = Promise.resolve();
   let activeMutations = 0;
   let activeUploads = 0;
@@ -148,6 +149,40 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
   async function waitForReads(fileId) {
     const current = activeReads.get(fileId);
     if (current?.count) await new Promise((resolve) => current.waiters.push(resolve));
+  }
+
+  async function saveGitHubArchive(workspaceId, userId, source, expected = null) {
+    const usage = catalog.usage(userId, storageLimitBytes);
+    const available = Math.max(0, usage.limitBytes - usage.usedBytes);
+    if (available === 0) throw new ApiError(507, 'STORAGE_CAP_EXCEEDED',
+      'Storage limit would be exceeded by the GitHub archive');
+    const downloaded = await githubClient.download(source);
+    if (downloaded.contentLength > maxUploadBytes || downloaded.contentLength > available) {
+      downloaded.stream.destroy();
+      throw downloaded.contentLength > maxUploadBytes
+        ? new ApiError(413, 'FILE_TOO_LARGE', 'GitHub archive exceeds the upload limit')
+        : new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Storage limit would be exceeded by the GitHub archive');
+    }
+    const stored = await storage.save(downloaded.stream, maxUploadBytes, available);
+    try {
+      await validateStoredFile('source.zip', await storage.sample(stored.storageKey),
+        () => storage.zipEntries(stored.storageKey));
+      await storage.zipEntries(stored.storageKey);
+      return await mutate(() => {
+        catalog.getWorkspace(workspaceId, userId, 'manage');
+        const current = catalog.usage(userId, storageLimitBytes);
+        if (stored.size > Math.max(0, current.limitBytes - current.usedBytes)) {
+          throw new ApiError(507, 'STORAGE_CAP_EXCEEDED',
+            'Storage limit would be exceeded by the GitHub archive');
+        }
+        return expected
+          ? catalog.refreshGitHubArchive(workspaceId, userId, source, expected, stored)
+          : catalog.importGitHubArchive(workspaceId, userId, source, stored);
+      });
+    } catch (error) {
+      await storage.remove(stored.storageKey);
+      throw error;
+    }
   }
 
   return async (request, response) => {
@@ -349,6 +384,37 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         }
         return json(response, 200, await mutate(() => catalog.setWorkspaceGitArchive(
           workspace.id, user.id, file.id, file.currentVersionId, commit)));
+      }
+      const githubImportMatch = /^\/v1\/workspaces\/([^/]+)\/github\/import$/u.exec(path);
+      if (request.method === 'POST' && githubImportMatch) {
+        const input = await readJson(request);
+        const workspace = catalog.getWorkspace(githubImportMatch[1], user.id, 'manage');
+        if (workspace.git) throw new ApiError(409, 'GIT_ARCHIVE_ALREADY_LINKED',
+          'Remove the current code archive from the workspace before importing a repository');
+        const source = await githubClient.resolve(input?.repository);
+        return json(response, 201, await saveGitHubArchive(workspace.id, user.id, source));
+      }
+      const githubRefreshMatch = /^\/v1\/workspaces\/([^/]+)\/github\/refresh$/u.exec(path);
+      if (request.method === 'POST' && githubRefreshMatch) {
+        const workspace = catalog.getWorkspace(githubRefreshMatch[1], user.id, 'manage');
+        if (workspace.git?.verification !== 'github-api') {
+          throw new ApiError(409, 'GITHUB_IMPORT_REQUIRED', 'Import a public GitHub repository first');
+        }
+        const expected = { ...workspace.git };
+        const source = await githubClient.resolve(expected.repositoryFullName);
+        if (source.commitSha === expected.commitSha) {
+          const current = catalog.getWorkspace(workspace.id, user.id, 'manage');
+          const file = catalog.getFile(expected.archiveFileId, user.id, 'manage');
+          if (current.git?.verification !== 'github-api'
+            || current.git.archiveVersionId !== expected.archiveVersionId
+            || file.currentVersionId !== expected.archiveVersionId) {
+            throw new ApiError(409, 'GIT_ARCHIVE_CHANGED',
+              'The code archive changed while refreshing; try again');
+          }
+          return json(response, 200, { git: current.git, unchanged: true });
+        }
+        return json(response, 200, await saveGitHubArchive(workspace.id, user.id, source,
+          expected));
       }
       const workspaceUploadMatch = /^\/v1\/workspaces\/([^/]+)\/uploads$/u.exec(path);
       if (request.method === 'POST' && workspaceUploadMatch) {

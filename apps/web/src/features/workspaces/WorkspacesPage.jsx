@@ -84,6 +84,8 @@ export function WorkspacePage() {
   const [memberEmail, setMemberEmail] = useState('');
   const [memberRole, setMemberRole] = useState('viewer');
   const [gitFileId, setGitFileId] = useState('');
+  const [githubRepository, setGithubRepository] = useState('');
+  const [githubNotice, setGithubNotice] = useState('');
   const [fileQuery, setFileQuery] = useState('');
   const uploadsPending = jobs.some((job) => ['checking', 'suggested', 'queued', 'uploading'].includes(job.status));
   const refresh = useCallback(async () => {
@@ -193,7 +195,9 @@ export function WorkspacePage() {
           <span className="workspace-file-info">{isOwner ? <Link to={`/view/${file.id}`}>{file.name}</Link> : <strong>{file.name}</strong>}
             <small>{workspace?.git?.archiveFileId === file.id ? 'Linked code archive · ' : ''}{formatBytes(file.size)}</small></span></label>
         <span className="workspace-inline workspace-file-actions"><a href={`${routes.workspaceContent(id, file.id)}?download=1`}>Download</a>
-          {canContribute && <WorkspaceReplacement workspaceId={id} file={file} onDone={refresh} />}
+          {canContribute && !(workspace?.git?.verification === 'github-api'
+            && workspace.git.archiveFileId === file.id)
+            && <WorkspaceReplacement workspaceId={id} file={file} onDone={refresh} />}
           {isOwner && <button className="btn-ghost" disabled={pending || reviewing} onClick={() => void change(() =>
             api(routes.workspaceFile(id, file.id), { method: 'DELETE' }))}>Remove</button>}</span>
       </li>)}</ul>
@@ -202,7 +206,33 @@ export function WorkspacePage() {
       <div className="workspace-section-heading"><div><h2>Code archive</h2>
         <p className="muted">Link a Git ZIP to save the code and project files in the same snapshot.</p></div>
         <span className="workspace-count">{workspace.git ? 'Linked' : 'Optional'}</span></div>
-      {workspace.git && <p className="workspace-archive-status">Linked code archive: <strong>{linkedArchive?.name ?? 'ZIP file'}</strong>. Claimed commit <code>{workspace.git.commitSha}</code> from its ZIP comment. Not verified against GitHub. The linked ZIP is included automatically in snapshots.</p>}
+      {workspace.git && <p className="workspace-archive-status">Linked code archive: <strong>{linkedArchive?.name ?? 'ZIP file'}</strong>.{' '}
+        {workspace.git.verification === 'github-api'
+          ? <>Imported from <strong>{workspace.git.repositoryFullName}</strong> at <code>{workspace.git.commitSha}</code> on {workspace.git.ref}. The archive is tied to this GitHub commit.</>
+          : <>Claimed commit <code>{workspace.git.commitSha}</code> from its ZIP comment. Not verified against GitHub.</>}{' '}
+        The linked ZIP is included automatically in snapshots.</p>}
+      {!workspace.git && <form className="workspace-inline" onSubmit={(event) => { event.preventDefault();
+        void change(async () => {
+          const result = await api(routes.workspaceGitHubImport(id), jsonOptions('POST',
+            { repository: githubRepository }));
+          setGithubNotice(`Imported ${result.git.repositoryFullName} at ${result.git.commitSha.slice(0, 12)}.`);
+        });
+      }}>
+        <input aria-label="Public GitHub repository" value={githubRepository}
+          placeholder="owner/repo or GitHub URL" required disabled={pending}
+          onChange={(event) => setGithubRepository(event.target.value)} />
+        <button disabled={pending}>Import public repository</button>
+      </form>}
+      {workspace.git?.verification === 'github-api' && <div className="workspace-inline">
+        <button disabled={pending} onClick={() => void change(async () => {
+          const result = await api(routes.workspaceGitHubRefresh(id), { method: 'POST' });
+          setGithubNotice(result.unchanged ? 'Already at the latest commit on the default branch.'
+            : `Updated to ${result.git.commitSha.slice(0, 12)}. Earlier snapshots keep their saved code version.`);
+        })}>Refresh from GitHub</button>
+        <span className="muted">Checks the default branch when you click. No automatic sync.</span>
+      </div>}
+      {githubNotice && <p role="status">{githubNotice}</p>}
+      <p className="muted">Public repositories only. Each imported ZIP and refresh uses your storage quota.</p>
       <div className="workspace-inline"><select aria-label="Git code archive" value={gitFileId}
         onChange={(event) => setGitFileId(event.target.value)}>
         <option value="">Choose a ZIP file</option>{files.filter((file) => file.name.toLowerCase().endsWith('.zip'))
@@ -220,7 +250,7 @@ export function WorkspacePage() {
         <span className="workspace-count">{selected.length} selected</span></div>
       <p className="workspace-selection-summary">{selected.length ? <>{selected.length} {selected.length === 1 ? 'file' : 'files'} · {formatBytes(selectedSize)} · current versions</>
         : 'Select files in Current project files above to continue.'}</p>
-      {linkedArchiveStale && <p className="error" role="alert">The linked code ZIP has a newer version. Link it again before saving a snapshot.</p>}
+      {linkedArchiveStale && <p className="error" role="alert">The linked code ZIP has a newer version. {workspace.git?.verification === 'github-api' ? 'Remove it from this workspace and import the repository again before saving a snapshot.' : 'Link it again before saving a snapshot.'}</p>}
       {uploadsPending && <p className="error" role="alert">Finish pending uploads before creating a snapshot. Refresh this file list after they finish.</p>}
       {selected.length > 200 && <p className="error" role="alert">Choose at most 200 files for one snapshot.</p>}
       <label>Snapshot name<input value={name} maxLength={255} disabled={reviewing}
@@ -229,7 +259,7 @@ export function WorkspacePage() {
         disabled={reviewing} onChange={(event) => setNote(event.target.value)} /></label>
       {reviewing ? <div className="workspace-review">
         {workspace.git && <p>Code archive: {files.find((file) =>
-          file.id === workspace.git.archiveFileId)?.name ?? 'ZIP file'} (claimed commit <code>{workspace.git.commitSha}</code>; not verified against GitHub). Its ZIP is included below.</p>}
+          file.id === workspace.git.archiveFileId)?.name ?? 'ZIP file'} ({workspace.git.verification === 'github-api' ? 'GitHub commit' : 'claimed commit'} <code>{workspace.git.commitSha}</code>{workspace.git.verification === 'github-api' ? '' : '; not verified against GitHub'}). Its ZIP is included below.</p>}
         <strong>Review “{name}” before saving</strong>
         <p>{reviewedItems.length} files · {formatBytes(reviewedItems.reduce((sum, file) => sum + file.size, 0))} already counted in storage</p>
         <ul>{reviewedItems.map((file) => <li key={file.id}>{file.name} · {formatBytes(file.size)} · current version {file.currentVersionId}</li>)}</ul>
@@ -307,7 +337,10 @@ export function SnapshotPage() {
       <p className="muted">Saved by {snapshot.createdByName} on {new Date(snapshot.createdAt).toLocaleString()} · {snapshot.items.length} exact file versions</p>
       <p>{snapshot.note || 'No note.'}</p>
       {snapshot.git && <p>Code archive: {snapshot.items.find((item) =>
-        item.fileId === snapshot.git.archiveFileId)?.name ?? 'ZIP file'} · version {snapshot.git.archiveVersionId}. Claimed commit <code>{snapshot.git.commitSha}</code> from its ZIP comment. Not verified against GitHub.</p>}
+        item.fileId === snapshot.git.archiveFileId)?.name ?? 'ZIP file'} · version {snapshot.git.archiveVersionId}.{' '}
+        {snapshot.git.verification === 'github-api'
+          ? <>Imported from {snapshot.git.repositoryFullName} at GitHub commit <code>{snapshot.git.commitSha}</code> on {snapshot.git.ref}.</>
+          : <>Claimed commit <code>{snapshot.git.commitSha}</code> from its ZIP comment. Not verified against GitHub.</>}</p>}
       <p className="muted">This snapshot is fixed. Later replacements, restores, renames, and folder moves do not change it.</p>
       <div className="workspace-inline">
         <a className="button-link" href={routes.snapshotArchive(id)}>Download all (.tar)</a>

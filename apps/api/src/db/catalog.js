@@ -73,16 +73,19 @@ export async function openCatalog(path, persistence) {
       ?? 'Community member';
     takenNames.push(user.displayName);
   }
-  // Existing links all came from uploaded ZIP comments. They are labels, not
-  // proof that the archive matches a commit in any repository.
+  // Legacy and manually linked ZIP comments are labels, not repository proof.
   for (const workspace of state.workspaces) {
-    if (workspace.git) workspace.git.commitVerified = false;
+    if (workspace.git?.verification !== 'github-api' && workspace.git) {
+      workspace.git.commitVerified = false;
+    }
   }
   for (const snapshot of state.snapshots) {
     snapshot.createdById ??= snapshot.ownerId;
     snapshot.createdByName ??= state.users.find((user) => user.id === snapshot.createdById)
       ?.displayName ?? 'Community member';
-    if (snapshot.git) snapshot.git.commitVerified = false;
+    if (snapshot.git?.verification !== 'github-api' && snapshot.git) {
+      snapshot.git.commitVerified = false;
+    }
   }
 
   let pending = Promise.resolve();
@@ -405,6 +408,61 @@ export async function openCatalog(path, persistence) {
         workspace.git = { archiveFileId: fileId, archiveVersionId: versionId,
           commitSha, verification: 'zip-comment', commitVerified: false };
         return workspace.git;
+      });
+    },
+    async importGitHubArchive(workspaceId, userId, source, stored) {
+      return write((next) => {
+        const workspace = ownedWorkspace(next, workspaceId, userId);
+        if (workspace.git) throw new ApiError(409, 'GIT_ARCHIVE_ALREADY_LINKED',
+          'Remove the current code archive from the workspace before importing a repository');
+        const name = `${source.repo}-source.zip`;
+        if (next.files.some((file) => workspace.fileIds.includes(file.id) && file.name === name)) {
+          throw new ApiError(409, 'NAME_CONFLICT', 'A file with this name is already in the workspace');
+        }
+        const createdAt = new Date().toISOString();
+        const file = { id: randomUUID(), name, folderId: ROOT_FOLDER_ID,
+          ownerId: userId, mimeType: 'application/zip', size: stored.size,
+          createdAt, storageKey: stored.storageKey, currentVersionId: randomUUID() };
+        next.files.push(file);
+        next.versions.push({ id: file.currentVersionId, fileId: file.id, name,
+          storageKey: file.storageKey, mimeType: file.mimeType, size: file.size,
+          createdAt, kind: 'imported', actorId: userId, label: '' });
+        workspace.fileIds.push(file.id);
+        workspace.git = { archiveFileId: file.id, archiveVersionId: file.currentVersionId,
+          commitSha: source.commitSha, verification: 'github-api', commitVerified: true,
+          repositoryFullName: source.repositoryFullName, ref: source.ref, importedAt: createdAt };
+        return { file: publicFile(file), git: workspace.git, unchanged: false };
+      });
+    },
+    async refreshGitHubArchive(workspaceId, userId, source, expected, stored) {
+      return write((next) => {
+        const workspace = ownedWorkspace(next, workspaceId, userId);
+        if (workspace.git?.verification !== 'github-api'
+          || workspace.git.repositoryFullName.toLowerCase() !== source.repositoryFullName.toLowerCase()) {
+          throw new ApiError(409, 'GITHUB_IMPORT_CHANGED', 'The linked GitHub repository changed');
+        }
+        const file = next.files.find((item) => item.id === workspace.git.archiveFileId
+          && item.ownerId === userId);
+        if (!file || !workspace.fileIds.includes(file.id)
+          || file.currentVersionId !== expected.archiveVersionId
+          || workspace.git.archiveVersionId !== expected.archiveVersionId) {
+          throw new ApiError(409, 'GIT_ARCHIVE_CHANGED',
+            'The code archive changed while refreshing; try again');
+        }
+        if (workspace.git.commitSha === source.commitSha) {
+          return { file: publicFile(file), git: workspace.git, unchanged: true };
+        }
+        const createdAt = new Date().toISOString();
+        const version = { id: randomUUID(), fileId: file.id, name: file.name,
+          storageKey: stored.storageKey, mimeType: file.mimeType, size: stored.size,
+          createdAt, kind: 'imported', actorId: userId, label: '' };
+        next.versions.push(version);
+        file.storageKey = version.storageKey;
+        file.size = version.size;
+        file.currentVersionId = version.id;
+        workspace.git = { ...workspace.git, archiveVersionId: version.id,
+          commitSha: source.commitSha, ref: source.ref, importedAt: createdAt };
+        return { file: publicFile(file), git: workspace.git, unchanged: false };
       });
     },
     async deleteWorkspace(workspaceId, userId) {
@@ -737,6 +795,11 @@ export async function openCatalog(path, persistence) {
       return write((next) => {
         const file = next.files.find((item) => item.id === fileId && item.ownerId === ownerId);
         if (!file) throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
+        if (next.workspaces.some((workspace) => workspace.ownerId === ownerId
+          && workspace.git?.verification === 'github-api' && workspace.git.archiveFileId === fileId)) {
+          throw new ApiError(409, 'GITHUB_ARCHIVE_MANAGED',
+            'Use Refresh from GitHub to update this code archive');
+        }
         const version = { id: randomUUID(), fileId, name: file.name,
           storageKey: stored.storageKey, mimeType: file.mimeType, size: stored.size,
           createdAt: new Date().toISOString(), kind: 'replaced', actorId, label: '' };
@@ -751,6 +814,11 @@ export async function openCatalog(path, persistence) {
       return write((next) => {
         const file = next.files.find((item) => item.id === fileId && item.ownerId === ownerId);
         if (!file) throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
+        if (next.workspaces.some((workspace) => workspace.ownerId === ownerId
+          && workspace.git?.verification === 'github-api' && workspace.git.archiveFileId === fileId)) {
+          throw new ApiError(409, 'GITHUB_ARCHIVE_MANAGED',
+            'Use Refresh from GitHub to update this code archive');
+        }
         const source = next.versions.find((item) => item.fileId === fileId && item.id === versionId);
         if (!source) throw new ApiError(404, 'VERSION_NOT_FOUND', 'File version was not found');
         const version = { id: randomUUID(), fileId, name: file.name,
