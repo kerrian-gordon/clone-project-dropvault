@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
 import { ApiError, unwrapApiError } from '../../routes/errors.js';
-import { zipEntryNames } from '../../modules/uploads/zip.js';
+import { gitArchiveCommit, zipEntryNames } from '../../modules/uploads/zip.js';
 
 export async function openLocalStorage(root) {
   const originals = join(root, 'originals');
@@ -84,6 +84,9 @@ export async function openLocalStorage(root) {
     },
     zipEntries(storageKey) {
       return zipEntryNames(join(originals, storageKey));
+    },
+    gitArchiveCommit(storageKey) {
+      return gitArchiveCommit(join(originals, storageKey));
     },
     async copy(storageKey) {
       const newKey = randomUUID();

@@ -13,12 +13,14 @@ function defaultAppearance() {
     settings: structuredClone(DEFAULT_THEME_SETTINGS), selectedAt: null, updatedAt: null };
 }
 
-export async function openCatalog(path) {
-  await mkdir(dirname(path), { recursive: true });
+export async function openCatalog(path, persistence) {
+  if (!persistence) await mkdir(dirname(path), { recursive: true });
   let state;
   let loadedFromDisk = true;
   try {
-    state = JSON.parse(await readFile(path, 'utf8'));
+    const raw = persistence ? await persistence.load() : await readFile(path, 'utf8');
+    if (raw === null) { const missing = new Error('Catalog does not exist'); missing.code = 'ENOENT'; throw missing; }
+    state = typeof raw === 'string' ? JSON.parse(raw) : raw;
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
     loadedFromDisk = false;
@@ -40,10 +42,16 @@ export async function openCatalog(path) {
   state.themes ??= [];
   state.appearances ??= [];
   state.versions ??= [];
+  state.workspaces ??= [];
+  state.workspaceGrants ??= [];
+  state.snapshots ??= [];
+  state.snapshotGrants ??= [];
   state.organizationSuggestions ??= [];
   state.organizationStats ??= [];
   if (![state.users, state.sessions, state.grants, state.themes,
-    state.appearances, state.versions, state.organizationSuggestions, state.organizationStats].every(Array.isArray)) {
+    state.appearances, state.versions, state.workspaces, state.workspaceGrants, state.snapshots,
+    state.snapshotGrants,
+    state.organizationSuggestions, state.organizationStats].every(Array.isArray)) {
     throw new Error('Invalid account catalog');
   }
   // Older catalogs stored only the current file. Give that content a stable
@@ -63,13 +71,16 @@ export async function openCatalog(path) {
     const operation = pending.then(async () => {
       const next = structuredClone(state);
       const result = change(next);
-      const tempPath = `${path}.${randomUUID()}.tmp`;
-      try {
-        await writeFile(tempPath, JSON.stringify(next, null, 2));
-        await rename(tempPath, path);
-      } catch (error) {
-        await rm(tempPath, { force: true });
-        throw error;
+      if (persistence) await persistence.save(next);
+      else {
+        const tempPath = `${path}.${randomUUID()}.tmp`;
+        try {
+          await writeFile(tempPath, JSON.stringify(next, null, 2));
+          await rename(tempPath, path);
+        } catch (error) {
+          await rm(tempPath, { force: true });
+          throw error;
+        }
       }
       state = next;
       return result;
@@ -87,8 +98,41 @@ export async function openCatalog(path) {
     return createHash('sha256').update(token).digest('hex');
   }
 
+  function ownedWorkspace(current, workspaceId, userId) {
+    const workspace = current.workspaces.find((item) => item.id === workspaceId && item.ownerId === userId);
+    if (!workspace) throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace was not found');
+    return workspace;
+  }
+
+  function accessibleWorkspace(current, workspaceId, userId, action = 'read') {
+    const workspace = current.workspaces.find((item) => item.id === workspaceId);
+    if (!workspace) throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace was not found');
+    if (workspace.ownerId === userId) return workspace;
+    const grant = current.workspaceGrants.find((item) => item.workspaceId === workspaceId
+      && item.userId === userId);
+    if (!grant || action === 'manage' || (action === 'contribute' && grant.role !== 'contributor')) {
+      throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace was not found');
+    }
+    return workspace;
+  }
+
+  function accessibleSnapshot(current, snapshotId, userId, manage = false) {
+    const snapshot = current.snapshots.find((item) => item.id === snapshotId);
+    if (!snapshot) throw new ApiError(404, 'SNAPSHOT_NOT_FOUND', 'Snapshot was not found');
+    if (snapshot.ownerId === userId) return snapshot;
+    if (!manage && current.workspaceGrants.some((grant) => grant.workspaceId === snapshot.workspaceId
+      && grant.userId === userId)) return snapshot;
+    if (manage || !current.snapshotGrants.some((grant) => grant.snapshotId === snapshotId
+      && grant.userId === userId) || !snapshot.items.every((item) =>
+      current.grants.some((grant) => grant.fileId === item.fileId && grant.userId === userId))) {
+      throw new ApiError(404, 'SNAPSHOT_NOT_FOUND', 'Snapshot was not found');
+    }
+    return snapshot;
+  }
+
   return {
     loadedFromDisk,
+    close: () => persistence?.close(),
     referencedStorageKeys() {
       return [...new Set([...state.files.map((file) => file.storageKey),
         ...state.versions.map((version) => version.storageKey)])];
@@ -246,6 +290,272 @@ export async function openCatalog(path) {
         return folder;
       });
     },
+    listWorkspaces(userId) {
+      const shared = new Set(state.workspaceGrants.filter((item) => item.userId === userId)
+        .map((item) => item.workspaceId));
+      return state.workspaces.filter((item) => item.ownerId === userId || shared.has(item.id));
+    },
+    getWorkspace(workspaceId, userId, action = 'read') {
+      return accessibleWorkspace(state, workspaceId, userId, action);
+    },
+    workspaceRole(workspaceId, userId) {
+      const workspace = accessibleWorkspace(state, workspaceId, userId);
+      if (workspace.ownerId === userId) return 'owner';
+      return state.workspaceGrants.find((item) => item.workspaceId === workspaceId
+        && item.userId === userId).role;
+    },
+    listWorkspaceGrants(workspaceId, ownerId) {
+      ownedWorkspace(state, workspaceId, ownerId);
+      return state.workspaceGrants.filter((grant) => grant.workspaceId === workspaceId)
+        .map((grant) => ({ ...grant, email: state.users.find((user) => user.id === grant.userId)?.email }));
+    },
+    async grantWorkspace(workspaceId, ownerId, email, role) {
+      return write((next) => {
+        ownedWorkspace(next, workspaceId, ownerId);
+        const recipient = next.users.find((user) => user.email === email);
+        if (!recipient) throw new ApiError(404, 'ACCOUNT_NOT_FOUND', 'Recipient was not found');
+        if (recipient.id === ownerId) throw new ApiError(400, 'INVALID_RECIPIENT', 'Owner already has access');
+        let grant = next.workspaceGrants.find((item) => item.workspaceId === workspaceId
+          && item.userId === recipient.id);
+        if (grant) grant.role = role;
+        else {
+          grant = { workspaceId, userId: recipient.id, role, createdAt: new Date().toISOString() };
+          next.workspaceGrants.push(grant);
+        }
+        return { ...grant, email: recipient.email };
+      });
+    },
+    async revokeWorkspaceGrant(workspaceId, ownerId, recipientId) {
+      return write((next) => {
+        ownedWorkspace(next, workspaceId, ownerId);
+        next.workspaceGrants = next.workspaceGrants.filter((grant) =>
+          !(grant.workspaceId === workspaceId && grant.userId === recipientId));
+      });
+    },
+    async createWorkspace(userId, name, description) {
+      return write((next) => {
+        const workspace = { id: randomUUID(), ownerId: userId, name, description,
+          fileIds: [], createdAt: new Date().toISOString() };
+        next.workspaces.push(workspace);
+        return workspace;
+      });
+    },
+    async addWorkspaceFile(workspaceId, userId, fileId) {
+      return write((next) => {
+        const workspace = ownedWorkspace(next, workspaceId, userId);
+        if (!next.files.some((file) => file.id === fileId && file.ownerId === userId)) {
+          throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
+        }
+        if (!workspace.fileIds.includes(fileId)) workspace.fileIds.push(fileId);
+        return workspace;
+      });
+    },
+    async removeWorkspaceFile(workspaceId, userId, fileId) {
+      return write((next) => {
+        const workspace = ownedWorkspace(next, workspaceId, userId);
+        if (!workspace.fileIds.includes(fileId)) {
+          throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found in this workspace');
+        }
+        workspace.fileIds = workspace.fileIds.filter((id) => id !== fileId);
+        if (workspace.git?.archiveFileId === fileId) delete workspace.git;
+      });
+    },
+    async setWorkspaceGitArchive(workspaceId, userId, fileId, versionId, commitSha) {
+      return write((next) => {
+        const workspace = ownedWorkspace(next, workspaceId, userId);
+        const file = next.files.find((item) => item.id === fileId && item.ownerId === userId);
+        if (!workspace.fileIds.includes(fileId) || !file || file.currentVersionId !== versionId
+          || !file.name.toLowerCase().endsWith('.zip')) {
+          throw new ApiError(409, 'GIT_ARCHIVE_CHANGED', 'Choose a current ZIP file in this workspace');
+        }
+        workspace.git = { archiveFileId: fileId, archiveVersionId: versionId,
+          commitSha, verification: 'zip-comment' };
+        return workspace.git;
+      });
+    },
+    async deleteWorkspace(workspaceId, userId) {
+      return write((next) => {
+        ownedWorkspace(next, workspaceId, userId);
+        if (next.snapshots.some((snapshot) => snapshot.workspaceId === workspaceId)) {
+          throw new ApiError(409, 'WORKSPACE_HAS_SNAPSHOTS',
+            'Delete this workspace\'s snapshots before deleting the workspace');
+        }
+        next.workspaces = next.workspaces.filter((item) => item.id !== workspaceId);
+        next.workspaceGrants = next.workspaceGrants.filter((grant) => grant.workspaceId !== workspaceId);
+      });
+    },
+    listWorkspaceFiles(workspaceId, userId) {
+      const workspace = accessibleWorkspace(state, workspaceId, userId);
+      const ids = new Set(workspace.fileIds);
+      return state.files.filter((file) => ids.has(file.id) && file.ownerId === workspace.ownerId)
+        .map(publicFile);
+    },
+    listOwnedFiles(userId) {
+      return state.files.filter((file) => file.ownerId === userId).map(publicFile);
+    },
+    listSnapshots(workspaceId, userId) {
+      accessibleWorkspace(state, workspaceId, userId);
+      return state.snapshots.filter((item) => item.workspaceId === workspaceId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    },
+    listSharedSnapshots(userId) {
+      return state.snapshots.filter((snapshot) => {
+        try { accessibleSnapshot(state, snapshot.id, userId); return snapshot.ownerId !== userId; }
+        catch { return false; }
+      });
+    },
+    getSnapshot(snapshotId, userId, manage = false) {
+      return accessibleSnapshot(state, snapshotId, userId, manage);
+    },
+    getSnapshotVersion(snapshotId, fileId, userId) {
+      const snapshot = accessibleSnapshot(state, snapshotId, userId);
+      const item = snapshot.items.find((entry) => entry.fileId === fileId);
+      if (!item) throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found in this snapshot');
+      const version = state.versions.find((entry) => entry.id === item.versionId && entry.fileId === fileId);
+      if (!version) throw new ApiError(404, 'VERSION_NOT_FOUND', 'Snapshot file version was not found');
+      return version;
+    },
+    snapshotVersions(snapshotId, userId) {
+      const snapshot = accessibleSnapshot(state, snapshotId, userId);
+      return snapshot.items.map((item) => {
+        const version = state.versions.find((entry) => entry.id === item.versionId
+          && entry.fileId === item.fileId);
+        if (!version) throw new ApiError(404, 'VERSION_NOT_FOUND', 'Snapshot file version was not found');
+        return version;
+      });
+    },
+    async copySnapshot(snapshotId, userId, stored) {
+      return write((next) => {
+        const source = accessibleSnapshot(next, snapshotId, userId);
+        if (stored.length !== source.items.length) throw new Error('Snapshot copy is incomplete');
+        const createdAt = new Date().toISOString();
+        const workspace = { id: randomUUID(), ownerId: userId,
+          name: `${source.name.slice(0, 245)} (copy)`,
+          description: `Copy of snapshot ${source.id}`, fileIds: [], createdAt };
+        next.workspaces.push(workspace);
+        const rootFolder = { id: randomUUID(), ownerId: userId, parentId: ROOT_FOLDER_ID,
+          name: `Snapshot ${workspace.id.slice(0, 8)}`, createdAt };
+        next.folders.push(rootFolder);
+        const folderIds = new Map([['[]', rootFolder.id]]);
+        for (const [index, item] of source.items.entries()) {
+          const version = next.versions.find((entry) => entry.id === item.versionId
+            && entry.fileId === item.fileId);
+          if (!version) throw new ApiError(404, 'VERSION_NOT_FOUND', 'Snapshot file version was not found');
+          const parts = item.folderPath ?? [];
+          let parentId = rootFolder.id;
+          for (let depth = 0; depth < parts.length; depth += 1) {
+            const key = JSON.stringify(parts.slice(0, depth + 1));
+            if (!folderIds.has(key)) {
+              const folder = { id: randomUUID(), ownerId: userId, parentId,
+                name: parts[depth], createdAt };
+              next.folders.push(folder);
+              folderIds.set(key, folder.id);
+            }
+            parentId = folderIds.get(key);
+          }
+          const file = { id: randomUUID(), name: item.name, folderId: parentId,
+            ownerId: userId, mimeType: item.mimeType, size: item.size, createdAt,
+            storageKey: stored[index].storageKey, currentVersionId: randomUUID() };
+          next.files.push(file);
+          next.versions.push({ id: file.currentVersionId, fileId: file.id, name: file.name,
+            storageKey: file.storageKey, mimeType: file.mimeType, size: file.size,
+            createdAt, kind: 'copied', copiedFromVersionId: item.versionId,
+            copiedFromSnapshotId: source.id, label: '' });
+          workspace.fileIds.push(file.id);
+          if (source.git?.archiveFileId === item.fileId) {
+            workspace.git = { ...source.git, archiveFileId: file.id,
+              archiveVersionId: file.currentVersionId };
+          }
+        }
+        return workspace;
+      });
+    },
+    assertFileDeletable(fileId, userId) {
+      this.getFile(fileId, userId, 'manage');
+      if (state.snapshots.some((snapshot) => snapshot.items.some((item) => item.fileId === fileId))) {
+        throw new ApiError(409, 'FILE_IN_SNAPSHOT',
+          'This file is used by a snapshot; delete the snapshot first');
+      }
+    },
+    async createSnapshot(workspaceId, userId, name, note, fileIds) {
+      return write((next) => {
+        const workspace = ownedWorkspace(next, workspaceId, userId);
+        if (workspace.git) {
+          const archive = next.files.find((file) => file.id === workspace.git.archiveFileId);
+          if (!archive || archive.currentVersionId !== workspace.git.archiveVersionId
+            || !fileIds.includes(archive.id)) {
+            throw new ApiError(409, 'GIT_ARCHIVE_CHANGED',
+              'Include the linked code archive at its linked version, or link its new version');
+          }
+        }
+        if (!fileIds.length || new Set(fileIds).size !== fileIds.length
+          || fileIds.some((id) => !workspace.fileIds.includes(id))) {
+          throw new ApiError(400, 'INVALID_SNAPSHOT_FILES', 'Select files from this workspace');
+        }
+        const items = fileIds.map((id) => {
+          const file = next.files.find((entry) => entry.id === id && entry.ownerId === userId);
+          if (!file) throw new ApiError(404, 'FILE_NOT_FOUND', 'A selected file was not found');
+          const version = next.versions.find((entry) => entry.id === file.currentVersionId && entry.fileId === id);
+          if (!version) throw new ApiError(404, 'VERSION_NOT_FOUND', 'A selected version was not found');
+          const folderPath = [];
+          let folderId = file.folderId;
+          while (folderId !== ROOT_FOLDER_ID) {
+            const folder = next.folders.find((entry) => entry.id === folderId && entry.ownerId === userId);
+            if (!folder) throw new ApiError(404, 'FOLDER_NOT_FOUND', 'A file folder was not found');
+            folderPath.unshift(folder.name);
+            folderId = folder.parentId;
+          }
+          return { fileId: id, versionId: version.id, name: file.name, folderId: file.folderId,
+            folderPath,
+            mimeType: version.mimeType, size: version.size };
+        });
+        const snapshot = { id: randomUUID(), workspaceId, ownerId: userId, name, note,
+          items, git: workspace.git ? { ...workspace.git } : null,
+          createdAt: new Date().toISOString() };
+        next.snapshots.push(snapshot);
+        return snapshot;
+      });
+    },
+    async deleteSnapshot(snapshotId, userId) {
+      return write((next) => {
+        accessibleSnapshot(next, snapshotId, userId, true);
+        next.snapshots = next.snapshots.filter((item) => item.id !== snapshotId);
+        next.snapshotGrants = next.snapshotGrants.filter((grant) => grant.snapshotId !== snapshotId);
+      });
+    },
+    listSnapshotGrants(snapshotId, userId) {
+      accessibleSnapshot(state, snapshotId, userId, true);
+      return state.snapshotGrants.filter((grant) => grant.snapshotId === snapshotId).map((grant) => ({
+        userId: grant.userId, email: state.users.find((user) => user.id === grant.userId)?.email,
+        createdAt: grant.createdAt,
+      }));
+    },
+    async grantSnapshot(snapshotId, ownerId, email) {
+      return write((next) => {
+        const snapshot = accessibleSnapshot(next, snapshotId, ownerId, true);
+        const recipient = next.users.find((user) => user.email === email);
+        if (!recipient) throw new ApiError(404, 'ACCOUNT_NOT_FOUND', 'Recipient was not found');
+        if (recipient.id === ownerId) throw new ApiError(400, 'INVALID_RECIPIENT', 'Owner already has access');
+        if (!snapshot.items.every((item) => next.grants.some((grant) =>
+          grant.fileId === item.fileId && grant.userId === recipient.id))) {
+          throw new ApiError(409, 'SNAPSHOT_ACCESS_INCOMPLETE',
+            'Share every file in this snapshot with the recipient first');
+        }
+        if (!next.snapshotGrants.some((grant) => grant.snapshotId === snapshotId
+          && grant.userId === recipient.id)) {
+          next.snapshotGrants.push({ snapshotId, userId: recipient.id,
+            createdAt: new Date().toISOString() });
+        }
+        return { userId: recipient.id, email: recipient.email };
+      });
+    },
+    async revokeSnapshotGrant(snapshotId, ownerId, recipientId) {
+      return write((next) => {
+        accessibleSnapshot(next, snapshotId, ownerId, true);
+        next.snapshotGrants = next.snapshotGrants.filter((grant) =>
+          !(grant.snapshotId === snapshotId && grant.userId === recipientId));
+      });
+    },
     listFolders(ownerId) {
       return state.folders.filter((folder) => folder.ownerId === ownerId);
     },
@@ -343,7 +653,25 @@ export async function openCatalog(path) {
         next.files.push(file);
         next.versions.push({ id: file.currentVersionId, fileId: file.id, name: file.name,
           storageKey: file.storageKey, mimeType: file.mimeType, size: file.size,
-          createdAt, kind: 'uploaded', label: '' });
+          createdAt, kind: 'uploaded', actorId: details.actorId ?? details.ownerId, label: '' });
+        return publicFile(file);
+      });
+    },
+    async addWorkspaceUploadedFile(workspaceId, actorId, details) {
+      return write((next) => {
+        const workspace = accessibleWorkspace(next, workspaceId, actorId, 'contribute');
+        if (next.files.some((file) => workspace.fileIds.includes(file.id) && file.name === details.name)) {
+          throw new ApiError(409, 'NAME_CONFLICT', 'A file with this name is already in the workspace');
+        }
+        const createdAt = new Date().toISOString();
+        const file = { id: randomUUID(), name: details.name, folderId: ROOT_FOLDER_ID,
+          ownerId: workspace.ownerId, mimeType: details.mimeType, size: details.size,
+          createdAt, storageKey: details.storageKey, currentVersionId: randomUUID() };
+        next.files.push(file);
+        next.versions.push({ id: file.currentVersionId, fileId: file.id, name: file.name,
+          storageKey: file.storageKey, mimeType: file.mimeType, size: file.size,
+          createdAt, kind: 'uploaded', actorId, label: '' });
+        workspace.fileIds.push(file.id);
         return publicFile(file);
       });
     },
@@ -364,13 +692,13 @@ export async function openCatalog(path) {
       return [...new Set(state.versions.filter((version) => version.fileId === fileId)
         .map((version) => version.storageKey))];
     },
-    async replaceFile(fileId, ownerId, stored) {
+    async replaceFile(fileId, ownerId, stored, actorId = ownerId) {
       return write((next) => {
         const file = next.files.find((item) => item.id === fileId && item.ownerId === ownerId);
         if (!file) throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
         const version = { id: randomUUID(), fileId, name: file.name,
           storageKey: stored.storageKey, mimeType: file.mimeType, size: stored.size,
-          createdAt: new Date().toISOString(), kind: 'replaced', label: '' };
+          createdAt: new Date().toISOString(), kind: 'replaced', actorId, label: '' };
         next.versions.push(version);
         file.storageKey = version.storageKey;
         file.size = version.size;
@@ -439,7 +767,15 @@ export async function openCatalog(path) {
       return write((next) => {
         const index = next.files.findIndex((file) => file.id === fileId && file.ownerId === userId);
         if (index === -1) throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
+        if (next.snapshots.some((snapshot) => snapshot.items.some((item) => item.fileId === fileId))) {
+          throw new ApiError(409, 'FILE_IN_SNAPSHOT',
+            'This file is used by a snapshot; delete the snapshot first');
+        }
         next.files.splice(index, 1);
+        for (const workspace of next.workspaces) {
+          workspace.fileIds = workspace.fileIds.filter((id) => id !== fileId);
+          if (workspace.git?.archiveFileId === fileId) delete workspace.git;
+        }
         next.versions = next.versions.filter((version) => version.fileId !== fileId);
         next.shares = next.shares.filter((share) => share.fileId !== fileId);
         next.grants = next.grants.filter((grant) => grant.fileId !== fileId);
@@ -507,6 +843,10 @@ export async function openCatalog(path) {
         }
         next.grants = next.grants.filter((grant) => !(grant.fileId === fileId
           && grant.userId === recipientId));
+        const affectedSnapshots = new Set(next.snapshots.filter((snapshot) =>
+          snapshot.items.some((item) => item.fileId === fileId)).map((snapshot) => snapshot.id));
+        next.snapshotGrants = next.snapshotGrants.filter((grant) =>
+          !(grant.userId === recipientId && affectedSnapshots.has(grant.snapshotId)));
       });
     },
     listShared(userId) {
