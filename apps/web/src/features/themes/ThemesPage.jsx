@@ -1,32 +1,23 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import { DEFAULT_THEME_SETTINGS, THEME_FONTS, THEME_SPACINGS, routes,
   themeContrastIssues } from '../../../../../packages/shared/index.js';
 import { useAuth } from '../../app/AuthContext.jsx';
 import { useAppearance } from '../../app/AppearanceContext.jsx';
 import { api } from '../../shared/lib/api.js';
+import { ThemePreviewBanner, ThemeSample, colorLabels } from './ThemePreview.jsx';
 
-const colorLabels = {
-  background: 'Background', surface: 'Cards', text: 'Text', accent: 'Accent',
-};
-
-function ThemeSample({ settings }) {
-  return <div className="theme-sample" style={{
-    background: settings.colors.background, color: settings.colors.text,
-    fontFamily: `${settings.font}, sans-serif`,
-    padding: settings.spacing === 'compact' ? '0.7rem' : '1.15rem',
-  }} aria-hidden="true">
-    <div className="theme-sample-card" style={{ background: settings.colors.surface }}>
-      <strong>My files</strong>
-      <span>Project notes.pdf</span>
-      <i style={{ background: settings.colors.accent }} />
-    </div>
-  </div>;
+function galleryPath(offset, search) {
+  const params = new URLSearchParams({ offset: String(offset), limit: '20' });
+  const trimmed = search.trim();
+  if (trimmed) params.set('q', trimmed);
+  return `${routes.themes}?${params}`;
 }
 
 export function ThemesPage() {
   const { user } = useAuth();
-  const { appearance, loading, error: appearanceError, install, saveSettings, reset,
-    previewing, startPreview, stopPreview } = useAppearance();
+  const { appearance, loading, error: appearanceError, saving, install, saveSettings, reset,
+    previewing, startPreview, stopPreview, refresh } = useAppearance();
   const [themes, setThemes] = useState([]);
   const [nextOffset, setNextOffset] = useState(null);
   const [galleryError, setGalleryError] = useState('');
@@ -36,22 +27,46 @@ export function ThemesPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [draft, setDraft] = useState(DEFAULT_THEME_SETTINGS);
   const [name, setName] = useState('');
-  const [creatorName, setCreatorName] = useState('');
+  const [sourceTheme, setSourceTheme] = useState(null);
+  const [sourceMissing, setSourceMissing] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const draftIssues = themeContrastIssues(draft);
   const savedIssues = themeContrastIssues(appearance.settings);
 
   useEffect(() => { setDraft(structuredClone(appearance.settings)); }, [appearance]);
 
   useEffect(() => {
+    if (!appearance.sourceThemeId) {
+      setSourceTheme(null);
+      setSourceMissing(false);
+      return undefined;
+    }
     let active = true;
-    api(routes.themes)
+    setSourceTheme(null);
+    setSourceMissing(false);
+    api(routes.theme(appearance.sourceThemeId))
+      .then((theme) => { if (active) setSourceTheme(theme); })
+      .catch(() => { if (active) setSourceMissing(true); });
+    return () => { active = false; };
+  }, [appearance.sourceThemeId]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    let active = true;
+    setGalleryError('');
+    api(galleryPath(0, debouncedSearch))
       .then((page) => {
         if (active) { setThemes(page.themes); setNextOffset(page.nextOffset); }
       })
       .catch((caught) => { if (active) setGalleryError(caught.message); });
     return () => { active = false; };
-  }, []);
+  }, [debouncedSearch]);
 
   async function run(action, success) {
     setBusy(true);
@@ -71,7 +86,7 @@ export function ThemesPage() {
     setLoadingMore(true);
     setGalleryError('');
     try {
-      const page = await api(`${routes.themes}?offset=${nextOffset}&limit=20`);
+      const page = await api(galleryPath(nextOffset, debouncedSearch));
       setThemes((current) => [...current, ...page.themes]);
       setNextOffset(page.nextOffset);
     } catch (caught) {
@@ -90,12 +105,11 @@ export function ThemesPage() {
     await run(async () => {
       const theme = await api(routes.themes, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, creatorName, settings: appearance.settings }),
+        body: JSON.stringify({ name, settings: appearance.settings }),
       });
       setThemes((current) => [theme, ...current]);
       setNextOffset((current) => current === null ? null : current + 1);
       setName('');
-      setCreatorName('');
     }, 'Your current appearance is published in the gallery.');
   }
 
@@ -112,23 +126,27 @@ export function ThemesPage() {
   return <section className="themes-page">
     <h1>Themes</h1>
     <p className="muted">Install a community theme, adjust your own copy, and keep it for your next visit.</p>
-    {appearanceError && <p className="error" role="alert">Could not load your saved appearance: {appearanceError}</p>}
-    {actionError && <p className="error" role="alert">{actionError}</p>}
+    {appearanceError && <p className="error" role="alert">
+      {appearanceError}{' '}
+      <button type="button" className="btn-ghost" onClick={() => void refresh()}>Try again</button>
+    </p>}
+    {actionError && actionError !== appearanceError && <p className="error" role="alert">{actionError}</p>}
     {notice && <p className="success" role="status">{notice}</p>}
-    {previewing && <div className="theme-preview-banner" role="status">
-      <strong>Previewing {previewing.name}</strong>
-      <span>This view is temporary. Your saved appearance has not changed.</span>
-      <div className="theme-actions">
-        <button type="button" disabled={busy} onClick={() => run(() => install(previewing.id), `${previewing.name} is now your appearance.`)}>Install this theme</button>
-        <button type="button" className="btn-ghost" onClick={stopPreview}>Cancel preview</button>
-      </div>
-    </div>}
+    {previewing && <ThemePreviewBanner previewing={previewing} busy={busy || saving}
+      onInstall={() => run(() => install(previewing.id), `${previewing.name} is now your appearance.`)}
+      onCancel={stopPreview} />}
 
     <section className="theme-section" aria-labelledby="current-theme-title">
       <h2 id="current-theme-title">Your appearance</h2>
-      <p>{loading ? 'Loading your appearance…' : <>Using <strong>{appearance.name}</strong>{appearance.sourceThemeId ? ' (personal copy)' : ''}</>}</p>
+      <p>{loading ? 'Loading your appearance…' : <>Using <strong>{appearance.name}</strong>{
+        appearance.sourceThemeId && (sourceMissing
+          ? ' (based on a gallery theme that is no longer listed)'
+          : sourceTheme
+            ? <> (based on <Link to={`/themes/${encodeURIComponent(sourceTheme.id)}`}>{sourceTheme.name}</Link>)</>
+            : ' (personal copy)')
+      }</>}</p>
       <ThemeSample settings={appearance.settings} />
-      <div className="theme-actions"><button className="btn-ghost" type="button" disabled={busy || loading} onClick={() => run(reset, 'Default appearance restored.')}>Use default</button></div>
+      <div className="theme-actions"><button className="btn-ghost" type="button" disabled={busy || loading || saving} onClick={() => run(reset, 'Default appearance restored.')}>Use default</button></div>
     </section>
 
     <section className="theme-section" aria-labelledby="customize-title">
@@ -147,35 +165,43 @@ export function ThemesPage() {
       </div>
       <ThemeSample settings={draft} />
       {draftIssues.length > 0 && <p className="error" role="alert">{draftIssues.join('; ')}. Adjust the colors before saving.</p>}
-      <div className="theme-actions"><button type="button" disabled={busy || loading || draftIssues.length > 0} onClick={() => run(() => saveSettings(draft), 'Your appearance has been saved.')}>Save my changes</button></div>
+      <div className="theme-actions"><button type="button" disabled={busy || loading || saving || draftIssues.length > 0} aria-busy={saving} onClick={() => run(() => saveSettings(draft), 'Your appearance has been saved.')}>Save my changes</button></div>
     </section>
 
     <section className="theme-section" aria-labelledby="publish-title">
       <h2 id="publish-title">Share your design</h2>
-      <p className="muted">Publishing makes a snapshot of your saved appearance available to other signed-in users.</p>
+      <p className="muted">Publishing lists a snapshot as <strong>{user.displayName}</strong>. Changing accounts later does not rewrite themes already in the gallery.</p>
       <form className="theme-publish" onSubmit={publish}>
-        <label>Public creator name<input value={creatorName} onChange={(event) => setCreatorName(event.target.value)} maxLength={50} required /></label>
         <label>Theme name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} required /></label>
-        <button type="submit" disabled={busy || loading || savedIssues.length > 0}>Publish theme</button>
+        <button type="submit" disabled={busy || loading || saving || savedIssues.length > 0} aria-busy={busy}>Publish theme</button>
       </form>
       {savedIssues.length > 0 && <p className="error">Update your saved colors before publishing: {savedIssues.join('; ')}.</p>}
     </section>
 
     <section className="theme-section" aria-labelledby="gallery-title">
       <h2 id="gallery-title">Community gallery</h2>
+      <form className="theme-search" onSubmit={(event) => event.preventDefault()}>
+        <label htmlFor="theme-search">Search by name or creator</label>
+        <input id="theme-search" type="search" value={search} maxLength={80}
+          placeholder="Ocean, Alex…"
+          onChange={(event) => setSearch(event.target.value)} />
+      </form>
       {galleryError && <p className="error" role="alert">{galleryError}</p>}
-      {themes.length === 0 && !galleryError && <p className="muted">No themes published yet. Share yours to start the gallery.</p>}
+      {themes.length === 0 && !galleryError && <p className="muted">{debouncedSearch.trim()
+        ? 'No themes match that search.'
+        : 'No themes published yet. Share yours to start the gallery.'}</p>}
       <div className="theme-grid">{themes.map((theme) => <article className="theme-card" key={theme.id}>
         <ThemeSample settings={theme.settings} />
         <h3>{theme.name}</h3>
         <p className="muted">By {theme.creatorName || 'Community member'} · {new Date(theme.createdAt).toLocaleDateString()}</p>
-        <div className="theme-card-actions"><button type="button" className="btn-ghost" disabled={busy || loading} onClick={() => startPreview(theme)}>Preview</button>
-        <button type="button" disabled={busy || loading} onClick={() => run(() => install(theme.id), `${theme.name} is now your appearance.`)}>
+        <p><Link to={`/themes/${encodeURIComponent(theme.id)}`}>View details</Link></p>
+        <div className="theme-card-actions"><button type="button" className="btn-ghost" disabled={busy || loading || saving} onClick={() => startPreview(theme)}>Preview</button>
+        <button type="button" disabled={busy || loading || saving} onClick={() => run(() => install(theme.id), `${theme.name} is now your appearance.`)}>
           {appearance.sourceThemeId === theme.id ? 'Install again' : 'Install theme'}
         </button></div>
         {theme.creatorId === user.id && (confirmDeleteId === theme.id
           ? <div className="theme-remove-confirm"><span>Remove from gallery?</span>
-            <button type="button" className="btn-danger" disabled={busy} onClick={() => removeTheme(theme)}>Remove</button>
+            <button type="button" className="btn-danger" disabled={busy} aria-busy={busy} onClick={() => removeTheme(theme)}>Remove</button>
             <button type="button" className="btn-ghost" onClick={() => setConfirmDeleteId(null)}>Cancel</button></div>
           : <button type="button" className="btn-ghost theme-remove" disabled={busy} onClick={() => setConfirmDeleteId(theme.id)}>Remove my theme</button>)}
       </article>)}</div>

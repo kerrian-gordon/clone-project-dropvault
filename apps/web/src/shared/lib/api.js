@@ -1,3 +1,5 @@
+import { clearAllCachedAppearances } from '../../app/appearanceState.js';
+
 export async function api(path, options) {
   let response;
   try {
@@ -6,6 +8,7 @@ export async function api(path, options) {
     throw new Error('Cannot reach the API. Start it with npm run start:api.');
   }
 
+  if (response.status === 401) clearAllCachedAppearances();
   if (response.status === 204) return null;
   const body = await response.json().catch(() => null);
   if (!response.ok) {

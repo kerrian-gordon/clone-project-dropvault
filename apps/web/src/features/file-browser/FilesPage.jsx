@@ -114,7 +114,7 @@ function ItemActions({ item, type, onDeleted, onChanged }) {
       {type === 'file' && <span className="muted">Keep the file extension unchanged.</span>}
     </form> : confirming ? <>
       <span>Delete “{item.name}”?</span>
-      <button type="button" className="btn-danger" disabled={pending} onClick={remove}>{pending ? 'Deleting…' : 'Delete'}</button>
+      <button type="button" className="btn-danger" disabled={pending} aria-busy={pending} onClick={remove}>{pending ? 'Deleting…' : 'Delete'}</button>
       <button type="button" className="btn-ghost" disabled={pending} onClick={() => setConfirming(false)}>Cancel</button>
     </> : <>
       <button type="button" className="btn-ghost" onClick={openEditor}>Rename or move</button>

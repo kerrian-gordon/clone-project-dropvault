@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { routes } from '../../../../packages/shared/index.js';
 import { api } from '../shared/lib/api.js';
+import { clearCachedAppearance } from './appearanceState.js';
 
 const AuthContext = createContext(null);
 
@@ -17,12 +18,14 @@ export function AuthProvider({ children }) {
     return () => { active = false; };
   }, []);
 
-  async function signIn(mode, email, password) {
+  async function signIn(mode, email, password, displayName) {
     const account = await api(`/v1/auth/${mode}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(mode === 'register'
+        ? { email, password, displayName } : { email, password }),
     });
+    clearCachedAppearance(account.id);
     setUser(account);
   }
 

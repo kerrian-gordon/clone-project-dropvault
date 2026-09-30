@@ -2,9 +2,9 @@ export const THEME_FONTS = Object.freeze(['Inter', 'Arial', 'Georgia']);
 export const THEME_SPACINGS = Object.freeze(['compact', 'comfortable']);
 export const DEFAULT_THEME_SETTINGS = Object.freeze({
   colors: Object.freeze({
-    background: '#f3f5f7',
+    background: '#f7f5f2',
     surface: '#ffffff',
-    text: '#1b2330',
+    text: '#1e1919',
     accent: '#0061ff',
   }),
   font: 'Inter',
@@ -36,6 +36,27 @@ export function validThemeName(name) {
 export function validCreatorName(name) {
   return typeof name === 'string' && name.length <= 50 && name.trim().length > 0
     && !/[\u0000-\u001f\u007f]/u.test(name);
+}
+
+export function publicCreatorName(email) {
+  const separator = typeof email === 'string' ? email.indexOf('@') : -1;
+  const local = separator > 0 ? email.slice(0, separator) : '';
+  return validCreatorName(local) ? local : 'Community member';
+}
+
+export function uniqueDisplayName(requested, taken) {
+  const used = new Set((taken ?? []).filter((name) => typeof name === 'string')
+    .map((name) => name.toLowerCase()));
+  const base = typeof requested === 'string' ? requested.trim() : '';
+  if (!validCreatorName(base)) return null;
+  if (!used.has(base.toLowerCase())) return base;
+  for (let index = 2; index < 1000; index += 1) {
+    const suffix = `-${index}`;
+    const stem = base.slice(0, Math.max(1, 50 - suffix.length));
+    const candidate = `${stem}${suffix}`;
+    if (validCreatorName(candidate) && !used.has(candidate.toLowerCase())) return candidate;
+  }
+  return null;
 }
 
 function linearChannel(value) {

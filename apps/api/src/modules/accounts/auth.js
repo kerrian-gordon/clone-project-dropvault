@@ -16,9 +16,9 @@ export function createAuthLimiter() {
     attempts.set(key, fresh);
     return fresh;
   }
-  function check(key, limit) {
+  function check(key, limit, message = 'Too many authentication attempts; try again later') {
     if (entry(key).count >= limit) {
-      throw new ApiError(429, 'RATE_LIMITED', 'Too many authentication attempts; try again later');
+      throw new ApiError(429, 'RATE_LIMITED', message);
     }
   }
   function record(key) {
@@ -40,6 +40,12 @@ export function createAuthLimiter() {
     },
     successfulLogin(ip, email) {
       attempts.delete(`login-account:${ip}:${email}`);
+    },
+    themePublish(_ip, userId) {
+      // Per account, in-memory; the count resets when this API process restarts.
+      const key = `theme:${userId}`;
+      check(key, 10, 'Too many theme publishes; try again later');
+      record(key);
     },
   };
 }

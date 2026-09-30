@@ -180,7 +180,7 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
           throw new ApiError(400, 'INVALID_CREDENTIALS', 'Provide an email and password of at least 12 characters');
         }
         const user = await catalog.createUser(input.email.trim().toLowerCase(),
-          await hashPassword(input.password));
+          await hashPassword(input.password), input?.displayName);
         const token = await createSession(catalog, user.id);
         return json(response, 201, user, { 'Set-Cookie': sessionCookie(token, !!request.socket.encrypted) });
       }
@@ -235,16 +235,21 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       if (request.method === 'GET' && path === '/v1/themes') {
         const offset = url.searchParams.has('offset') ? Number(url.searchParams.get('offset')) : 0;
         const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 20;
+        const query = url.searchParams.get('q') ?? '';
         if (!Number.isSafeInteger(offset) || offset < 0
           || !Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
           throw new ApiError(400, 'INVALID_PAGE', 'Choose a non-negative offset and a limit from 1 to 50');
         }
-        return json(response, 200, catalog.listThemes(offset, limit));
+        if (typeof query !== 'string' || query.length > 80) {
+          throw new ApiError(400, 'INVALID_SEARCH', 'Search must be 80 characters or fewer');
+        }
+        return json(response, 200, catalog.listThemes(offset, limit, query));
       }
       if (request.method === 'POST' && path === '/v1/themes') {
+        authLimiter.themePublish(request.socket.remoteAddress, user.id);
         const input = await readJson(request);
         return json(response, 201, await catalog.createTheme(user.id, input?.name,
-          input?.settings, input?.creatorName));
+          input?.settings));
       }
       const themeMatch = /^\/v1\/themes\/([^/]+)$/u.exec(path);
       if (request.method === 'GET' && themeMatch) {

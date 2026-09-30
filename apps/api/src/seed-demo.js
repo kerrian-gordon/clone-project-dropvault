@@ -1,13 +1,21 @@
+import { execFile as execFileCb } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { access, link, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { access, link, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 import { MAX_UPLOAD_BYTES, ROOT_FOLDER_ID, SUPPORTED_UPLOAD_TYPES,
   themeContrastIssues, validCreatorName, validThemeName,
   validThemeSettings } from '../../../packages/shared/index.js';
 import { hashPassword, validPassword } from './modules/accounts/auth.js';
+import { apiListenOptions, listenApi } from './start.js';
 import { validateStoredFile } from './modules/uploads/validate.js';
 import { zipEntryNames } from './modules/uploads/zip.js';
+
+const execFile = promisify(execFileCb);
+const demoFreeLimitBytes = 104857600;
+const loopbackDemoPassword = 'correct horse battery staple';
 
 const defaultStorageRoot = fileURLToPath(new URL('../../../storage/', import.meta.url));
 const fixturePath = fileURLToPath(new URL('../../web/src/shared/data/mock-multi-user-drive.json', import.meta.url));
@@ -149,6 +157,16 @@ export async function seedDemoData({ storageRoot = defaultStorageRoot, password 
 
   const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
   const ids = new Set(fixture.users.map((user) => user.id));
+  const displayNames = new Set();
+  for (const user of fixture.users) {
+    if (user.displayName) {
+      if (!validCreatorName(user.displayName)
+        || displayNames.has(user.displayName.toLowerCase())) {
+        throw new Error(`Fixture user display name is invalid: ${user.email}`);
+      }
+      displayNames.add(user.displayName.toLowerCase());
+    }
+  }
   const folderIds = new Set(fixture.folders.map((folder) => folder.id));
   const fileIds = new Set(fixture.files.map((file) => file.id));
   for (const folder of fixture.folders) {
@@ -234,11 +252,102 @@ export async function seedDemoData({ storageRoot = defaultStorageRoot, password 
       .reduce((sum, usage) => sum + usage.usedBytes, 0), storageRoot };
 }
 
+function isLoopbackHost(host) {
+  const value = String(host).toLowerCase();
+  return value === '127.0.0.1' || value === 'localhost' || value === '::1'
+    || value === '::ffff:127.0.0.1';
+}
+
+function demoPassword(host) {
+  if (process.env.DROPVAULT_DEMO_PASSWORD) return process.env.DROPVAULT_DEMO_PASSWORD;
+  if (isLoopbackHost(host)) return loopbackDemoPassword;
+  throw new Error('Set DROPVAULT_DEMO_PASSWORD when the API is not bound to loopback');
+}
+
+function isNodeCommand(command) {
+  const name = String(command).trim().split(/[/\\]/).pop() || '';
+  return name === 'node' || name === 'node.exe';
+}
+
+async function commandForPid(pid) {
+  const { stdout } = await execFile('ps', ['-p', String(pid), '-o', 'comm=']);
+  return stdout.trim();
+}
+
+async function listenerPids(port) {
+  try {
+    const { stdout } = await execFile('lsof', [`-tiTCP:${port}`, '-sTCP:LISTEN']);
+    return stdout.trim().split(/\s+/).filter(Boolean);
+  } catch (error) {
+    if (error.code === 1 && !String(error.stdout || '').trim()) return [];
+    throw error;
+  }
+}
+
+async function stopNodeListener(port) {
+  const pids = await listenerPids(port);
+  if (!pids.length) return;
+  const processes = [];
+  for (const pid of pids) {
+    const command = await commandForPid(pid);
+    processes.push({ pid, command });
+    console.log(`Listener on :${port}: pid ${pid} command ${command || '(unknown)'}`);
+  }
+  const foreign = processes.filter((entry) => !isNodeCommand(entry.command));
+  if (foreign.length) {
+    throw new Error(`Refusing to stop non-node listener on :${port} (${
+      foreign.map((entry) => `${entry.command || 'unknown'} pid ${entry.pid}`).join(', ')
+    })`);
+  }
+  for (const { pid, command } of processes) {
+    console.log(`Stopping ${command} on :${port} (pid ${pid})`);
+    process.kill(Number(pid), 'SIGTERM');
+  }
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (!(await listenerPids(port)).length) return;
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+  }
+  throw new Error(`Port ${port} is still in use`);
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   if (process.env.NODE_ENV === 'production') throw new Error('Demo seeding is disabled in production');
-  const password = process.env.DROPVAULT_DEMO_PASSWORD || randomBytes(18).toString('base64url');
-  const result = await seedDemoData({ storageRoot: process.env.DROPVAULT_STORAGE_DIR || defaultStorageRoot, password });
+  const resetting = process.argv.includes('--reset');
+  const listen = apiListenOptions(resetting ? { storageLimitBytes: demoFreeLimitBytes } : {});
+  if (resetting) {
+    await stopNodeListener(listen.port);
+    const leftover = await listenerPids(listen.port);
+    if (leftover.length) {
+      throw new Error(`Port ${listen.port} is still in use`);
+    }
+  }
+  const password = resetting
+    ? demoPassword(listen.host)
+    : (process.env.DROPVAULT_DEMO_PASSWORD || randomBytes(18).toString('base64url'));
+  const storageRoot = resetting
+    ? await mkdtemp(join(tmpdir(), 'dropvault-demo-'))
+    : (process.env.DROPVAULT_STORAGE_DIR || defaultStorageRoot);
+  const result = await seedDemoData({ storageRoot, password });
   console.log(`Seeded ${result.users.length} demo accounts, ${result.folders} folders and ${result.files} files in ${result.storageRoot}`);
   console.log(`Sign in as ${result.users.join(' or ')} with password: ${password}`);
-  console.log('For the fixture\'s 100 MiB free cap, set DROPVAULT_STORAGE_LIMIT_BYTES=104857600 before starting the API.');
+  if (!resetting) {
+    console.log('For the fixture\'s 100 MiB free cap, set DROPVAULT_STORAGE_LIMIT_BYTES=104857600 before starting the API.');
+  } else {
+    try {
+      const leftover = await listenerPids(listen.port);
+      if (leftover.length) throw new Error(`Port ${listen.port} is still in use`);
+      const { server } = await listenApi({ storageRoot, storageLimitBytes: demoFreeLimitBytes });
+      console.log(`100 MiB free cap. Demo data: ${storageRoot}`);
+      const stop = () => {
+        server.close();
+        server.closeAllConnections?.();
+        rm(storageRoot, { recursive: true, force: true }).finally(() => process.exit(0));
+      };
+      process.once('SIGINT', stop);
+      process.once('SIGTERM', stop);
+    } catch (error) {
+      await rm(storageRoot, { recursive: true, force: true });
+      throw error;
+    }
+  }
 }

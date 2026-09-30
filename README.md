@@ -2,11 +2,11 @@
 
 Starting point for a Dropbox-style document app. The shared contract and local API are implemented. The React web app has account entry, owned and shared file listings, a multi-file picker and drop area with per-file progress and errors, a storage meter, owner-only deletion, named-account access management, a demo-plan upgrade and retry prompt for storage-limit errors, and a viewer with previews for common browser-supported formats. Bearer-link sharing UI remains to be built.
 
+The Themes page lets signed-in users preview and install community themes, search by name or creator, open a theme's details (what it can change, and that it cannot access files), customize their own saved appearance, and publish a snapshot with a public creator name. Creators can remove gallery entries without removing anyone's installed copy. The API checks color contrast when saving or publishing. The web app loads each account's appearance after sign-in and applies its colors, font, and spacing on later visits. See [the theme contract](docs/api.md#themes-and-saved-appearance). Umer's storefront requirements excerpt (what the PRD asks versus this prototype) is [Section 3](docs/community-theme-storefront-section-3.md).
+
 Owners can upload a new version of an existing file, name revisions, preview or download older bytes, compare text versions, and restore an older version as a new current revision. File IDs, folders, and grants remain stable. History does not expire by date in this prototype, but every retained revision counts toward storage usage; deleting an unpinned file removes all its revisions. See [the API contract](docs/api.md#file-model-and-limits).
 
 Workspaces collect project files. Owners can invite viewers and contributors; contributors upload and replace files against the owner's quota. Owners save fixed snapshots of selected exact versions. Members can download a complete snapshot as a TAR archive, or copy it into a new workspace under their own account and quota. A workspace can link an uploaded `git archive` ZIP to the commit label in its ZIP comment, and snapshots retain that code and data link. This label is uploader supplied and is not verified against GitHub. See [workspace and snapshot endpoints](docs/api.md#workspaces-and-snapshots).
-
-The Themes page lets signed-in users preview and install community themes, customize their own saved appearance, and publish a snapshot with a public creator name. Creators can remove gallery entries without removing anyone's installed copy. The API checks color contrast when saving or publishing. The web app loads each account's appearance after sign-in and applies its colors, font, and spacing on later visits. See [the theme contract](docs/api.md#themes-and-saved-appearance).
 
 ```text
 apps/
