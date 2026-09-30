@@ -1,13 +1,14 @@
 /** @typedef {{ id: string, name: string, parentId: string, ownerId: string, createdAt: string }} Folder */
 /** @typedef {{ id: string, name: string, folderId: string, ownerId: string, mimeType: string, size: number, createdAt: string }} FileRecord */
-/** @typedef {{ id: string, email: string, tier: 'free' | 'demo', createdAt: string }} User */
+/** @typedef {{ id: string, email: string, displayName: string, tier: 'free' | 'demo', createdAt: string }} User */
 /** @typedef {{ usedBytes: number, limitBytes: number, tier: 'free' | 'demo' }} StorageUsage */
 /** @typedef {{ colors: { background: string, surface: string, text: string, accent: string }, font: 'Inter' | 'Arial' | 'Georgia', spacing: 'compact' | 'comfortable' }} ThemeSettings */
 /** @typedef {{ id: string, creatorId: string, creatorName: string, name: string, settings: ThemeSettings, createdAt: string }} Theme */
 /** @typedef {{ sourceThemeId: string | null, name: string, settings: ThemeSettings, selectedAt: string | null, updatedAt: string | null }} Appearance */
 
 export { DEFAULT_THEME_SETTINGS, THEME_FONTS, THEME_SPACINGS, contrastRatio,
-  themeContrastIssues, validCreatorName, validThemeName, validThemeSettings } from './themes.js';
+  publicCreatorName, themeContrastIssues, uniqueDisplayName, validCreatorName, validThemeName,
+  validThemeSettings } from './themes.js';
 
 export const ROOT_FOLDER_ID = 'root';
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;

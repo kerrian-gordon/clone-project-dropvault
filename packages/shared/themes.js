@@ -38,6 +38,27 @@ export function validCreatorName(name) {
     && !/[\u0000-\u001f\u007f]/u.test(name);
 }
 
+export function publicCreatorName(email) {
+  const separator = typeof email === 'string' ? email.indexOf('@') : -1;
+  const local = separator > 0 ? email.slice(0, separator) : '';
+  return validCreatorName(local) ? local : 'Community member';
+}
+
+export function uniqueDisplayName(requested, taken) {
+  const used = new Set((taken ?? []).filter((name) => typeof name === 'string')
+    .map((name) => name.toLowerCase()));
+  const base = typeof requested === 'string' ? requested.trim() : '';
+  if (!validCreatorName(base)) return null;
+  if (!used.has(base.toLowerCase())) return base;
+  for (let index = 2; index < 1000; index += 1) {
+    const suffix = `-${index}`;
+    const stem = base.slice(0, Math.max(1, 50 - suffix.length));
+    const candidate = `${stem}${suffix}`;
+    if (validCreatorName(candidate) && !used.has(candidate.toLowerCase())) return candidate;
+  }
+  return null;
+}
+
 function linearChannel(value) {
   const channel = value / 255;
   return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;

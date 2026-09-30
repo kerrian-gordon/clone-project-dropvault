@@ -149,6 +149,16 @@ export async function seedDemoData({ storageRoot = defaultStorageRoot, password 
 
   const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
   const ids = new Set(fixture.users.map((user) => user.id));
+  const displayNames = new Set();
+  for (const user of fixture.users) {
+    if (user.displayName) {
+      if (!validCreatorName(user.displayName)
+        || displayNames.has(user.displayName.toLowerCase())) {
+        throw new Error(`Fixture user display name is invalid: ${user.email}`);
+      }
+      displayNames.add(user.displayName.toLowerCase());
+    }
+  }
   const folderIds = new Set(fixture.folders.map((folder) => folder.id));
   const fileIds = new Set(fixture.files.map((file) => file.id));
   for (const folder of fixture.folders) {

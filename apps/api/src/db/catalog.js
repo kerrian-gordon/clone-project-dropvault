@@ -1,8 +1,8 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { DEFAULT_THEME_SETTINGS, ROOT_FOLDER_ID, themeContrastIssues, validCreatorName, validThemeName,
-  validThemeSettings } from '../../../../packages/shared/index.js';
+import { DEFAULT_THEME_SETTINGS, ROOT_FOLDER_ID, publicCreatorName, themeContrastIssues, uniqueDisplayName,
+  validCreatorName, validThemeName, validThemeSettings } from '../../../../packages/shared/index.js';
 import { ApiError } from '../routes/errors.js';
 
 const MAX_THEMES_PER_ACCOUNT = 20;
@@ -43,6 +43,16 @@ export async function openCatalog(path) {
     throw new Error('Invalid account catalog');
   }
   for (const theme of state.themes) theme.creatorName ??= 'Community member';
+  const takenNames = [];
+  for (const user of state.users) {
+    if (validCreatorName(user.displayName)) takenNames.push(user.displayName);
+  }
+  for (const user of state.users) {
+    if (validCreatorName(user.displayName)) continue;
+    user.displayName = uniqueDisplayName(publicCreatorName(user.email), takenNames)
+      ?? 'Community member';
+    takenNames.push(user.displayName);
+  }
 
   let pending = Promise.resolve();
   function write(change) {
@@ -78,12 +88,21 @@ export async function openCatalog(path) {
     referencedStorageKeys() {
       return state.files.map((file) => file.storageKey);
     },
-    async createUser(email, passwordHash) {
+    async createUser(email, passwordHash, requestedName) {
       return write((next) => {
         if (next.users.some((user) => user.email === email)) {
           throw new ApiError(409, 'ACCOUNT_EXISTS', 'Account already exists');
         }
-        const user = { id: randomUUID(), email, passwordHash, tier: 'free',
+        const requested = typeof requestedName === 'string' && requestedName.trim()
+          ? requestedName.trim() : publicCreatorName(email);
+        if (!validCreatorName(requested)) {
+          throw new ApiError(400, 'INVALID_DISPLAY_NAME', 'Provide a public display name');
+        }
+        const displayName = uniqueDisplayName(requested, next.users.map((user) => user.displayName));
+        if (!displayName) {
+          throw new ApiError(400, 'INVALID_DISPLAY_NAME', 'Provide a public display name');
+        }
+        const user = { id: randomUUID(), email, passwordHash, displayName, tier: 'free',
           createdAt: new Date().toISOString() };
         next.users.push(user);
         return publicUser(user);
@@ -149,11 +168,8 @@ export async function openCatalog(path) {
       if (!theme) throw new ApiError(404, 'THEME_NOT_FOUND', 'Theme was not found');
       return theme;
     },
-    async createTheme(creatorId, name, settings, creatorName = 'Community member') {
+    async createTheme(creatorId, name, settings) {
       if (!validThemeName(name)) throw new ApiError(400, 'INVALID_THEME_NAME', 'Provide a valid theme name');
-      if (!validCreatorName(creatorName)) {
-        throw new ApiError(400, 'INVALID_CREATOR_NAME', 'Provide a valid creator name');
-      }
       if (!validThemeSettings(settings)) {
         throw new ApiError(400, 'INVALID_THEME_SETTINGS', 'Provide supported theme settings');
       }
@@ -161,6 +177,11 @@ export async function openCatalog(path) {
         throw new ApiError(400, 'INVALID_THEME_CONTRAST', themeContrastIssues(settings).join('; '));
       }
       return write((next) => {
+        const creator = next.users.find((item) => item.id === creatorId);
+        const creatorName = creator?.displayName;
+        if (!validCreatorName(creatorName)) {
+          throw new ApiError(400, 'INVALID_DISPLAY_NAME', 'Provide a public display name');
+        }
         if (next.themes.filter((theme) => theme.creatorId === creatorId).length
           >= MAX_THEMES_PER_ACCOUNT) {
           throw new ApiError(409, 'THEME_LIMIT_REACHED', 'Theme publishing limit reached');

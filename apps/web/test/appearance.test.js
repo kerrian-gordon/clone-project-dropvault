@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_THEME_SETTINGS } from '../../../packages/shared/index.js';
+import { DEFAULT_THEME_SETTINGS, uniqueDisplayName } from '../../../packages/shared/index.js';
 import { appearanceCacheKey, applyThemeToRoot, clearAllCachedAppearances, clearCachedAppearance,
   defaultAppearance, deriveAppearance, parseCachedAppearance, previewAfterNavigation,
   readCachedAppearance, safeSettings, shouldRefreshOnVisible, VISIBLE_REFRESH_MS,
@@ -187,6 +187,12 @@ test('visibility refetch waits a minute between tab switches', () => {
   const justNow = 1_000_000;
   assert.equal(shouldRefreshOnVisible(justNow, justNow + 1_000), false);
   assert.equal(shouldRefreshOnVisible(justNow, justNow + VISIBLE_REFRESH_MS), true);
+});
+
+test('display names stay unique with a short suffix', () => {
+  assert.equal(uniqueDisplayName('Alex', []), 'Alex');
+  assert.equal(uniqueDisplayName('Alex', ['Alex']), 'Alex-2');
+  assert.equal(uniqueDisplayName('alex', ['Alex']), 'alex-2');
 });
 
 test('a 401 can clear every cached appearance on the machine', () => {

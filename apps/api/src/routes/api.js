@@ -168,7 +168,7 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
           throw new ApiError(400, 'INVALID_CREDENTIALS', 'Provide an email and password of at least 12 characters');
         }
         const user = await catalog.createUser(input.email.trim().toLowerCase(),
-          await hashPassword(input.password));
+          await hashPassword(input.password), input?.displayName);
         const token = await createSession(catalog, user.id);
         return json(response, 201, user, { 'Set-Cookie': sessionCookie(token, !!request.socket.encrypted) });
       }
@@ -234,9 +234,10 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         return json(response, 200, catalog.listThemes(offset, limit, query));
       }
       if (request.method === 'POST' && path === '/v1/themes') {
+        authLimiter.themePublish(request.socket.remoteAddress, user.id);
         const input = await readJson(request);
         return json(response, 201, await catalog.createTheme(user.id, input?.name,
-          input?.settings, input?.creatorName));
+          input?.settings));
       }
       const themeMatch = /^\/v1\/themes\/([^/]+)$/u.exec(path);
       if (request.method === 'GET' && themeMatch) {

@@ -3,12 +3,14 @@
     {
       "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
       "email": "alex@example.test",
+      "displayName": "Alex",
       "tier": "free",
       "createdAt": "2026-09-01T09:00:00.000Z"
     },
     {
       "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2",
       "email": "blair@example.test",
+      "displayName": "Blair",
       "tier": "free",
       "createdAt": "2026-09-02T09:00:00.000Z"
     }
