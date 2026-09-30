@@ -1,0 +1,8 @@
+{
+  "purpose": "First untouched preamble-CSV source check after the rule was written",
+  "samples": [
+    {"id":"giss-global","filename":"giss-global.csv","source_group":"nasa-giss","url":"https://data.giss.nasa.gov/gistemp/tabledata_v4/GLB.Ts%2BdSST.csv"},
+    {"id":"giss-north","filename":"giss-north.csv","source_group":"nasa-giss","url":"https://data.giss.nasa.gov/gistemp/tabledata_v4/NH.Ts%2BdSST.csv"},
+    {"id":"giss-south","filename":"giss-south.csv","source_group":"nasa-giss","url":"https://data.giss.nasa.gov/gistemp/tabledata_v4/SH.Ts%2BdSST.csv"}
+  ]
+}

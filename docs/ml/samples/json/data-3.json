@@ -1,0 +1,8 @@
+{
+  "nested": {
+    "settings": {
+      "enabled": true,
+      "limit": 12
+    }
+  }
+}

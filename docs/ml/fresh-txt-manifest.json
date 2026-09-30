@@ -1,0 +1,61 @@
+{
+    "purpose":  "Unseen plain-text negatives for the revised CSV rule",
+    "label_status":  "pending human review",
+    "samples":  [
+                    {
+                        "sample_id":  "gnu-gpl",
+                        "relative_path":  "docs/ml/fresh-txt-files/gnu-gpl.txt",
+                        "sha256":  "3972DC9744F6499F0F9B2DBF76696F2AE7AD8AF9B23DDE66D6AF86C9DFB36986",
+                        "bytes":  35149,
+                        "format_label":  "TXT",
+                        "source_group":  "gnu-licenses",
+                        "source_url":  "https://www.gnu.org/licenses/gpl-3.0.txt",
+                        "split":  "fresh_txt_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "python-license",
+                        "relative_path":  "docs/ml/fresh-txt-files/python-license.txt",
+                        "sha256":  "B0E25A78CFFB43F4D92DE8B61CCFA1F1F98ECBC22330B54B5251E7B6BA010231",
+                        "bytes":  13804,
+                        "format_label":  "TXT",
+                        "source_group":  "cpython",
+                        "source_url":  "https://raw.githubusercontent.com/python/cpython/main/LICENSE",
+                        "split":  "fresh_txt_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "node-license",
+                        "relative_path":  "docs/ml/fresh-txt-files/node-license.txt",
+                        "sha256":  "37110192CD7621A80510E2F2630AE08F0420F97257D4AE1C4D51C11261F1F4B7",
+                        "bytes":  154607,
+                        "format_label":  "TXT",
+                        "source_group":  "nodejs",
+                        "source_url":  "https://raw.githubusercontent.com/nodejs/node/main/LICENSE",
+                        "split":  "fresh_txt_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "go-license",
+                        "relative_path":  "docs/ml/fresh-txt-files/go-license.txt",
+                        "sha256":  "911F8F5782931320F5B8D1160A76365B83AEA6447EE6C04FA6D5591467DB9DAD",
+                        "bytes":  1453,
+                        "format_label":  "TXT",
+                        "source_group":  "golang-go",
+                        "source_url":  "https://raw.githubusercontent.com/golang/go/master/LICENSE",
+                        "split":  "fresh_txt_holdout",
+                        "review_status":  "pending"
+                    },
+                    {
+                        "sample_id":  "rust-mit",
+                        "relative_path":  "docs/ml/fresh-txt-files/rust-mit.txt",
+                        "sha256":  "B71BD43A069CA0641A9ECFE585CA7B3C53B5CC1608F8B68321168698E28B5EA1",
+                        "bytes":  1068,
+                        "format_label":  "TXT",
+                        "source_group":  "rust-lang",
+                        "source_url":  "https://raw.githubusercontent.com/rust-lang/rust/master/LICENSE-MIT",
+                        "split":  "fresh_txt_holdout",
+                        "review_status":  "pending"
+                    }
+                ]
+}
