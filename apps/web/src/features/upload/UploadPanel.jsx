@@ -5,7 +5,7 @@ import { formatBytes } from '../../shared/components/StorageMeter.jsx';
 import { useUploads } from './UploadContext.jsx';
 
 export function UploadPanel({ folderId, usage, refreshUsage }) {
-  const { jobs, enqueue, chooseDestination, retry } = useUploads();
+  const { jobs, enqueue, chooseDestination, retry, dismiss } = useUploads();
   const { user, changePlan, demoPlanSwitchEnabled } = useAuth();
   const input = useRef(null);
   const upgradeDialog = useRef(null);
@@ -31,6 +31,11 @@ export function UploadPanel({ folderId, usage, refreshUsage }) {
     upgradeDialog.current?.close();
     setUpgradeJobId(null);
     setUpgradeError('');
+  }
+
+  function removeJob(id) {
+    if (upgradeJobId === id) closeUpgrade();
+    dismiss(id);
   }
 
   async function upgradeAndRetry() {
@@ -94,7 +99,7 @@ export function UploadPanel({ folderId, usage, refreshUsage }) {
       onDragEnd={resetDragState}
       onDrop={onDrop}>
       <p><strong>Drop files here</strong> or choose them from your device.</p>
-      <button type="button" onClick={() => input.current?.click()}>Choose files</button>
+      <button type="button" className="btn-ghost" onClick={() => input.current?.click()}>Choose files</button>
       <input ref={input} className="visually-hidden" type="file" multiple accept={accept}
         aria-label="Choose files to upload" onChange={(event) => { addFiles(event.target.files); event.target.value = ''; }} />
       <p className="muted">PDF, Office documents, text, images, audio, video and archives · 100 MiB per file</p>
@@ -118,10 +123,12 @@ export function UploadPanel({ folderId, usage, refreshUsage }) {
                 : job.status === 'queued' ? `Waiting${job.destinationName ? ` for ${job.destinationName}` : ''}`
                   : `${job.progress}% uploaded${job.destinationName ? ` to ${job.destinationName}` : ''}`}
         </p>
-        {job.status === 'failed' && job.code !== 'CLIENT_VALIDATION' && <button type="button" className="btn-ghost" onClick={() => retry(job.id)}>Retry</button>}
-        {job.code === 'STORAGE_CAP_EXCEEDED' && <div className="cap-actions">
-          <p className="muted">This file stays in the queue until you refresh or log out. {user.tier === 'free' && demoPlanSwitchEnabled ? 'Free space and retry, or switch to the demo plan.' : 'Free space, then retry.'}</p>
-          {user.tier === 'free' && demoPlanSwitchEnabled && <button type="button" onClick={() => { setUpgradeError(''); setUpgradeJobId(job.id); }}>Upgrade storage</button>}
+        {job.code === 'STORAGE_CAP_EXCEEDED' && <p className="muted">This file stays in the queue until you remove it, refresh, or log out. {user.tier === 'free' && demoPlanSwitchEnabled ? 'Free space and retry, switch to the demo plan, or remove it.' : 'Free space and retry, or remove it.'}</p>}
+        {job.status === 'failed' && <div className="upload-job-actions">
+          {job.code !== 'CLIENT_VALIDATION' && <button type="button" className="btn-ghost" onClick={() => retry(job.id)}>Retry</button>}
+          {job.code === 'STORAGE_CAP_EXCEEDED' && user.tier === 'free' && demoPlanSwitchEnabled && <button type="button" onClick={() => { setUpgradeError(''); setUpgradeJobId(job.id); }}>Upgrade storage</button>}
+          <button type="button" className="btn-ghost" onClick={() => removeJob(job.id)}
+            aria-label={`Remove ${job.name} from the upload queue`}>Remove</button>
         </div>}
       </li>)}</ul>
     </div>}
@@ -135,6 +142,8 @@ export function UploadPanel({ folderId, usage, refreshUsage }) {
       {upgradeError && <p className="error" role="alert">{upgradeError}</p>}
       <div className="dialog-actions">
         <button type="button" className="btn-ghost" disabled={upgradePending} onClick={closeUpgrade}>Cancel</button>
+        <button type="button" className="btn-ghost" disabled={upgradePending}
+          onClick={() => { const id = upgradeJobId; closeUpgrade(); if (id != null) dismiss(id); }}>Remove from queue</button>
         {user.tier === 'free' && demoPlanSwitchEnabled && <button type="button" disabled={upgradePending || !demoHasSpace} onClick={upgradeAndRetry}>
           {upgradePending ? 'Upgrading…' : 'Switch to demo and retry'}
         </button>}

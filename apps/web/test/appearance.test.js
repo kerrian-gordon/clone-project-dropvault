@@ -11,6 +11,7 @@ const customSettings = {
   colors: { background: '#111827', surface: '#1f2937', text: '#f5f7fa', accent: '#80b5ff' },
   font: 'Georgia',
   spacing: 'compact',
+  texture: 'grain',
 };
 const customAppearance = {
   sourceThemeId: 'theme-1', name: 'Ocean', settings: customSettings,
@@ -115,6 +116,7 @@ test('preview clears when leaving /themes', () => {
 test('unsafe settings are rejected before they reach CSS variables', () => {
   assert.equal(safeSettings(customSettings), true);
   assert.equal(safeSettings({ ...customSettings, spacing: 'huge' }), false);
+  assert.equal(safeSettings({ ...customSettings, texture: 'photo' }), false);
   assert.equal(safeSettings({
     ...customSettings, colors: { ...customSettings.colors, background: 'red; } body { display:none' },
   }), false);
@@ -126,6 +128,7 @@ test('unsafe settings are rejected before they reach CSS variables', () => {
   });
   assert.equal(root.props['--paper'], DEFAULT_THEME_SETTINGS.colors.background);
   assert.equal(root.dataset.themeSpacing, DEFAULT_THEME_SETTINGS.spacing);
+  assert.equal(root.dataset.themeTexture, DEFAULT_THEME_SETTINGS.texture);
 });
 
 test('unmodified default appearance leaves the stylesheet in charge', () => {
@@ -135,12 +138,14 @@ test('unmodified default appearance leaves the stylesheet in charge', () => {
   applyThemeToRoot(root, { followStylesheet: true, settings: DEFAULT_THEME_SETTINGS });
   assert.equal(root.props['--paper'], undefined);
   assert.equal(root.dataset.themeSpacing, undefined);
+  assert.equal(root.dataset.themeTexture, undefined);
 });
 
 test('custom compact spacing is written to the root dataset', () => {
   const root = fakeRoot();
   applyThemeToRoot(root, { followStylesheet: false, settings: customSettings });
   assert.equal(root.dataset.themeSpacing, 'compact');
+  assert.equal(root.dataset.themeTexture, 'grain');
   assert.equal(root.props['--ink'], customSettings.colors.text);
 });
 

@@ -1,6 +1,6 @@
 /* DropVault - Dropbox-style pass.
    Keeps every existing selector and the theme variable contract
-   (--ink, --paper, --card, --accent, --accent-contrast, --app-font, data-theme-spacing).
+   (--ink, --paper, --card, --accent, --accent-contrast, --app-font, data-theme-spacing, data-theme-texture).
    Section 2 (shell) is NEW and only applies once the JSX uses those classes.
    v2: Inter weights match 450/550/650 as loaded; status colors adapt to dark themes;
    secondary and ghost buttons share one look; row actions stay visible while confirming. */
@@ -31,9 +31,16 @@
   --r-card: 12px;  /* cards, panels, dialogs */
   --r-ctl: 8px;    /* inputs, nav items, chips */
   --r-btn: 8px;    /* set to 100px for pill buttons like the marketing site */
+  --paper-texture: none;
+  --paper-texture-size: auto;
+  --paper-texture-position: 0 0;
   font-family: var(--app-font);
   color: var(--ink);
-  background: var(--paper);
+  background-color: var(--paper);
+  background-image: var(--paper-texture);
+  background-size: var(--paper-texture-size);
+  background-position: var(--paper-texture-position);
+  background-repeat: repeat;
   line-height: 1.45;
 }
 * { box-sizing: border-box; }
@@ -71,11 +78,15 @@ button[aria-busy="true"] { cursor: wait; }
   position: sticky; top: 0; height: 100vh;
   display: flex; flex-direction: column; gap: 2px;
   padding: 1rem 0.75rem;
-  background: var(--paper);
+  background-color: var(--paper);
+  background-image: var(--paper-texture);
+  background-size: var(--paper-texture-size);
+  background-position: var(--paper-texture-position);
+  background-repeat: repeat;
   border-right: 1px solid var(--line);
 }
 .sidebar .brand { padding: 0.25rem 0.75rem 1rem; font-size: 1.15rem; }
-.sidebar .create { margin: 0 0.25rem 1rem; text-align: center; }
+.sidebar .create { margin: 0 0.25rem 1rem; width: calc(100% - 0.5rem); text-align: center; }
 .sidebar nav { display: grid; gap: 2px; }
 .sidebar nav a {
   display: flex; align-items: center; gap: 0.65rem;
@@ -86,14 +97,20 @@ button[aria-busy="true"] { cursor: wait; }
 }
 .sidebar nav a:hover { background: var(--hover); }
 .sidebar nav a.active { background: var(--tint); color: var(--accent-ink); font-weight: 650; }
-.sidebar .storage-meter { margin: auto 0 0; padding: 0.75rem; }
+.sidebar-storage { margin: auto 0 0; }
+.sidebar .storage-meter { padding: 0.75rem; }
+.sidebar-plan-switch { margin: 0 0.25rem 0.5rem; width: calc(100% - 0.5rem); }
 .shell-main { min-width: 0; }
 .shell-top {
   position: sticky; top: 0; z-index: 3;
   display: flex; align-items: center; gap: 1rem;
   min-height: var(--top-h);
   padding: var(--top-pad) 1.5rem;
-  background: var(--paper);
+  background-color: var(--paper);
+  background-image: var(--paper-texture);
+  background-size: var(--paper-texture-size);
+  background-position: var(--paper-texture-position);
+  background-repeat: repeat;
   border-bottom: 1px solid var(--line);
 }
 .shell-search { flex: 1; max-width: 640px; }
@@ -242,8 +259,9 @@ h1 { margin: 0.4rem 0 0.75rem; font-size: 1.6rem; letter-spacing: -0.02em; font-
 .share-form { display: flex; align-items: end; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
 .share-form label { width: 100%; font-size: 0.85rem; color: var(--muted); }
 .share-form input { padding: 0.55rem 0.7rem; border: 1px solid var(--line); border-radius: var(--r-ctl); flex: 1; min-width: 12rem; background: var(--card); color: var(--ink); }
-.cap-actions { margin-top: 0.5rem; }
-.cap-actions button { margin-top: 0.2rem; }
+.sidebar .storage-meter { font-size: 0.8rem; }
+.sidebar .storage-meter .meter-label { margin: 0.4rem 0 0; }
+.upload-job-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.45rem; }
 .upgrade-dialog {
   width: min(30rem, calc(100% - 2rem));
   padding: 1.5rem;
@@ -301,7 +319,13 @@ h1 { margin: 0.4rem 0 0.75rem; font-size: 1.6rem; letter-spacing: -0.02em; font-
 .theme-section { margin: 1.2rem 0; padding: 1.1rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
 .theme-section h2 { margin: 0 0 0.5rem; font-size: 1.1rem; font-weight: 650; }
 .theme-section p { margin: 0.45rem 0 0.85rem; }
-.theme-sample { border-radius: var(--r-card); border: 1px solid var(--line); min-height: 110px; display: grid; align-items: center; }
+.theme-sample {
+  border-radius: var(--r-card); border: 1px solid var(--line); min-height: 110px; display: grid; align-items: center;
+  background-image: var(--paper-texture);
+  background-size: var(--paper-texture-size);
+  background-position: var(--paper-texture-position);
+  background-repeat: repeat;
+}
 .theme-sample-card { display: grid; gap: 0.4rem; padding: 0.65rem; border-radius: var(--r-ctl); max-width: 240px; }
 .theme-sample-card span { font-size: 0.82rem; }
 .theme-sample-card i { display: block; width: 40%; height: 8px; border-radius: 4px; }
@@ -341,7 +365,45 @@ h1 { margin: 0.4rem 0 0.75rem; font-size: 1.6rem; letter-spacing: -0.02em; font-
 .theme-token-list dd { margin: 0; display: flex; align-items: center; gap: 0.45rem; }
 .theme-swatch { width: 1rem; height: 1rem; border-radius: 4px; border: 1px solid var(--line); display: inline-block; }
 
-/* ---------- 9. Spacing modes (unchanged contract) ---------- */
+/* ---------- 9. Background textures ---------- */
+:root[data-theme-texture="none"],
+.theme-sample[data-theme-texture="none"] {
+  --paper-texture: none;
+  --paper-texture-size: auto;
+  --paper-texture-position: 0 0;
+}
+:root[data-theme-texture="paper"],
+.theme-sample[data-theme-texture="paper"] {
+  --paper-texture:
+    repeating-linear-gradient(0deg, rgb(0 0 0 / 0.05) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.07) 0 1px, transparent 1px 8px);
+  --paper-texture-size: auto;
+  --paper-texture-position: 0 0;
+}
+:root[data-theme-texture="linen"],
+.theme-sample[data-theme-texture="linen"] {
+  --paper-texture:
+    repeating-linear-gradient(45deg, rgb(0 0 0 / 0.055) 0 1px, transparent 1px 9px),
+    repeating-linear-gradient(-45deg, rgb(255 255 255 / 0.06) 0 1px, transparent 1px 9px);
+  --paper-texture-size: auto;
+  --paper-texture-position: 0 0;
+}
+:root[data-theme-texture="grain"],
+.theme-sample[data-theme-texture="grain"] {
+  --paper-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.16'/%3E%3C/svg%3E");
+  --paper-texture-size: 180px 180px;
+  --paper-texture-position: 0 0;
+}
+:root[data-theme-texture="dots"],
+.theme-sample[data-theme-texture="dots"] {
+  --paper-texture:
+    radial-gradient(circle, rgb(0 0 0 / 0.16) 0.65px, transparent 0.85px),
+    radial-gradient(circle, rgb(255 255 255 / 0.1) 0.55px, transparent 0.75px);
+  --paper-texture-size: 11px 11px, 11px 11px;
+  --paper-texture-position: 0 0, 5px 5px;
+}
+
+/* ---------- 10. Spacing modes (unchanged contract) ---------- */
 :root[data-theme-spacing="compact"] { --top-pad: 0.45rem; }
 :root[data-theme-spacing="compact"] .content { margin-top: 1rem; }
 :root[data-theme-spacing="compact"] .row-main { padding: 0.4rem 0.7rem; }
@@ -352,12 +414,13 @@ h1 { margin: 0.4rem 0 0.75rem; font-size: 1.6rem; letter-spacing: -0.02em; font-
 :root[data-theme-spacing="comfortable"] .theme-section { padding: 1.1rem; margin: 1.2rem 0; }
 :root[data-theme-spacing="comfortable"] .sidebar nav a { padding: 0.5rem 0.75rem; }
 
-/* ---------- 10. Responsive and motion ---------- */
+/* ---------- 11. Responsive and motion ---------- */
 @media (max-width: 800px) {
   .shell { grid-template-columns: 1fr; }
   .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; border-right: 0; border-bottom: 1px solid var(--line); }
   .sidebar nav { display: flex; flex-wrap: wrap; }
-  .sidebar .storage-meter { flex: 1 0 100%; margin: 0; padding: 0.25rem 0.75rem; }
+  .sidebar-storage, .sidebar .storage-meter { flex: 1 0 100%; margin: 0; padding: 0.25rem 0.75rem; }
+  .sidebar-plan-switch { width: auto; margin: 0 0.25rem 0.5rem; }
   .shell-top { padding: var(--top-pad) 1rem; }
 }
 @media (max-width: 650px) {

@@ -28,11 +28,13 @@ Before starting the API on a **fresh, empty** local storage directory, run:
 npm run seed:demo
 ```
 
-The command imports two fake accounts and real sample file bytes. It prints one generated password for `alex@example.test` and `blair@example.test`; save it for local testing. Passwords are hashed in the catalog and are absent from the JSON fixture. Alex owns three files and grants Blair access to `Project-brief.pdf`. The PDF, MP4, PPTX, and TXT samples can be downloaded; the PDF, video, and text can be previewed. Alex's seeded usage begins at 100 MiB.
+The command imports two fake accounts and real sample file bytes. On loopback it uses the password `correct horse battery staple` unless `DROPVAULT_DEMO_PASSWORD` is set. Passwords are hashed in the catalog and are absent from the JSON fixture. Alex owns three files and grants Blair access to `Project-brief.pdf`. The PDF, MP4, PPTX, and TXT samples can be downloaded; the PDF, video, and text can be previewed. Alex's seeded usage begins at 100 MiB.
 
 The seed refuses to run when `storage/catalog.json` or stored files already exist. To preserve existing data, set `DROPVAULT_STORAGE_DIR` to a **new empty directory** for both seeding and starting the API. The seed is disabled with `NODE_ENV=production`. Do not use the demo accounts for real data.
 
-To reproduce the blocked-upload and local Demo tier flow, start the API with `DROPVAULT_STORAGE_LIMIT_BYTES=104857600` and `DROPVAULT_ENABLE_DEMO_PLAN_SWITCH=1`. The unpaid tier switch is unavailable with S3 storage or `NODE_ENV=production`; public upgrades need a real entitlement or billing flow.
+`npm run reset:demo` reseeds into a temp directory, starts the API with a 100 MiB cap, and turns **on** the local unpaid Demo upgrade switch. Open `http://127.0.0.1:5173/login` after `npm run dev:web`. Stopping that process deletes the temp catalog.
+
+To start the API yourself for the blocked-upload flow, set `DROPVAULT_STORAGE_LIMIT_BYTES=104857600` and `DROPVAULT_ENABLE_DEMO_PLAN_SWITCH=1`. The unpaid tier switch is unavailable with S3 storage or `NODE_ENV=production`; public upgrades need a real entitlement or billing flow.
 
 ## Storage and configuration
 

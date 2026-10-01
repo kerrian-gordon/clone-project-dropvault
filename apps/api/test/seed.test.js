@@ -47,9 +47,12 @@ test('demo seed creates usable accounts, downloads, grants, and quota flow', asy
     });
     assert.equal(themeResponse.status, 201);
     const gallery = await (await request(alexCookie, '/v1/themes')).json();
-    assert.equal(gallery.total, 3);
+    assert.equal(gallery.total, 6);
     assert.ok(gallery.themes.some((item) => item.name === 'Midnight' && item.creatorName === 'Blair'));
     assert.ok(gallery.themes.some((item) => item.name === 'Ocean blue' && item.creatorName === 'Alex'));
+    assert.ok(gallery.themes.some((item) => item.name === 'Forest' && item.creatorName === 'Alex'));
+    assert.ok(gallery.themes.some((item) => item.name === 'Clay' && item.creatorName === 'Blair'));
+    assert.ok(gallery.themes.some((item) => item.name === 'Ink' && item.creatorName === 'Alex'));
     const blairStartingAppearance = await (await request(blairCookie, '/v1/account/appearance')).json();
     assert.equal(blairStartingAppearance.name, 'Ocean blue');
     assert.equal(blairStartingAppearance.settings.colors.accent, '#b34739');

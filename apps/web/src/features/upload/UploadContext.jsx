@@ -44,9 +44,11 @@ export function UploadProvider({ children }) {
   const queue = useRef([]);
   const processing = useRef(false);
   const currentRequest = useRef(null);
+  const currentJobId = useRef(null);
   const nextId = useRef(0);
   const active = useRef(true);
   const decided = useRef(new Set());
+  const dismissed = useRef(new Set());
 
   const update = useCallback((id, change) => {
     setJobs((previous) => previous.map((job) => job.id === id ? { ...job, ...change } : job));
@@ -57,15 +59,22 @@ export function UploadProvider({ children }) {
     processing.current = true;
     while (queue.current.length) {
       const job = queue.current.shift();
+      if (dismissed.current.has(job.id)) continue;
+      currentJobId.current = job.id;
       update(job.id, { status: 'uploading', progress: 0 });
       try {
         await upload(job.file, job.folderId, (progress) => update(job.id, { progress }),
           (request) => { currentRequest.current = request; });
-        update(job.id, { status: 'success', progress: 100, file: null });
-        setCompletedVersion((version) => version + 1);
+        if (!dismissed.current.has(job.id)) {
+          update(job.id, { status: 'success', progress: 100, file: null });
+          setCompletedVersion((version) => version + 1);
+        }
       } catch (error) {
-        update(job.id, { status: 'failed', error: error.message, code: error.code });
+        if (!dismissed.current.has(job.id)) {
+          update(job.id, { status: 'failed', error: error.message, code: error.code });
+        }
       } finally {
+        if (currentJobId.current === job.id) currentJobId.current = null;
         currentRequest.current = null;
       }
     }
@@ -87,7 +96,7 @@ export function UploadProvider({ children }) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: job.name, currentFolderId: folderId }),
       }).then(({ suggestion }) => {
-        if (!active.current) return;
+        if (!active.current || dismissed.current.has(job.id)) return;
         if (suggestion) {
           update(job.id, { status: 'suggested', suggestion });
         } else {
@@ -96,7 +105,7 @@ export function UploadProvider({ children }) {
           void processQueue();
         }
       }).catch(() => {
-        if (!active.current) return;
+        if (!active.current || dismissed.current.has(job.id)) return;
         update(job.id, { status: 'queued' });
         queue.current.push(job);
         void processQueue();
@@ -106,7 +115,7 @@ export function UploadProvider({ children }) {
 
   const chooseDestination = useCallback((id, accept) => {
     const job = jobs.find((item) => item.id === id);
-    if (!job || job.status !== 'suggested' || decided.current.has(id)) return;
+    if (!job || job.status !== 'suggested' || decided.current.has(id) || dismissed.current.has(id)) return;
     decided.current.add(id);
     const folderId = accept ? job.suggestion.folderId : job.sourceFolderId;
     update(id, { status: 'queued', folderId,
@@ -121,17 +130,26 @@ export function UploadProvider({ children }) {
 
   const retry = useCallback((id) => {
     const job = jobs.find((item) => item.id === id);
-    if (!job || job.status !== 'failed' || job.code === 'CLIENT_VALIDATION') return;
+    if (!job || job.status !== 'failed' || job.code === 'CLIENT_VALIDATION' || dismissed.current.has(id)) return;
     update(id, { status: 'queued', progress: 0, error: '', code: '' });
     queue.current.push(job);
     void processQueue();
   }, [jobs, processQueue, update]);
 
+  const dismiss = useCallback((id) => {
+    if (dismissed.current.has(id)) return;
+    dismissed.current.add(id);
+    decided.current.delete(id);
+    queue.current = queue.current.filter((job) => job.id !== id);
+    if (currentJobId.current === id) currentRequest.current?.abort();
+    setJobs((previous) => previous.filter((job) => job.id !== id));
+  }, []);
+
   useEffect(() => {
     active.current = true;
     return () => { active.current = false; currentRequest.current?.abort(); queue.current = []; };
   }, []);
-  return <UploadContext.Provider value={{ jobs, enqueue, chooseDestination, retry, completedVersion }}>{children}</UploadContext.Provider>;
+  return <UploadContext.Provider value={{ jobs, enqueue, chooseDestination, retry, dismiss, completedVersion }}>{children}</UploadContext.Provider>;
 }
 
 export function useUploads() { return useContext(UploadContext); }

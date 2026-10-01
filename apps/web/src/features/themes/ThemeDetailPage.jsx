@@ -7,6 +7,7 @@ import { ThemePreviewBanner, ThemeSample, colorLabels } from './ThemePreview.jsx
 
 const surfaceCopy = [
   ['Colors', 'Background, cards, text, and accent. Nothing else.'],
+  ['Background texture', 'A repeating paper, linen, grain, or dotted overlay on the page color. Themes cannot upload photos.'],
   ['Typography', 'A font from the approved list (Inter, Arial, or Georgia).'],
   ['Spacing', 'Compact or comfortable padding on lists and pages.'],
 ];
@@ -66,12 +67,13 @@ export function ThemeDetailPage() {
         <ul className="theme-surface-list">
           {surfaceCopy.map(([title, detail]) => <li key={title}><strong>{title}.</strong> {detail}</li>)}
         </ul>
-        <p>A theme cannot read your files, passwords, or account email. It only sets approved colors, font, and spacing.</p>
+        <p>A theme cannot read your files, passwords, or account email. It only sets approved colors, texture, font, and spacing.</p>
         <dl className="theme-token-list">
           {Object.entries(colorLabels).map(([key, label]) => <div key={key}>
             <dt>{label}</dt>
             <dd><span className="theme-swatch" style={{ background: theme.settings.colors[key] }} /> {theme.settings.colors[key]}</dd>
           </div>)}
+          <div><dt>Texture</dt><dd>{theme.settings.texture}</dd></div>
           <div><dt>Font</dt><dd>{theme.settings.font}</dd></div>
           <div><dt>Spacing</dt><dd>{theme.settings.spacing}</dd></div>
         </dl>

@@ -1,4 +1,4 @@
-import { WARN_THRESHOLD } from '../lib/useStorage.js';
+import { WARN_THRESHOLD } from '../lib/useStorage.jsx';
 
 export function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
