@@ -259,8 +259,7 @@ h1 { margin: 0.4rem 0 0.75rem; font-size: 1.6rem; letter-spacing: -0.02em; font-
 .share-form input { padding: 0.55rem 0.7rem; border: 1px solid var(--line); border-radius: var(--r-ctl); flex: 1; min-width: 12rem; background: var(--card); color: var(--ink); }
 .sidebar .storage-meter { font-size: 0.8rem; }
 .sidebar .storage-meter .meter-label { margin: 0.4rem 0 0; }
-.cap-actions { margin-top: 0.5rem; }
-.cap-actions button { margin-top: 0.2rem; }
+.upload-job-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.45rem; }
 .upgrade-dialog {
   width: min(30rem, calc(100% - 2rem));
   padding: 1.5rem;
