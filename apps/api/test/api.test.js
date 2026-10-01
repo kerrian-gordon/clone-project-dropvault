@@ -168,6 +168,13 @@ test('demo plan startup setting rejects an exposed host or S3 backend', async ()
     demoPlanSwitchEnabled: true }), /cannot be enabled with S3/u);
 });
 
+test('reset-style listen options enable the local demo plan switch', () => {
+  const options = apiListenOptions({ storageLimitBytes: 104857600, demoPlanSetting: '1' });
+  assert.equal(options.demoPlanSwitchEnabled, true);
+  assert.equal(options.storageLimitBytes, 104857600);
+  assert.equal(apiListenOptions({ demoPlanSwitchEnabled: true }).demoPlanSwitchEnabled, true);
+});
+
 async function stop(server) {
   server.closeAllConnections();
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

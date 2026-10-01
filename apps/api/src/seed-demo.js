@@ -313,7 +313,9 @@ async function stopNodeListener(port) {
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   if (process.env.NODE_ENV === 'production') throw new Error('Demo seeding is disabled in production');
   const resetting = process.argv.includes('--reset');
-  const listen = apiListenOptions(resetting ? { storageLimitBytes: demoFreeLimitBytes } : {});
+  const listen = apiListenOptions(resetting
+    ? { storageLimitBytes: demoFreeLimitBytes, demoPlanSetting: '1' }
+    : {});
   if (resetting) {
     await stopNodeListener(listen.port);
     const leftover = await listenerPids(listen.port);
@@ -321,7 +323,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       throw new Error(`Port ${listen.port} is still in use`);
     }
   }
-  const password = resetting
+  const password = (resetting || isLoopbackHost(listen.host))
     ? demoPassword(listen.host)
     : (process.env.DROPVAULT_DEMO_PASSWORD || randomBytes(18).toString('base64url'));
   const storageRoot = resetting
@@ -336,8 +338,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     try {
       const leftover = await listenerPids(listen.port);
       if (leftover.length) throw new Error(`Port ${listen.port} is still in use`);
-      const { server } = await listenApi({ storageRoot, storageLimitBytes: demoFreeLimitBytes });
-      console.log(`100 MiB free cap. Demo data: ${storageRoot}`);
+      const { server } = await listenApi({
+        storageRoot, storageLimitBytes: demoFreeLimitBytes, demoPlanSetting: '1',
+      });
+      console.log('100 MiB free cap. Demo plan upgrade switch is on.');
+      console.log('Open http://127.0.0.1:5173/login');
+      console.log(`Demo data: ${storageRoot}`);
       const stop = () => {
         server.close();
         server.closeAllConnections?.();

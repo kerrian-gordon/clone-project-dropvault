@@ -31,12 +31,12 @@ Use Node.js 24. From a fresh checkout, run these from the repository root:
 ```sh
 npm install
 npm --prefix apps/web install
-npm run seed:demo
 ```
 
-The seed command prints a generated password for `alex@example.test` and `blair@example.test`. It creates sample file bytes in local storage and refuses to overwrite existing data. Start these in **separate terminals**:
+On a **fresh** checkout, seed once, then start API and web in separate terminals:
 
 ```sh
+npm run seed:demo
 npm run dev:api
 ```
 
@@ -44,11 +44,13 @@ npm run dev:api
 npm run dev:web
 ```
 
-Open the URL printed by Vite, usually `http://127.0.0.1:5173`. On Windows PowerShell, use `npm.cmd` if `npm` is blocked by the shell's script policy. The [Mac setup guide](docs/mac-frontend-setup.md) gives first-time instructions.
+On loopback, the printed password is `correct horse battery staple` unless you set `DROPVAULT_DEMO_PASSWORD`. Seed refuses to overwrite existing data.
+
+For a live click-through, skip those three commands and run `npm run reset:demo` instead. It reseeds a temp catalog, starts the API at the 100 MiB free cap with the local Demo upgrade switch on, and prints the same loopback password. In a second terminal run only `npm run dev:web`. Open `http://127.0.0.1:5173/login`. Vite is pinned to that port so a second copy fails instead of moving to 5174. On Windows PowerShell, use `npm.cmd` if `npm` is blocked. The [Mac setup guide](docs/mac-frontend-setup.md) has first-time instructions.
 
 **Five-minute walkthrough:**
 
-1. Sign in as Alex and open **My files**. Preview a sample file, then drop a small TXT or CSV file into the upload area.
+1. Sign in as Alex and open **My files**. Preview a sample file. Alex starts at the free cap, so dropping another file shows the upgrade prompt when the Demo switch is on.
 2. Open **Workspaces**, create a project, add an owned file, select it, and save a snapshot. Open the snapshot to download its TAR archive or copy it into a new workspace.
 3. Return to a file's viewer to inspect version history or create a share link. Sign in as Blair to see the sample file shared with that account.
 4. Open **Themes** and install a community theme; sign out and back in to see the saved appearance.

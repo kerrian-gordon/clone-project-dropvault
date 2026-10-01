@@ -23,7 +23,11 @@ export function apiListenOptions(overrides = {}) {
   if (!['local', 's3'].includes(storageBackend)) {
     throw new Error('DROPVAULT_STORAGE_BACKEND must be local or s3');
   }
-  const demoPlanSetting = overrides.demoPlanSetting ?? process.env.DROPVAULT_ENABLE_DEMO_PLAN_SWITCH ?? '0';
+  let demoPlanSetting = overrides.demoPlanSetting;
+  if (demoPlanSetting === undefined && typeof overrides.demoPlanSwitchEnabled === 'boolean') {
+    demoPlanSetting = overrides.demoPlanSwitchEnabled ? '1' : '0';
+  }
+  demoPlanSetting ??= process.env.DROPVAULT_ENABLE_DEMO_PLAN_SWITCH ?? '0';
   if (!['0', '1'].includes(demoPlanSetting)) {
     throw new Error('DROPVAULT_ENABLE_DEMO_PLAN_SWITCH must be 0 or 1');
   }

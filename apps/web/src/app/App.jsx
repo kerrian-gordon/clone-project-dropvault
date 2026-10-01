@@ -177,6 +177,7 @@ function AuthPage({ mode }) {
         {error && <p className="error" role="alert">{error}</p>}
         <button type="submit" disabled={pending}>{pending ? 'Please wait…' : registering ? 'Create account' : 'Log in'}</button>
       </form>
+      <p className="muted">Dropvault runs on this computer. There is no public site.</p>
       <p>{registering ? 'Already have an account?' : 'New to Dropvault?'}{' '}
         <Link to={registering ? '/login' : '/register'} state={location.state}>{registering ? 'Log in' : 'Create one'}</Link>
       </p>
@@ -185,7 +186,11 @@ function AuthPage({ mode }) {
 }
 
 function NotFoundPage() {
-  return <main className="centered"><h1>Page not found</h1><Link to="/files">Go to my files</Link></main>;
+  return <main className="centered">
+    <h1>Page not found</h1>
+    <p className="muted">Dropvault is a local app. A public website is not deployed.</p>
+    <Link to="/files">Go to my files</Link>
+  </main>;
 }
 
 export function App() {
