@@ -10,6 +10,7 @@ import { UploadProvider, useUploads } from '../features/upload/UploadContext.jsx
 import { ThemesPage } from '../features/themes/ThemesPage.jsx';
 import { ThemeDetailPage } from '../features/themes/ThemeDetailPage.jsx';
 import { WorkspacesPage, WorkspacePage, SnapshotPage } from '../features/workspaces/WorkspacesPage.jsx';
+import { DemoPlanSwitch } from '../shared/components/DemoPlanSwitch.jsx';
 import { StorageMeter } from '../shared/components/StorageMeter.jsx';
 import { StorageProvider, useStorage } from '../shared/lib/useStorage.jsx';
 import { filesNavCurrent, workspacesNavCurrent } from './navCurrent.js';
@@ -84,7 +85,7 @@ function SignedInShell({ user, filesActive, workspacesActive, onLogout }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { enqueue } = useUploads();
-  const { usage, error } = useStorage();
+  const { usage, error, refreshUsage } = useStorage();
   const input = useRef(null);
   const folderMatch = useMatch('/folders/:id');
   const folderId = folderMatch?.params.id || ROOT_FOLDER_ID;
@@ -121,7 +122,10 @@ function SignedInShell({ user, filesActive, workspacesActive, onLogout }) {
             aria-current={workspacesActive ? 'page' : undefined}
           >Workspaces</Link>
         </nav>
-        <StorageMeter usage={usage} error={error} />
+        <div className="sidebar-storage">
+          <StorageMeter usage={usage} error={error} />
+          <DemoPlanSwitch usage={usage} refreshUsage={refreshUsage} />
+        </div>
       </aside>
       <div className="shell-main">
         <header className="shell-top">
