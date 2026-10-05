@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: dropvault-freemium-demo
+    runtime: docker
+    plan: 0.5c-512mb
+    autoDeployTrigger: off
+    healthCheckPath: /v1/health
+    disk:
+      name: dropvault-demo-data
+      mountPath: /data
+      sizeGB: 2
+    envVars:
+      - key: DROPVAULT_DEMO_ACCESS_PASSWORD
+        sync: false
+      - key: DROPVAULT_DEMO_PASSWORD
+        sync: false

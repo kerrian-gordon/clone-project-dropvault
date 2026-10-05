@@ -18,6 +18,9 @@ test('hosted demo requires an explicit volume, gate, seeded-account password, an
     DROPVAULT_DEMO_ACCESS_PASSWORD: gatePassword, DROPVAULT_DEMO_PASSWORD: accountPassword,
     DROPVAULT_PUBLIC_BASE_URL: 'https://demo.example.test' };
   assert.equal(hostedDemoOptions(good).secureSessionCookies, true);
+  assert.equal(hostedDemoOptions({ ...good, DROPVAULT_PUBLIC_BASE_URL: '',
+    RENDER_EXTERNAL_URL: 'https://dropvault-freemium-demo.onrender.com' }).publicBaseUrl,
+    'https://dropvault-freemium-demo.onrender.com');
   assert.throws(() => hostedDemoOptions({ ...good, DROPVAULT_STORAGE_DIR: '' }), /persistent-volume/u);
   assert.throws(() => hostedDemoOptions({ ...good, DROPVAULT_DEMO_ACCESS_PASSWORD: 'short' }), /32 characters/u);
   assert.throws(() => hostedDemoOptions({ ...good, DROPVAULT_DEMO_PASSWORD: 'short' }), /12 to 1024/u);

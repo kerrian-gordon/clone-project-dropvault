@@ -12,7 +12,7 @@ export function hostedDemoOptions(env = process.env) {
   const storageRoot = env.DROPVAULT_STORAGE_DIR;
   const accessPassword = env.DROPVAULT_DEMO_ACCESS_PASSWORD;
   const accountPassword = env.DROPVAULT_DEMO_PASSWORD;
-  const publicBaseUrl = env.DROPVAULT_PUBLIC_BASE_URL;
+  const publicBaseUrl = env.DROPVAULT_PUBLIC_BASE_URL || env.RENDER_EXTERNAL_URL;
   const host = env.DROPVAULT_HOST || '0.0.0.0';
   const port = Number(env.PORT || 3000);
   if (!storageRoot || !isAbsolute(storageRoot)) {
@@ -24,7 +24,7 @@ export function hostedDemoOptions(env = process.env) {
   if (!validPassword(accountPassword)) {
     throw new Error('DROPVAULT_DEMO_PASSWORD must have 12 to 1024 characters');
   }
-  if (!publicBaseUrl) throw new Error('DROPVAULT_PUBLIC_BASE_URL is required');
+  if (!publicBaseUrl) throw new Error('DROPVAULT_PUBLIC_BASE_URL or RENDER_EXTERNAL_URL is required');
   const url = new URL(publicBaseUrl);
   const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
   if ((url.protocol !== 'https:' && !(loopback && url.protocol === 'http:'))
