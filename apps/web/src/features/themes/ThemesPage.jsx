@@ -19,6 +19,7 @@ export function ThemesPage() {
   const { appearance, loading, error: appearanceError, saving, install, saveSettings, reset,
     previewing, startPreview, stopPreview, refresh } = useAppearance();
   const [themes, setThemes] = useState([]);
+  const [library, setLibrary] = useState({ installed: [], published: [] });
   const [nextOffset, setNextOffset] = useState(null);
   const [galleryError, setGalleryError] = useState('');
   const [actionError, setActionError] = useState('');
@@ -36,6 +37,13 @@ export function ThemesPage() {
   const savedIssues = themeContrastIssues(appearance.settings);
 
   useEffect(() => { setDraft(structuredClone(appearance.settings)); }, [appearance]);
+
+  useEffect(() => {
+    let active = true;
+    api(routes.myThemes).then((value) => { if (active) setLibrary(value); })
+      .catch((caught) => { if (active) setActionError(caught.message); });
+    return () => { active = false; };
+  }, [appearance.sourceThemeId, themes.length]);
 
   useEffect(() => {
     if (!appearance.sourceThemeId) {
@@ -120,7 +128,7 @@ export function ThemesPage() {
       setNextOffset((current) => current === null ? null : Math.max(0, current - 1));
       setConfirmDeleteId(null);
       if (previewing?.id === theme.id) stopPreview();
-    }, 'Theme removed from the gallery. Installed personal copies are kept.');
+    }, 'Theme unlisted. Existing users can keep using it.');
   }
 
   return <section className="themes-page">
@@ -146,7 +154,26 @@ export function ThemesPage() {
             : ' (personal copy)')
       }</>}</p>
       <ThemeSample settings={appearance.settings} />
-      <div className="theme-actions"><button className="btn-ghost" type="button" disabled={busy || loading || saving} onClick={() => run(reset, 'Default appearance restored.')}>Use default</button></div>
+      <div className="theme-actions"><button className="btn-ghost" type="button" disabled={busy || loading || saving} onClick={() => run(reset, 'Default appearance restored.')}>Use default anytime</button></div>
+    </section>
+
+    <section className="theme-section" aria-labelledby="my-themes-title">
+      <h2 id="my-themes-title">My themes</h2>
+      <p className="muted">Themes you have installed or published. You can switch back to an installed theme even if its creator unlists it.</p>
+      <h3>Installed</h3>
+      {library.installed.length === 0 && <p className="muted">No community themes installed yet.</p>}
+      {library.installed.map((theme) => <div className="theme-actions" key={`installed-${theme.id}`}>
+        <span>{theme.name}{theme.unlistedAt ? ' (unlisted)' : ''}</span>
+        <button type="button" className="btn-ghost" disabled={busy || loading || saving}
+          onClick={() => run(() => install(theme.id), `${theme.name} is now your appearance.`)}>Use theme</button>
+      </div>)}
+      <h3>Published</h3>
+      {library.published.length === 0 && <p className="muted">You have not published a theme.</p>}
+      {library.published.map((theme) => <div className="theme-actions" key={`published-${theme.id}`}>
+        <span>{theme.name}{theme.unlistedAt ? ' (unlisted)' : ' (in gallery)'}</span>
+        <button type="button" className="btn-ghost" disabled={busy || loading || saving}
+          onClick={() => run(() => install(theme.id), `${theme.name} is now your appearance.`)}>Use theme</button>
+      </div>)}
     </section>
 
     <section className="theme-section" aria-labelledby="customize-title">
@@ -200,10 +227,10 @@ export function ThemesPage() {
           {appearance.sourceThemeId === theme.id ? 'Install again' : 'Install theme'}
         </button></div>
         {theme.creatorId === user.id && (confirmDeleteId === theme.id
-          ? <div className="theme-remove-confirm"><span>Remove from gallery?</span>
-            <button type="button" className="btn-danger" disabled={busy} aria-busy={busy} onClick={() => removeTheme(theme)}>Remove</button>
+          ? <div className="theme-remove-confirm"><span>Unlist from gallery? Existing copies stay available.</span>
+            <button type="button" className="btn-danger" disabled={busy} aria-busy={busy} onClick={() => removeTheme(theme)}>Unlist</button>
             <button type="button" className="btn-ghost" onClick={() => setConfirmDeleteId(null)}>Cancel</button></div>
-          : <button type="button" className="btn-ghost theme-remove" disabled={busy} onClick={() => setConfirmDeleteId(theme.id)}>Remove my theme</button>)}
+          : <button type="button" className="btn-ghost theme-remove" disabled={busy} onClick={() => setConfirmDeleteId(theme.id)}>Unlist my theme</button>)}
       </article>)}</div>
       {nextOffset !== null && <button type="button" className="btn-ghost" disabled={loadingMore} onClick={loadMore}>Load more themes</button>}
     </section>

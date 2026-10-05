@@ -31,4 +31,5 @@ build/
 /docs/ml/preamble-csv-files/
 /docs/ml/fresh-txt-files/
 /docs/ml/holdout-v2-files/
+/docs/ml/private-folder-data/
 __pycache__/

@@ -1,0 +1,291 @@
+{
+    "description":  "Synthetic plumbing fixture only; no real user labels or accuracy evidence.",
+    "examples":  [
+                     {
+                         "accountId":  "synthetic-lab",
+                         "observedAt":  "2026-01-01T12:00:00Z",
+                         "name":  "beach.jpg",
+                         "currentFolderId":  "root",
+                         "targetFolderId":  "photos",
+                         "folders":  [
+                                         {
+                                             "id":  "photos",
+                                             "name":  "Photos"
+                                         },
+                                         {
+                                             "id":  "documents",
+                                             "name":  "Documents"
+                                         },
+                                         {
+                                             "id":  "lab",
+                                             "name":  "Lab Data"
+                                         }
+                                     ],
+                         "labelSource":  "synthetic"
+                     },
+                     {
+                         "accountId":  "synthetic-lab",
+                         "observedAt":  "2026-01-02T12:00:00Z",
+                         "name":  "sunset.png",
+                         "currentFolderId":  "root",
+                         "targetFolderId":  "photos",
+                         "folders":  [
+                                         {
+                                             "id":  "photos",
+                                             "name":  "Photos"
+                                         },
+                                         {
+                                             "id":  "documents",
+                                             "name":  "Documents"
+                                         },
+                                         {
+                                             "id":  "lab",
+                                             "name":  "Lab Data"
+                                         }
+                                     ],
+                         "labelSource":  "synthetic"
+                     },
+                     {
+                         "accountId":  "synthetic-lab",
+                         "observedAt":  "2026-01-03T12:00:00Z",
+                         "name":  "draft-notes.txt",
+                         "currentFolderId":  "root",
+                         "targetFolderId":  "documents",
+                         "folders":  [
+                                         {
+                                             "id":  "photos",
+                                             "name":  "Photos"
+                                         },
+                                         {
+                                             "id":  "documents",
+                                             "name":  "Documents"
+                                         },
+                                         {
+                                             "id":  "lab",
+                                             "name":  "Lab Data"
+                                         }
+                                     ],
+                         "labelSource":  "synthetic"
+                     },
+                     {
+                         "accountId":  "synthetic-lab",
+                         "observedAt":  "2026-01-04T12:00:00Z",
+                         "name":  "meeting-brief.pdf",
+                         "currentFolderId":  "root",
+                         "targetFolderId":  "documents",
+                         "folders":  [
+                                         {
+                                             "id":  "photos",
+                                             "name":  "Photos"
+                                         },
+                                         {
+                                             "id":  "documents",
+                                             "name":  "Documents"
+                                         },
+                                         {
+                                             "id":  "lab",
+                                             "name":  "Lab Data"
+                                         }
+                                     ],
+                         "labelSource":  "synthetic"
+                     },
+                     {
+                         "accountId":  "synthetic-lab",
+                         "observedAt":  "2026-01-05T12:00:00Z",
+                         "name":  "microscopy-cells.csv",
+                         "currentFolderId":  "root",
+                         "targetFolderId":  "lab",
+                         "folders":  [
+                                         {
+                                             "id":  "photos",
+                                             "name":  "Photos"
+                                         },
+                                         {
+                                             "id":  "documents",
+                                             "name":  "Documents"
+                                         },
+                                         {
+                                             "id":  "lab",
+                                             "name":  "Lab Data"
+                                         }
+                                     ],
+                         "labelSource":  "synthetic"
+                     },
+                     {
+                         "accountId":  "synthetic-lab",
+                         "observedAt":  "2026-01-06T12:00:00Z",
+                         "name":  "microscopy-counts.json",
+                         "currentFolderId":  "root",
+                         "targetFolderId":  "lab",
+                         "folders":  [
+                                         {
+                                             "id":  "photos",
+                                             "name":  "Photos"
+                                         },
+                                         {
+                                             "id":  "documents",
+                                             "name":  "Documents"
+                                         },
+                                         {
+                                             "id":  "lab",
+                                             "name":  "Lab Data"
+                                         }
+                                     ],
+                         "labelSource":  "synthetic"
+                     },
+                     {
+                         "accountId":  "synthetic-lab",
+                         "observedAt":  "2026-01-11T12:00:00Z",
+                         "name":  "portrait.jpg",
+                         "currentFolderId":  "root",
+                         "targetFolderId":  "photos",
+                         "folders":  [
+                                         {
+                                             "id":  "photos",
+                                             "name":  "Photos"
+                                         },
+                                         {
+                                             "id":  "documents",
+                                             "name":  "Documents"
+                                         },
+                                         {
+                                             "id":  "lab",
+                                             "name":  "Lab Data"
+                                         }
+                                     ],
+                         "labelSource":  "synthetic"
+                     },
+                     {
+                         "accountId":  "synthetic-lab",
+                         "observedAt":  "2026-01-12T12:00:00Z",
+                         "name":  "garden.png",
+                         "currentFolderId":  "root",
+                         "targetFolderId":  "photos",
+                         "folders":  [
+                                         {
+                                             "id":  "photos",
+                                             "name":  "Photos"
+                                         },
+                                         {
+                                             "id":  "documents",
+                                             "name":  "Documents"
+                                         },
+                                         {
+                                             "id":  "lab",
+                                             "name":  "Lab Data"
+                                         }
+                                     ],
+                         "labelSource":  "synthetic"
+                     },
+                     {
+                         "accountId":  "synthetic-lab",
+                         "observedAt":  "2026-01-13T12:00:00Z",
+                         "name":  "field-notes.txt",
+                         "currentFolderId":  "root",
+                         "targetFolderId":  "documents",
+                         "folders":  [
+                                         {
+                                             "id":  "photos",
+                                             "name":  "Photos"
+                                         },
+                                         {
+                                             "id":  "documents",
+                                             "name":  "Documents"
+                                         },
+                                         {
+                                             "id":  "lab",
+                                             "name":  "Lab Data"
+                                         }
+                                     ],
+                         "labelSource":  "synthetic"
+                     },
+                     {
+                         "accountId":  "synthetic-lab",
+                         "observedAt":  "2026-01-14T12:00:00Z",
+                         "name":  "proposal.pdf",
+                         "currentFolderId":  "root",
+                         "targetFolderId":  "documents",
+                         "folders":  [
+                                         {
+                                             "id":  "photos",
+                                             "name":  "Photos"
+                                         },
+                                         {
+                                             "id":  "documents",
+                                             "name":  "Documents"
+                                         },
+                                         {
+                                             "id":  "lab",
+                                             "name":  "Lab Data"
+                                         }
+                                     ],
+                         "labelSource":  "synthetic"
+                     },
+                     {
+                         "accountId":  "synthetic-lab",
+                         "observedAt":  "2026-01-15T12:00:00Z",
+                         "name":  "microscopy-images.txt",
+                         "currentFolderId":  "root",
+                         "targetFolderId":  "lab",
+                         "folders":  [
+                                         {
+                                             "id":  "photos",
+                                             "name":  "Photos"
+                                         },
+                                         {
+                                             "id":  "documents",
+                                             "name":  "Documents"
+                                         },
+                                         {
+                                             "id":  "lab",
+                                             "name":  "Lab Data"
+                                         }
+                                     ],
+                         "labelSource":  "synthetic"
+                     },
+                     {
+                         "accountId":  "synthetic-lab",
+                         "observedAt":  "2026-01-16T12:00:00Z",
+                         "name":  "microscopy-values.json",
+                         "currentFolderId":  "root",
+                         "targetFolderId":  "lab",
+                         "folders":  [
+                                         {
+                                             "id":  "photos",
+                                             "name":  "Photos"
+                                         },
+                                         {
+                                             "id":  "documents",
+                                             "name":  "Documents"
+                                         },
+                                         {
+                                             "id":  "lab",
+                                             "name":  "Lab Data"
+                                         }
+                                     ],
+                         "labelSource":  "synthetic"
+                     },
+                     {
+                         "accountId":  "synthetic-lab",
+                         "observedAt":  "2026-01-17T12:00:00Z",
+                         "name":  "unfamiliar.dat",
+                         "currentFolderId":  "root",
+                         "targetFolderId":  "lab",
+                         "folders":  [
+                                         {
+                                             "id":  "photos",
+                                             "name":  "Photos"
+                                         },
+                                         {
+                                             "id":  "documents",
+                                             "name":  "Documents"
+                                         },
+                                         {
+                                             "id":  "lab",
+                                             "name":  "Lab Data"
+                                         }
+                                     ],
+                         "labelSource":  "synthetic"
+                     }
+                 ]
+}

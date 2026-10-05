@@ -8,7 +8,7 @@
 /** @typedef {{ id: string, email: string, displayName: string, tier: 'free' | 'demo', createdAt: string }} User */
 /** @typedef {{ usedBytes: number, limitBytes: number, tier: 'free' | 'demo' }} StorageUsage */
 /** @typedef {{ colors: { background: string, surface: string, text: string, accent: string }, font: 'Inter' | 'Arial' | 'Georgia', spacing: 'compact' | 'comfortable' }} ThemeSettings */
-/** @typedef {{ id: string, creatorId: string, creatorName: string, name: string, settings: ThemeSettings, createdAt: string }} Theme */
+/** @typedef {{ id: string, creatorId: string, creatorName: string, name: string, settings: ThemeSettings, createdAt: string, unlistedAt?: string, removedAt?: string }} Theme */
 /** @typedef {{ sourceThemeId: string | null, name: string, settings: ThemeSettings, selectedAt: string | null, updatedAt: string | null }} Appearance */
 
 export { DEFAULT_THEME_SETTINGS, THEME_FONTS, THEME_SPACINGS, contrastRatio,
@@ -38,7 +38,9 @@ export const routes = Object.freeze({
   logout: '/v1/auth/logout',
   account: '/v1/account',
   themes: '/v1/themes',
+  myThemes: '/v1/account/themes',
   theme: (themeId) => `/v1/themes/${encodeURIComponent(themeId)}`,
+  themeReport: (themeId) => `/v1/themes/${encodeURIComponent(themeId)}/report`,
   appearance: '/v1/account/appearance',
   appearanceSettings: '/v1/account/appearance/settings',
   claimLegacy: '/v1/account/claim-legacy',

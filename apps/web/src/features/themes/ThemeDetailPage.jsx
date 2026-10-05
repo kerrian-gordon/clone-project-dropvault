@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { routes } from '../../../../../packages/shared/index.js';
+import { useAuth } from '../../app/AuthContext.jsx';
 import { useAppearance } from '../../app/AppearanceContext.jsx';
 import { api } from '../../shared/lib/api.js';
 import { ThemePreviewBanner, ThemeSample, colorLabels } from './ThemePreview.jsx';
@@ -13,11 +14,13 @@ const surfaceCopy = [
 
 export function ThemeDetailPage() {
   const { id } = useParams();
+  const { user } = useAuth();
   const { appearance, loading, saving, install, previewing, startPreview, stopPreview } = useAppearance();
   const [theme, setTheme] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const [reportReason, setReportReason] = useState('broken');
 
   useEffect(() => {
     let active = true;
@@ -43,6 +46,23 @@ export function ThemeDetailPage() {
     try {
       await install(theme.id);
       setNotice(`${theme.name} is now your appearance.`);
+    } catch (caught) {
+      setError(caught.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reportTheme(event) {
+    event.preventDefault();
+    setBusy(true);
+    setNotice('');
+    setError('');
+    try {
+      await api(routes.themeReport(id), { method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reportReason }) });
+      setNotice('Report sent for review. Thank you.');
     } catch (caught) {
       setError(caught.message);
     } finally {
@@ -82,6 +102,15 @@ export function ThemeDetailPage() {
           {appearance.sourceThemeId === theme.id ? 'Install again' : 'Install theme'}
         </button>
       </div>
+      {theme.creatorId !== user?.id && <form className="theme-actions" onSubmit={reportTheme}>
+        <label>Report this theme <select value={reportReason}
+          onChange={(event) => setReportReason(event.target.value)}>
+          <option value="broken">Looks broken</option>
+          <option value="misleading">Misleading</option>
+          <option value="unsafe">Unsafe</option>
+        </select></label>
+        <button type="submit" className="btn-ghost" disabled={busy}>Send report</button>
+      </form>}
     </>}
   </section>;
 }

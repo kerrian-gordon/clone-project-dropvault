@@ -7,8 +7,8 @@ import test from 'node:test';
 import { DEFAULT_THEME_SETTINGS } from '../../../packages/shared/index.js';
 import { createApiServer } from '../src/server.js';
 
-async function start(storageRoot) {
-  const server = await createApiServer({ storageRoot });
+async function start(storageRoot, options = {}) {
+  const server = await createApiServer({ storageRoot, ...options });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   return { server, base: `http://127.0.0.1:${server.address().port}` };
@@ -121,9 +121,16 @@ test('community theme installation and personal edits survive restart without ch
     assert.equal((await request(alex, `/v1/themes/${theme.id}`, { method: 'DELETE' })).status, 204);
     assert.equal((await request(blair, `/v1/themes/${theme.id}`)).status, 404);
     assert.deepEqual((await (await request(blair, '/v1/account/appearance')).json()).settings, personal);
+    assert.equal((await (await request(blair, '/v1/account/themes')).json()).installed[0].id, theme.id);
+    await stop(running.server);
+    running = await start(storageRoot);
+    assert.equal((await (await request(blair, '/v1/account/appearance')).json()).sourceThemeId, theme.id);
     const reset = await request(blair, '/v1/account/appearance', { method: 'DELETE' });
     assert.equal(reset.status, 200);
     assert.deepEqual((await reset.json()).settings, DEFAULT_THEME_SETTINGS);
+    assert.equal((await request(blair, '/v1/account/appearance', { method: 'PUT',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ themeId: theme.id }),
+    })).status, 200);
   } finally {
     if (running) await stop(running.server);
     await rm(storageRoot, { recursive: true, force: true });
@@ -162,6 +169,64 @@ test('deleting another account\'s theme returns 404 like a missing theme', async
     assert.equal(forbidden.status, 404);
     assert.equal((await forbidden.json()).error.code, 'THEME_NOT_FOUND');
     assert.equal((await request(alex, `/v1/themes/${theme.id}`)).status, 200);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('reports require an account and safety removal resets installed copies', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-theme-safety-'));
+  const moderatorToken = 'moderator-token-for-isolated-theme-test-123';
+  let running;
+  try {
+    running = await start(storageRoot, { moderatorToken });
+    const request = (cookie, path, options = {}) => fetch(`${running.base}${path}`, {
+      ...options, headers: { ...options.headers, ...(cookie ? { Cookie: cookie } : {}) },
+    });
+    const register = async (email) => {
+      const response = await request(null, '/v1/auth/register', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: 'correct horse battery staple' }),
+      });
+      return response.headers.get('set-cookie').split(';', 1)[0];
+    };
+    const creator = await register('creator@example.test');
+    const viewer = await register('viewer@example.test');
+    const newcomer = await register('newcomer@example.test');
+    const theme = await (await request(creator, '/v1/themes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Evening', settings: DEFAULT_THEME_SETTINGS }),
+    })).json();
+    const report = () => ({ method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'misleading' }) });
+    assert.equal((await request(null, `/v1/themes/${theme.id}/report`, report())).status, 401);
+    assert.equal((await request(viewer, `/v1/themes/${theme.id}/report`, report())).status, 200);
+    assert.equal((await request(viewer, `/v1/themes/${theme.id}/report`, report())).status, 200);
+    assert.equal((await request(viewer, '/v1/account/appearance', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ themeId: theme.id }),
+    })).status, 200);
+    assert.equal((await request(creator, `/v1/themes/${theme.id}`, { method: 'DELETE' })).status, 204);
+    assert.equal((await request(newcomer, '/v1/account/appearance', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ themeId: theme.id }),
+    })).status, 404);
+    assert.equal((await (await request(viewer, '/v1/account/appearance')).json()).sourceThemeId, theme.id);
+    assert.equal((await request(null, '/v1/moderation/theme-reports')).status, 404);
+    const headers = { 'X-DropVault-Moderator-Token': moderatorToken };
+    const reports = await (await request(null, '/v1/moderation/theme-reports', { headers })).json();
+    assert.equal(reports.reports.length, 1);
+    assert.equal(reports.reports[0].reason, 'misleading');
+    assert.equal((await request(null, `/v1/moderation/themes/${theme.id}/remove`, {
+      method: 'POST', headers,
+    })).status, 204);
+    assert.equal((await (await request(viewer, '/v1/account/appearance')).json()).sourceThemeId, null);
+    assert.deepEqual((await (await request(viewer, '/v1/account/themes')).json()).installed, []);
+    assert.equal((await request(viewer, '/v1/account/appearance', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ themeId: theme.id }),
+    })).status, 404);
   } finally {
     if (running) await stop(running.server);
     await rm(storageRoot, { recursive: true, force: true });

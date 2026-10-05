@@ -71,7 +71,9 @@ test('multi-file drop and version history preserve recoverable content',
       assert.match(await zone.getAttribute('class'), /dragging/u);
       await zone.dispatchEvent('dragover', { dataTransfer });
       await zone.dispatchEvent('drop', { dataTransfer });
-      assert.doesNotMatch(await zone.getAttribute('class'), /dragging/u);
+      const zoneClass = await zone.getAttribute('class').catch(() => null);
+      assert.ok(zoneClass, `Upload panel disappeared after drop: ${pageErrors.join('; ')}`);
+      assert.doesNotMatch(zoneClass, /dragging/u);
       await page.getByRole('link', { name: /notes\.txt/u }).waitFor();
       await page.getByText('Choose where to upload this file.').waitFor();
       await page.getByRole('button', { name: 'Use suggested folder' }).click();
@@ -132,7 +134,7 @@ test('multi-file drop and version history preserve recoverable content',
       await page.getByRole('button', { name: 'Log in' }).click();
       await page.getByRole('link', { name: 'Workspaces', exact: true }).click();
       await page.getByRole('link', { name: /Research notes/u }).click();
-      await page.getByText('Your role: contributor.').waitFor();
+      await page.locator('.workspace-role').getByText('contributor').waitFor();
       await page.getByRole('link', { name: 'Trial one' }).click();
       await page.getByRole('link', { name: 'Download all (.tar)' }).waitFor();
       await page.getByRole('button', { name: 'Restore as new workspace' }).click();
@@ -143,6 +145,28 @@ test('multi-file drop and version history preserve recoverable content',
         name: 'extra.txt', mimeType: 'text/plain', buffer: Buffer.from('Contribution'),
       });
       await page.getByText('extra.txt: success').waitFor();
+      await page.getByRole('link', { name: 'My files', exact: true }).click();
+      const uploadInput = page.getByLabel('Choose files to upload');
+      await uploadInput.setInputFiles({
+        name: 'disguised.txt', mimeType: 'text/plain', buffer: Buffer.from('{"sample":true,"count":2}'),
+      });
+      await page.getByText(/This file looks like JSON, but its name ends in \.txt/u).waitFor();
+      await page.getByRole('button', { name: 'Skip file' }).click();
+      await page.getByText('Skipped.').waitFor();
+      assert.equal(await page.getByRole('link', { name: 'disguised.txt' }).count(), 0);
+      await uploadInput.setInputFiles({
+        name: 'confirmed.txt', mimeType: 'text/plain', buffer: Buffer.from('{"sample":true,"count":3}'),
+      });
+      await page.getByText(/This file looks like JSON, but its name ends in \.txt/u).waitFor();
+      await page.getByRole('button', { name: 'Upload anyway' }).click();
+      await page.getByRole('link', { name: 'confirmed.txt' }).waitFor();
+      await uploadInput.setInputFiles({
+        name: 'invalid.pdf', mimeType: 'application/pdf', buffer: Buffer.from('A plain text file'),
+      });
+      await page.getByText(/This file looks like TXT, but its name ends in \.pdf/u).waitFor();
+      await page.getByRole('button', { name: 'Upload anyway' }).click();
+      await page.getByRole('alert').getByText('File content does not match its type').waitFor();
+      assert.equal(await page.getByRole('link', { name: 'invalid.pdf' }).count(), 0);
       assert.deepEqual(pageErrors, []);
     } finally {
       if (browser) await browser.close();

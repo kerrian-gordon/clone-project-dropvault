@@ -7,11 +7,13 @@ import { createHandler } from './routes/api.js';
 import { createGitHubClient } from './services/github/public-import.js';
 import { openLocalStorage } from './services/storage/local.js';
 import { openS3Storage } from './services/storage/s3.js';
+import { wrapDemoSite } from './demo-site.js';
 
 export async function createApiServer({ storageRoot, maxUploadBytes = MAX_UPLOAD_BYTES,
   storageLimitBytes = DEFAULT_STORAGE_LIMIT_BYTES, legacyClaimToken,
   publicBaseUrl, storageFactory = openLocalStorage, productionStorage,
-  demoPlanSwitchEnabled = false, githubClient = createGitHubClient() }) {
+  demoPlanSwitchEnabled = false, moderatorToken, githubClient = createGitHubClient(),
+  demoSite }) {
   if (!Number.isSafeInteger(storageLimitBytes) || storageLimitBytes < 0
     || storageLimitBytes > Math.floor(Number.MAX_SAFE_INTEGER / 10)) {
     throw new Error('storageLimitBytes must be a non-negative safe integer that supports the demo tier');
@@ -19,6 +21,10 @@ export async function createApiServer({ storageRoot, maxUploadBytes = MAX_UPLOAD
   if (legacyClaimToken !== undefined && (typeof legacyClaimToken !== 'string'
     || legacyClaimToken.length < 32)) {
     throw new Error('legacyClaimToken must have at least 32 characters');
+  }
+  if (moderatorToken !== undefined && (typeof moderatorToken !== 'string'
+    || moderatorToken.length < 32)) {
+    throw new Error('moderatorToken must have at least 32 characters');
   }
   if (publicBaseUrl !== undefined) {
     const url = new URL(publicBaseUrl);
@@ -41,8 +47,10 @@ export async function createApiServer({ storageRoot, maxUploadBytes = MAX_UPLOAD
       ? await openS3Storage(productionStorage) : await storageFactory(storageRoot);
     const referencedStorageKeys = catalog.referencedStorageKeys();
     await storage.recoverDeletes(referencedStorageKeys);
-    const server = createServer(createHandler({ catalog, storage, maxUploadBytes, storageLimitBytes,
-      legacyClaimToken, publicBaseUrl, demoPlanSwitchEnabled, githubClient }));
+    const apiHandler = createHandler({ catalog, storage, maxUploadBytes, storageLimitBytes,
+      legacyClaimToken, publicBaseUrl, demoPlanSwitchEnabled, moderatorToken, githubClient,
+      secureSessionCookies: demoSite?.secureSessionCookies });
+    const server = createServer(demoSite ? wrapDemoSite(apiHandler, demoSite) : apiHandler);
     server.on('close', () => { void catalog.close?.(); });
     return server;
   } catch (error) {

@@ -38,6 +38,8 @@ export async function openCatalog(path, persistence) {
   state.sessions ??= [];
   state.grants ??= [];
   state.themes ??= [];
+  state.themeReports ??= [];
+  state.themeLibrary ??= [];
   state.appearances ??= [];
   state.versions ??= [];
   state.workspaces ??= [];
@@ -46,7 +48,7 @@ export async function openCatalog(path, persistence) {
   state.snapshotGrants ??= [];
   state.organizationSuggestions ??= [];
   state.organizationStats ??= [];
-  if (![state.users, state.sessions, state.grants, state.themes,
+  if (![state.users, state.sessions, state.grants, state.themes, state.themeReports, state.themeLibrary,
     state.appearances, state.versions, state.workspaces, state.workspaceGrants, state.snapshots,
     state.snapshotGrants,
     state.organizationSuggestions, state.organizationStats].every(Array.isArray)) {
@@ -63,6 +65,13 @@ export async function openCatalog(path, persistence) {
     }
   }
   for (const theme of state.themes) theme.creatorName ??= 'Community member';
+  for (const appearance of state.appearances) {
+    if (appearance.sourceThemeId && !state.themeLibrary.some((entry) =>
+      entry.userId === appearance.userId && entry.themeId === appearance.sourceThemeId)) {
+      state.themeLibrary.push({ userId: appearance.userId, themeId: appearance.sourceThemeId,
+        installedAt: appearance.selectedAt ?? appearance.updatedAt ?? new Date().toISOString() });
+    }
+  }
   const takenNames = [];
   for (const user of state.users) {
     if (validCreatorName(user.displayName)) takenNames.push(user.displayName);
@@ -230,19 +239,29 @@ export async function openCatalog(path, persistence) {
     },
     listThemes(offset = 0, limit = 20, query = '') {
       const needle = query.trim().toLowerCase();
+      const listed = state.themes.filter((theme) => !theme.unlistedAt && !theme.removedAt);
       const matched = needle
-        ? state.themes.filter((theme) => theme.name.toLowerCase().includes(needle)
+        ? listed.filter((theme) => theme.name.toLowerCase().includes(needle)
           || theme.creatorName.toLowerCase().includes(needle))
-        : state.themes;
+        : listed;
       const sorted = [...matched].sort((left, right) =>
         right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id));
       return { themes: sorted.slice(offset, offset + limit), total: sorted.length,
         nextOffset: offset + limit < sorted.length ? offset + limit : null };
     },
     getTheme(themeId) {
-      const theme = state.themes.find((item) => item.id === themeId);
+      const theme = state.themes.find((item) => item.id === themeId && !item.unlistedAt && !item.removedAt);
       if (!theme) throw new ApiError(404, 'THEME_NOT_FOUND', 'Theme was not found');
       return theme;
+    },
+    myThemes(userId) {
+      this.getUser(userId);
+      return {
+        installed: state.themeLibrary.filter((entry) => entry.userId === userId)
+          .map((entry) => state.themes.find((theme) => theme.id === entry.themeId
+            && !theme.removedAt)).filter(Boolean),
+        published: state.themes.filter((theme) => theme.creatorId === userId && !theme.removedAt),
+      };
     },
     async createTheme(creatorId, name, settings) {
       if (!validThemeName(name)) throw new ApiError(400, 'INVALID_THEME_NAME', 'Provide a valid theme name');
@@ -258,7 +277,8 @@ export async function openCatalog(path, persistence) {
         if (!validCreatorName(creatorName)) {
           throw new ApiError(400, 'INVALID_DISPLAY_NAME', 'Provide a public display name');
         }
-        if (next.themes.filter((theme) => theme.creatorId === creatorId).length
+        if (next.themes.filter((theme) => theme.creatorId === creatorId
+          && !theme.unlistedAt && !theme.removedAt).length
           >= MAX_THEMES_PER_ACCOUNT) {
           throw new ApiError(409, 'THEME_LIMIT_REACHED', 'Theme publishing limit reached');
         }
@@ -270,9 +290,46 @@ export async function openCatalog(path, persistence) {
     },
     async deleteTheme(themeId, creatorId) {
       return write((next) => {
-        const index = next.themes.findIndex((item) => item.id === themeId && item.creatorId === creatorId);
+        const index = next.themes.findIndex((item) => item.id === themeId && item.creatorId === creatorId
+          && !item.unlistedAt && !item.removedAt);
         if (index === -1) throw new ApiError(404, 'THEME_NOT_FOUND', 'Theme was not found');
-        next.themes.splice(index, 1);
+        next.themes[index].unlistedAt = new Date().toISOString();
+      });
+    },
+    async reportTheme(themeId, reporterId, reason) {
+      if (!['broken', 'misleading', 'unsafe'].includes(reason)) {
+        throw new ApiError(400, 'INVALID_REPORT_REASON', 'Choose broken, misleading, or unsafe');
+      }
+      return write((next) => {
+        const theme = next.themes.find((item) => item.id === themeId && !item.unlistedAt && !item.removedAt);
+        if (!theme) throw new ApiError(404, 'THEME_NOT_FOUND', 'Theme was not found');
+        if (theme.creatorId === reporterId) {
+          throw new ApiError(400, 'OWN_THEME_REPORT', 'Use unlist for your own theme');
+        }
+        let report = next.themeReports.find((item) => item.themeId === themeId && item.reporterId === reporterId);
+        if (report) {
+          report.reason = reason;
+          report.updatedAt = new Date().toISOString();
+        } else {
+          report = { id: randomUUID(), themeId, reporterId, reason,
+            createdAt: new Date().toISOString() };
+          next.themeReports.push(report);
+        }
+        return { id: report.id, reason: report.reason };
+      });
+    },
+    listThemeReports() {
+      return state.themeReports.map((report) => ({ ...report,
+        theme: state.themes.find((theme) => theme.id === report.themeId) ?? null }));
+    },
+    async safetyRemoveTheme(themeId) {
+      return write((next) => {
+        const theme = next.themes.find((item) => item.id === themeId);
+        if (!theme) throw new ApiError(404, 'THEME_NOT_FOUND', 'Theme was not found');
+        if (theme.removedAt) return;
+        theme.removedAt = new Date().toISOString();
+        next.appearances = next.appearances.filter((appearance) => appearance.sourceThemeId !== themeId);
+        next.themeLibrary = next.themeLibrary.filter((entry) => entry.themeId !== themeId);
       });
     },
     getAppearance(userId) {
@@ -284,13 +341,17 @@ export async function openCatalog(path, persistence) {
     },
     async installTheme(userId, themeId) {
       return write((next) => {
-        const theme = next.themes.find((item) => item.id === themeId);
+        const inLibrary = next.themeLibrary.some((entry) => entry.userId === userId && entry.themeId === themeId);
+        const theme = next.themes.find((item) => item.id === themeId && !item.removedAt
+          && (!item.unlistedAt || inLibrary || item.creatorId === userId));
         if (!theme) throw new ApiError(404, 'THEME_NOT_FOUND', 'Theme was not found');
         const selectedAt = new Date().toISOString();
         const appearance = { userId, sourceThemeId: theme.id, name: theme.name,
           settings: structuredClone(theme.settings), selectedAt, updatedAt: selectedAt };
         next.appearances = next.appearances.filter((item) => item.userId !== userId);
         next.appearances.push(appearance);
+        if (!inLibrary) next.themeLibrary.push({ userId, themeId,
+          installedAt: selectedAt });
         const { userId: _userId, ...publicAppearance } = appearance;
         return publicAppearance;
       });

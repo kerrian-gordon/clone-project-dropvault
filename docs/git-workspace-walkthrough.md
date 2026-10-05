@@ -34,6 +34,14 @@ tar -xOf snapshot.tar manifest.json
 
 The manifest maps safe archive paths to original names, folder paths, file IDs, exact version IDs, and the supplied Git commit label. **Restore as new workspace** makes independent copies under your account; it requires enough free quota and does not change the original snapshot.
 
+Each newly downloaded TAR also includes a SHA-256 checksum for every file in its manifest. Verify the download before using it:
+
+```sh
+npm run verify:snapshot -- snapshot.tar
+```
+
+The command checks TAR structure, file sizes, and each checksum without extracting files. Older TAR downloads without checksums must be downloaded again from the snapshot. The checksums detect changed or incomplete downloads; they do not authenticate the person who supplied a manually linked Git commit label.
+
 ## Current limits
 
 - The manually uploaded code ZIP is a point-in-time export. It is not refreshed from GitHub. DropVault does not import a GitHub README separately or store the repository's Git history.

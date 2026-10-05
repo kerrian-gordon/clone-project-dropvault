@@ -1,6 +1,6 @@
 # Dropvault local API contract
 
-The API uses Node.js 24. Local development stores file bytes on disk and metadata in a JSON catalog. Production mode targets AWS S3 for bytes and PostgreSQL for catalog metadata. It listens on `127.0.0.1:3000` by default. The unpaid demo plan switch is disabled by default and can be enabled only for local storage on a loopback host outside `NODE_ENV=production`. The catalog remains an in-memory document with a PostgreSQL advisory lock, so only one API process may run against a database at a time.
+The API uses Node.js 24. Local development stores file bytes on disk and metadata in a JSON catalog. Production mode targets AWS S3 for bytes and PostgreSQL for catalog metadata. It listens on `127.0.0.1:3000` by default. Normal API startup keeps the unpaid demo plan switch disabled except with local storage on a loopback host outside `NODE_ENV=production`; the [separate, gated hosted demo](hosted-demo.md) enables it for invited reviewers only. The catalog remains an in-memory document with a PostgreSQL advisory lock, so only one API process may run against a database at a time.
 
 ## Accounts and permissions
 
@@ -17,7 +17,7 @@ The API uses Node.js 24. Local development stores file bytes on disk and metadat
 - Signed-in accounts can publish themes to a public gallery. A published theme is an immutable snapshot `{ id, creatorId, creatorName, name, settings, createdAt }`. The server gets `creatorId` from the session, not from the request. `creatorName` is copied from the account `displayName` at publish time, so later account changes or a missing account do not rewrite the gallery. A `creatorName` field in the POST body is ignored. Themes already stored, including the seeded "Alex" and "Blair" entries, keep their existing labels. Older themes without a label appear as "Community member". Each account may publish up to 20 themes. Theme publishes are also limited to 10 per account per 15 minutes (`429 RATE_LIMITED`); that counter lives in process memory and resets when the API restarts. All cookie-session writes, including theme and appearance routes, check the request `Origin` against the `Host` header.
 - `ThemeSettings` is `{ "colors": { "background": "#f7f5f2", "surface": "#ffffff", "text": "#1e1919", "accent": "#0061ff" }, "font": "Inter", "spacing": "comfortable" }`. All four colors must be six-digit hex values. `font` is `Inter`, `Arial`, or `Georgia`; `spacing` is `compact` or `comfortable`. Extra fields, CSS, HTML, and scripts are rejected.
 - Saving or publishing a theme requires a contrast ratio of at least 4.5:1 for text and accent against both the background and card surface. Previously saved themes remain readable through the API even if they do not pass the new check; users must adjust them before saving again or publishing.
-- Installing a theme copies its settings into the signed-in account's appearance. Personal changes update that copy, leaving the published original and other accounts unchanged. `GET /v1/account/appearance` returns the saved selection after a new session or API restart. Accounts without a selection receive the default appearance.
+- Installing a theme copies its settings into the signed-in account's appearance. Personal changes update that copy, leaving the published original and other accounts unchanged. Creator unlisting hides a theme from the gallery but keeps installed copies and lets previous installers switch back to it. Platform safety removal clears appearances derived from the theme, including personal changes, so affected accounts return to the default when their appearance next refreshes. `GET /v1/account/appearance` returns the saved selection after a new session or API restart. Accounts without a selection receive the default appearance.
 - `Appearance` is `{ sourceThemeId, name, settings, selectedAt, updatedAt }`. `sourceThemeId` identifies the published theme used as the starting point; it is `null` for the default. The web app should fetch this response after sign-in and apply only the documented settings to its own CSS variables. Theme bytes are not part of file uploads or storage quotas.
 
 ## File model and limits
@@ -44,11 +44,13 @@ Set `DROPVAULT_STORAGE_BACKEND=s3`, `DROPVAULT_DATABASE_URL`, `DROPVAULT_S3_BUCK
 | Method and path | Request | Success response |
 | --- | --- | --- |
 | `GET /v1/health` | None | `200 { "status": "ok" }` |
-| `GET /v1/capabilities` | None | `200 { "demoPlanSwitchEnabled": boolean }`; lets the web app hide local-only upgrade controls |
+| `GET /v1/capabilities` | None | `200 { "demoPlanSwitchEnabled": boolean }`; lets the web app hide upgrade controls unless local testing or the gated demo enables them |
 | `GET /v1/themes?offset=0&limit=20&q=` | Signed-in gallery; `offset` is non-negative and `limit` is 1–50; optional `q` (max 80 chars) matches theme name or creator name | `200 { "themes": Theme[], "total", "nextOffset" }` |
 | `GET /v1/themes/:id` | Signed-in account | `200 Theme` |
 | `POST /v1/themes` | JSON `{ "name": "Night study", "settings": ThemeSettings }`. A `creatorName` in the body is ignored. | `201 Theme`; `creatorName` is the account `displayName` snapshotted at publish. 20 themes per account (`409 THEME_LIMIT_REACHED`); 10 publishes per account per 15 minutes (`429 RATE_LIMITED`). |
-| `DELETE /v1/themes/:id` | Creator only | `204`; removes gallery listing. Personal copies remain saved. Other signed-in accounts receive `404 THEME_NOT_FOUND`, same as a missing id. |
+| `DELETE /v1/themes/:id` | Creator only | `204`; unlists the theme. Previous installers keep it. Other signed-in accounts receive `404 THEME_NOT_FOUND`, same as a missing id. |
+| `POST /v1/themes/:id/report` | Signed-in account other than creator; JSON `{ "reason": "broken" | "misleading" | "unsafe" }` | `200 { id, reason }`; one report per account and theme, with later reports updating the reason. |
+| `GET /v1/account/themes` | Signed-in account | `200 { installed: Theme[], published: Theme[] }`; includes unlisted themes but excludes safety-removed themes. |
 | `GET /v1/account/appearance` | None | `200 Appearance` for the signed-in account |
 | `PUT /v1/account/appearance` | JSON `{ "themeId": "published-theme-id" }` | `200 Appearance`; installs a personal copy |
 | `PUT /v1/account/appearance/settings` | JSON `{ "settings": ThemeSettings }` | `200 Appearance`; replaces the account's saved settings |
@@ -112,7 +114,7 @@ Workspaces collect the owner's files. The owner may invite viewers, who browse a
 | `GET /v1/snapshots/shared` | Signed-in recipient | `200 { "snapshots": Snapshot[] }` currently accessible to them |
 | `GET /v1/snapshots/:id` | Owner, workspace member, or separately invited recipient with every file grant | `200 Snapshot` |
 | `GET /v1/snapshots/:id/files/:fileId/content` | Same; add `?download=1` for attachment | `200` bytes of the pinned version with its saved name |
-| `GET /v1/snapshots/:id/archive` | Same | TAR download with manifest and all pinned bytes |
+| `GET /v1/snapshots/:id/archive` | Same | TAR download with manifest, SHA-256 per file, and all pinned bytes |
 | `POST /v1/snapshots/:id/copy` | Same; sufficient requesting-account quota | `201 Workspace` with independent files copied into the requester's account |
 | `DELETE /v1/snapshots/:id` | Owner | `204`; removes snapshot and its recipient grants |
 | `GET /v1/snapshots/:id/access` | Owner | `200 { "users": [{ "userId", "email", "createdAt" }] }` |

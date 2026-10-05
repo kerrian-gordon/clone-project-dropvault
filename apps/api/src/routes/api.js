@@ -45,7 +45,7 @@ async function readJson(request) {
 
 export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BYTES,
   storageLimitBytes, legacyClaimToken, publicBaseUrl, demoPlanSwitchEnabled = false,
-  githubClient }) {
+  moderatorToken, githubClient, secureSessionCookies = false }) {
   let pendingMutation = Promise.resolve();
   let activeMutations = 0;
   let activeUploads = 0;
@@ -211,6 +211,25 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       if (request.method === 'GET' && path === '/v1/capabilities') {
         return json(response, 200, { demoPlanSwitchEnabled });
       }
+      const moderationPath = path === '/v1/moderation/theme-reports'
+        || /^\/v1\/moderation\/themes\/[^/]+\/remove$/u.test(path);
+      if (moderationPath) {
+        const supplied = request.headers['x-dropvault-moderator-token'];
+        if (!moderatorToken || typeof supplied !== 'string'
+          || !timingSafeEqual(createHash('sha256').update(supplied).digest(),
+            createHash('sha256').update(moderatorToken).digest())) {
+          throw new ApiError(404, 'NOT_FOUND', 'Route was not found');
+        }
+        if (request.method === 'GET' && path === '/v1/moderation/theme-reports') {
+          return json(response, 200, { reports: catalog.listThemeReports() });
+        }
+        const removeMatch = /^\/v1\/moderation\/themes\/([^/]+)\/remove$/u.exec(path);
+        if (request.method === 'POST' && removeMatch) {
+          await mutate(() => catalog.safetyRemoveTheme(removeMatch[1]));
+          response.writeHead(204);
+          return response.end();
+        }
+      }
       if (request.method === 'POST' && path === '/v1/auth/register') {
         authLimiter.registration(request.socket.remoteAddress);
         const input = await readJson(request);
@@ -220,7 +239,8 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         const user = await catalog.createUser(input.email.trim().toLowerCase(),
           await hashPassword(input.password), input?.displayName);
         const token = await createSession(catalog, user.id);
-        return json(response, 201, user, { 'Set-Cookie': sessionCookie(token, !!request.socket.encrypted) });
+        return json(response, 201, user, { 'Set-Cookie': sessionCookie(token,
+          secureSessionCookies || !!request.socket.encrypted) });
       }
       if (request.method === 'POST' && path === '/v1/auth/login') {
         const input = await readJson(request);
@@ -236,7 +256,7 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         authLimiter.successfulLogin(ip, email);
         const token = await createSession(catalog, user.id);
         return json(response, 200, catalog.getUser(user.id),
-          { 'Set-Cookie': sessionCookie(token, !!request.socket.encrypted) });
+          { 'Set-Cookie': sessionCookie(token, secureSessionCookies || !!request.socket.encrypted) });
       }
       const shareMatch = /^\/v1\/shares\/([^/]+)$/u.exec(path);
       if (request.method === 'GET' && shareMatch) {
@@ -247,7 +267,8 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       const user = requireUser(request, catalog);
       if (request.method === 'POST' && path === '/v1/auth/logout') {
         await catalog.deleteSession(sessionToken(request));
-        response.writeHead(204, { 'Set-Cookie': clearSessionCookie(!!request.socket.encrypted) });
+        response.writeHead(204, { 'Set-Cookie': clearSessionCookie(
+          secureSessionCookies || !!request.socket.encrypted) });
         return response.end();
       }
       if (request.method === 'GET' && path === '/v1/account') {
@@ -255,6 +276,9 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       }
       if (request.method === 'GET' && path === '/v1/account/appearance') {
         return json(response, 200, catalog.getAppearance(user.id));
+      }
+      if (request.method === 'GET' && path === '/v1/account/themes') {
+        return json(response, 200, catalog.myThemes(user.id));
       }
       if (request.method === 'PUT' && path === '/v1/account/appearance') {
         const input = await readJson(request);
@@ -290,6 +314,11 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
           input?.settings));
       }
       const themeMatch = /^\/v1\/themes\/([^/]+)$/u.exec(path);
+      const reportMatch = /^\/v1\/themes\/([^/]+)\/report$/u.exec(path);
+      if (request.method === 'POST' && reportMatch) {
+        const input = await readJson(request);
+        return json(response, 200, await mutate(() => catalog.reportTheme(reportMatch[1], user.id, input?.reason)));
+      }
       if (request.method === 'GET' && themeMatch) {
         return json(response, 200, catalog.getTheme(themeMatch[1]));
       }
@@ -582,12 +611,13 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         const releases = [];
         try {
           for (const item of snapshot.items) releases.push(beginRead(item.fileId));
+          const archive = await snapshotArchive(snapshot, versions, storage);
           response.writeHead(200, {
             'Content-Type': 'application/x-tar',
             'Content-Disposition': `attachment; filename="snapshot-${snapshot.id}.tar"`,
             'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store',
           });
-          await pipeline(snapshotArchive(snapshot, versions, storage), response);
+          await pipeline(archive, response);
         } finally {
           for (const release of releases) release();
         }

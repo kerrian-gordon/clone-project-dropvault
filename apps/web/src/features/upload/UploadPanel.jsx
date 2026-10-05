@@ -5,7 +5,7 @@ import { formatBytes } from '../../shared/components/StorageMeter.jsx';
 import { useUploads } from './UploadContext.jsx';
 
 export function UploadPanel({ folderId, usage, refreshUsage }) {
-  const { jobs, enqueue, chooseDestination, retry } = useUploads();
+  const { jobs, enqueue, chooseType, chooseDestination, retry } = useUploads();
   const { user, changePlan, demoPlanSwitchEnabled } = useAuth();
   const input = useRef(null);
   const upgradeDialog = useRef(null);
@@ -103,6 +103,13 @@ export function UploadPanel({ folderId, usage, refreshUsage }) {
       <h2>Uploads</h2>
       <ul>{visibleJobs.map((job) => <li key={job.id}>
         <div className="upload-job-heading"><strong>{job.name}</strong><span>{formatBytes(job.size)}</span></div>
+        {job.status === 'type_mismatch' && <div className="folder-suggestion">
+          <p role="alert">This file looks like <strong>{job.recognition.format}</strong>, but its name ends in <strong>.{job.name.split('.').at(-1).toLowerCase()}</strong>. Check the file before uploading.</p>
+          <div className="dialog-actions">
+            <button type="button" onClick={() => chooseType(job.id, true)}>Upload anyway</button>
+            <button type="button" className="btn-ghost" onClick={() => chooseType(job.id, false)}>Skip file</button>
+          </div>
+        </div>}
         {job.status === 'suggested' && <div className="folder-suggestion">
           <p>Suggested folder: <strong>{job.suggestion.folderName}</strong>. {job.suggestion.reason}.</p>
           <div className="dialog-actions">
@@ -110,10 +117,15 @@ export function UploadPanel({ folderId, usage, refreshUsage }) {
             <button type="button" className="btn-ghost" onClick={() => chooseDestination(job.id, false)}>Keep here</button>
           </div>
         </div>}
+        {job.recognition && job.recognition.format !== 'UNKNOWN' && job.status !== 'type_mismatch' &&
+          <p className="muted">Content looks like {job.recognition.format}.</p>}
         {job.status === 'uploading' && <progress max="100" value={job.progress} aria-label={`${job.name} upload progress`} />}
         <p className={job.status === 'failed' ? 'error' : 'muted'} role={job.status === 'failed' ? 'alert' : undefined}>
           {job.status === 'failed' ? job.error : job.status === 'success' ? `Uploaded${job.destinationName ? ` to ${job.destinationName}` : ''}`
-            : job.status === 'checking' ? 'Checking for a matching folder…'
+            : job.status === 'recognizing' ? 'Checking file content…'
+              : job.status === 'type_mismatch' ? 'Waiting for your choice.'
+                : job.status === 'skipped' ? 'Skipped.'
+                  : job.status === 'checking' ? 'Checking for a matching folder…'
               : job.status === 'suggested' ? 'Choose where to upload this file.'
                 : job.status === 'queued' ? `Waiting${job.destinationName ? ` for ${job.destinationName}` : ''}`
                   : `${job.progress}% uploaded${job.destinationName ? ` to ${job.destinationName}` : ''}`}

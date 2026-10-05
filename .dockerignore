@@ -1,0 +1,12 @@
+.git
+.codex
+.agents
+node_modules
+**/node_modules
+**/dist
+storage
+.pptx-build
+presentations
+docs
+scripts
+*.log

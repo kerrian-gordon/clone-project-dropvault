@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
-import { AppearanceProvider } from './AppearanceContext.jsx';
+import { AppearanceProvider, useAppearance } from './AppearanceContext.jsx';
 import { FilesPage } from '../features/file-browser/FilesPage.jsx';
 import { SharedPage } from '../features/file-browser/SharedPage.jsx';
 import { ViewerPage } from '../features/viewer/ViewerPage.jsx';
@@ -12,6 +12,8 @@ import { WorkspacesPage, WorkspacePage, SnapshotPage } from '../features/workspa
 
 function ProtectedLayout() {
   const { user, loading, signOut } = useAuth();
+  const { reset, saving: appearanceSaving } = useAppearance();
+  const [appearanceActionError, setAppearanceActionError] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
   const inFolder = Boolean(useMatch('/folders/*'));
@@ -26,6 +28,15 @@ function ProtectedLayout() {
       navigate('/login', { replace: true });
     } catch (error) {
       window.alert(error.message);
+    }
+  }
+
+  async function useDefault() {
+    setAppearanceActionError('');
+    try {
+      await reset();
+    } catch (error) {
+      setAppearanceActionError(error.message);
     }
   }
 
@@ -57,11 +68,16 @@ function ProtectedLayout() {
             {/* Add <form role="search" className="shell-search"> only when search works;
                 a dead input is worse than none in a demo. */}
             <div className="account">
+              <button type="button" className="btn-ghost" disabled={appearanceSaving}
+                onClick={useDefault}>Use default appearance</button>
               <span>{user.email}</span>
               <button type="button" onClick={handleLogout}>Log out</button>
             </div>
           </header>
-          <main className="content"><Outlet /></main>
+          <main className="content">
+            {appearanceActionError && <p className="error" role="alert">{appearanceActionError}</p>}
+            <Outlet />
+          </main>
         </div>
       </div>
     </UploadProvider>

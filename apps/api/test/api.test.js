@@ -10,6 +10,7 @@ import { openCatalog } from '../src/db/catalog.js';
 import { createApiServer } from '../src/server.js';
 import { apiListenOptions } from '../src/start.js';
 import { openLocalStorage } from '../src/services/storage/local.js';
+import { verifySnapshotArchive } from '../../../scripts/verify-snapshot.mjs';
 
 const nativeFetch = globalThis.fetch;
 let activeCookie;
@@ -114,6 +115,17 @@ test('workspace snapshots bind a Git archive version and preserve its commit lab
     assert.equal(manifest.createdById, owner.id);
     assert.equal(manifest.createdByName, owner.displayName);
     assert.equal(manifest.files[0].versionId, file.currentVersionId);
+    assert.match(manifest.files[0].sha256, /^[a-f0-9]{64}$/u);
+    const tarPath = join(storageRoot, 'snapshot.tar');
+    await writeFile(tarPath, tar);
+    assert.deepEqual(await verifySnapshotArchive(tarPath), {
+      snapshotId: saved.id, files: 1, gitCommit: commit,
+    });
+    const changed = Buffer.from(tar);
+    const contentOffset = 512 + Math.ceil(manifestLength / 512) * 512 + 512;
+    changed[contentOffset + 10] ^= 1;
+    await writeFile(tarPath, changed);
+    await assert.rejects(verifySnapshotArchive(tarPath), /Checksum mismatch/u);
     assert.match(manifest.files[0].path, /^files\/Code\//u);
     const replacement = await fetch(`${running.base}/v1/files/${file.id}/versions`, {
       method: 'POST', headers: { 'Content-Type': 'application/zip' },

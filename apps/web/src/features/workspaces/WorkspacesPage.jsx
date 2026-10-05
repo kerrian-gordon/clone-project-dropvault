@@ -38,7 +38,7 @@ export function WorkspacesPage() {
   }
   return <section className="workspace-page">
     <div className="workspace-index-header"><div><h1>Workspaces</h1>
-      <p className="muted">Keep code, data, and other project files together. Save exact versions when a milestone is ready.</p></div>
+      <p className="muted">Bring project files and an optional GitHub code archive into one workspace. Save their exact versions as a snapshot a teammate can download or copy later.</p></div>
       <a className="button-link" href="#new-workspace">New workspace</a></div>
     {error && <p className="error" role="alert">{error}</p>}
     <section aria-labelledby="my-workspaces"><div className="workspace-section-heading"><h2 id="my-workspaces">Workspaces I can access</h2>
@@ -283,7 +283,7 @@ export function WorkspacePage() {
     </section>}
     {isOwner && <section className="workspace-card workspace-form" id="workspace-snapshots">
       <div className="workspace-section-heading"><div><h2>Save a snapshot</h2>
-        <p className="muted">Freeze the selected file versions so this project can be downloaded or copied later.</p></div>
+        <p className="muted">Pin the selected file versions and any linked code archive together for a project handoff.</p></div>
         <span className="workspace-count">{selected.length} selected</span></div>
       <p className="workspace-selection-summary">{selected.length ? <>{selected.length} {selected.length === 1 ? 'file' : 'files'} · {formatBytes(selectedSize)} · current versions</>
         : 'Select files in Current project files above to continue.'}</p>
@@ -380,7 +380,7 @@ export function SnapshotPage() {
           ? <>Imported from {snapshot.git.repositoryFullName} at GitHub commit <code>{snapshot.git.commitSha}</code>.{' '}
             <a href={snapshot.git.sourceUrl} target="_blank" rel="noopener noreferrer">View source at this commit</a>.</>
           : <>Claimed commit <code>{snapshot.git.commitSha}</code> from its ZIP comment. Not verified against GitHub.</>}</p>}
-      <p className="muted">This snapshot is fixed. Later replacements, restores, renames, and folder moves do not change it.</p>
+      <p className="muted">This snapshot pins the versions listed below. Later file edits, renames, and folder moves do not change it.</p>
       <div className="workspace-inline">
         <a className="button-link" href={routes.snapshotArchive(id)}>Download all (.tar)</a>
         <button className="btn-ghost" disabled={pending} onClick={() => void change(async () => {
@@ -388,6 +388,7 @@ export function SnapshotPage() {
           navigate(`/workspaces/${copy.id}`);
         })}>Restore as new workspace</button>
       </div>
+      <p className="muted">The download includes a manifest with SHA-256 checksums. The DropVault CLI can verify the handoff before you use its files.</p>
       <p className="muted">Restoring copies every file into your account and requires enough free storage. Your current files stay as they are.</p>
       <div className="list">{snapshot.items.map((item) => <div className="row" key={item.fileId}>
         <div className="row-main"><strong>{item.name}</strong><span className="muted">{snapshot.git?.archiveFileId === item.fileId ? 'Code archive' : 'Project file'} · version {item.versionId} · {formatBytes(item.size)}</span></div>

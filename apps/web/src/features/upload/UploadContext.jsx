@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { MAX_NAME_LENGTH, MAX_UPLOAD_BYTES, SUPPORTED_UPLOAD_TYPES, routes, validName } from '../../../../../packages/shared/index.js';
 import { api } from '../../shared/lib/api.js';
+import { recognizeFile } from './recognizeFile.js';
 
 const UploadContext = createContext(null);
 const extensionOf = (name) => name.split('.').at(-1)?.toLowerCase();
@@ -47,6 +48,7 @@ export function UploadProvider({ children }) {
   const nextId = useRef(0);
   const active = useRef(true);
   const decided = useRef(new Set());
+  const typeDecided = useRef(new Set());
 
   const update = useCallback((id, change) => {
     setJobs((previous) => previous.map((job) => job.id === id ? { ...job, ...change } : job));
@@ -72,37 +74,72 @@ export function UploadProvider({ children }) {
     processing.current = false;
   }, [update]);
 
+  const checkFolder = useCallback((job) => {
+    if (!active.current) return;
+    update(job.id, { status: 'checking' });
+    void api(routes.organizationSuggestions, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: job.name, currentFolderId: job.sourceFolderId }),
+    }).then(({ suggestion }) => {
+      if (!active.current) return;
+      if (suggestion) {
+        update(job.id, { status: 'suggested', suggestion });
+      } else {
+        update(job.id, { status: 'queued' });
+        queue.current.push(job);
+        void processQueue();
+      }
+    }).catch(() => {
+      if (!active.current) return;
+      update(job.id, { status: 'queued' });
+      queue.current.push(job);
+      void processQueue();
+    });
+  }, [processQueue, update]);
+
   const enqueue = useCallback((files, folderId) => {
     const incoming = Array.from(files, (file) => {
       const error = validateUpload(file);
       return { id: ++nextId.current, file, name: file.name, size: file.size, folderId,
         sourceFolderId: folderId, destinationName: '', suggestion: null,
-        status: error ? 'failed' : 'checking', progress: 0, error,
+        recognition: null, status: error ? 'failed' : 'recognizing', progress: 0, error,
         code: error ? 'CLIENT_VALIDATION' : '' };
     });
     if (!incoming.length) return;
     setJobs((previous) => [...incoming, ...previous]);
-    for (const job of incoming.filter((item) => !item.error)) {
-      void api(routes.organizationSuggestions, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: job.name, currentFolderId: folderId }),
-      }).then(({ suggestion }) => {
-        if (!active.current) return;
-        if (suggestion) {
-          update(job.id, { status: 'suggested', suggestion });
-        } else {
-          update(job.id, { status: 'queued' });
-          queue.current.push(job);
-          void processQueue();
+    void (async () => {
+      for (const job of incoming.filter((item) => !item.error)) {
+        let recognition;
+        try {
+          recognition = await recognizeFile(job.file);
+        } catch {
+          if (!active.current) return;
+          checkFolder(job);
+          continue;
         }
-      }).catch(() => {
         if (!active.current) return;
-        update(job.id, { status: 'queued' });
-        queue.current.push(job);
-        void processQueue();
-      });
+        const checked = { ...job, recognition };
+        if (recognition.format !== 'UNKNOWN'
+          && recognition.format.toLowerCase() !== extensionOf(job.name)) {
+          update(job.id, { status: 'type_mismatch', recognition });
+          continue;
+        }
+        update(job.id, { recognition });
+        checkFolder(checked);
+      }
+    })();
+  }, [checkFolder, update]);
+
+  const chooseType = useCallback((id, proceed) => {
+    const job = jobs.find((item) => item.id === id);
+    if (!job || job.status !== 'type_mismatch' || typeDecided.current.has(id)) return;
+    typeDecided.current.add(id);
+    if (!proceed) {
+      update(id, { status: 'skipped', file: null });
+      return;
     }
-  }, [processQueue, update]);
+    checkFolder(job);
+  }, [checkFolder, jobs, update]);
 
   const chooseDestination = useCallback((id, accept) => {
     const job = jobs.find((item) => item.id === id);
@@ -131,7 +168,7 @@ export function UploadProvider({ children }) {
     active.current = true;
     return () => { active.current = false; currentRequest.current?.abort(); queue.current = []; };
   }, []);
-  return <UploadContext.Provider value={{ jobs, enqueue, chooseDestination, retry, completedVersion }}>{children}</UploadContext.Provider>;
+  return <UploadContext.Provider value={{ jobs, enqueue, chooseType, chooseDestination, retry, completedVersion }}>{children}</UploadContext.Provider>;
 }
 
 export function useUploads() { return useContext(UploadContext); }
