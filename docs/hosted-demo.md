@@ -16,7 +16,7 @@ This is an invite-only demonstration of the free plan and an **unpaid Demo tier*
 | --- | --- |
 | `DROPVAULT_DEMO_ACCESS_PASSWORD` | A random secret of at least 32 characters for the site gate. |
 | `DROPVAULT_DEMO_PASSWORD` | A separate password of at least 12 characters for the seeded accounts. |
-| `DROPVAULT_PUBLIC_BASE_URL` | The final `https://` origin, such as `https://demo.example.com`. This sets absolute share links and Secure session cookies. |
+| `DROPVAULT_PUBLIC_BASE_URL` | The final `https://` origin, such as `https://demo.example.com`. This sets absolute share links and Secure session cookies. Render supplies its `RENDER_EXTERNAL_URL` automatically when this is unset. |
 | `DROPVAULT_STORAGE_DIR` | Absolute path of the mounted persistent volume. The image defaults to `/data`. The directory must exist. |
 | `PORT` | HTTP listener port; defaults to `3000`. |
 
@@ -33,6 +33,12 @@ docker build -t dropvault-demo .
 Configure the required environment variables as **secrets** in your hosting provider, mount a persistent volume at `/data`, and run the image on port `3000`. Terminate HTTPS at the provider and forward the original `Host` header. Use the provider's health check path `/v1/health`. The health check does not require the invitation password; other pages and endpoints do.
 
 For a local dry run, `DROPVAULT_PUBLIC_BASE_URL` may use a loopback HTTP origin matching the published port. The container expects an existing `/data` mount. Open the site, enter the site access credentials (`demo` and the access password) in the browser prompt, then sign in as Alex with the seeded-account password. The browser prompt is part of this invite-only demo, separate from DropVault's account login.
+
+## Deploy on Render
+
+The repository's [`render.yaml`](../render.yaml) defines one Docker web service, the smallest paid compute plan, a 2 GB persistent disk at `/data`, and the `/v1/health` check. Render will prompt for the two passwords when you create a Blueprint instance. The service uses Render's `RENDER_EXTERNAL_URL` automatically, so you do not need to guess its address before creation. Automatic deploys are off for this demo; deploy a new commit deliberately from the Render dashboard.
+
+In Render, connect the GitHub repository, choose **New → Blueprint**, and select this repository's `main` branch. Review the paid compute and disk settings before creating the service. The free compute plan cannot attach the persistent disk this demo requires. Once the deployment is live, visit the service URL and follow the reviewer path below. Keep the two passwords out of Git and share them only with invited reviewers.
 
 ## Five-minute reviewer path
 
