@@ -1,6 +1,6 @@
 # Try a code-and-data snapshot
 
-This is the current **manual** Git workflow. DropVault stores an archive of one committed code version with selected data file versions; it does not connect to GitHub or act as a Git remote.
+This is the **manual** Git workflow. DropVault stores an archive of one committed code version with selected data file versions. For public repositories, it can also [import and manually refresh from GitHub](github-import.md). It does not act as a Git remote.
 
 ## 1. Prepare a code ZIP
 
@@ -34,9 +34,17 @@ tar -xOf snapshot.tar manifest.json
 
 The manifest maps safe archive paths to original names, folder paths, file IDs, exact version IDs, and the supplied Git commit label. **Restore as new workspace** makes independent copies under your account; it requires enough free quota and does not change the original snapshot.
 
+Each newly downloaded TAR also includes a SHA-256 checksum for every file in its manifest. Verify the download before using it:
+
+```sh
+npm run verify:snapshot -- snapshot.tar
+```
+
+The command checks TAR structure, file sizes, and each checksum without extracting files. Older TAR downloads without checksums must be downloaded again from the snapshot. The checksums detect changed or incomplete downloads; they do not authenticate the person who supplied a manually linked Git commit label.
+
 ## Current limits
 
-- The code ZIP is a point-in-time export. DropVault does not fetch new commits, import a GitHub README separately, or store the repository's Git history.
+- The manually uploaded code ZIP is a point-in-time export. It is not refreshed from GitHub. DropVault does not import a GitHub README separately or store the repository's Git history.
 - The supplied commit label can be forged or belong to another repository. Treat it as a reference until a future verified import exists.
 - DropVault does not detect Git LFS pointer files or missing submodule contents in the ZIP. Inspect the archive before using it as a complete handoff.
 - The upload limit is 100 MiB per file in the running app. A larger code ZIP needs a future larger-file import path.

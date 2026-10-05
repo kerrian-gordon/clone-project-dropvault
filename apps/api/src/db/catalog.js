@@ -38,6 +38,8 @@ export async function openCatalog(path, persistence) {
   state.sessions ??= [];
   state.grants ??= [];
   state.themes ??= [];
+  state.themeReports ??= [];
+  state.themeLibrary ??= [];
   state.appearances ??= [];
   state.versions ??= [];
   state.workspaces ??= [];
@@ -46,7 +48,7 @@ export async function openCatalog(path, persistence) {
   state.snapshotGrants ??= [];
   state.organizationSuggestions ??= [];
   state.organizationStats ??= [];
-  if (![state.users, state.sessions, state.grants, state.themes,
+  if (![state.users, state.sessions, state.grants, state.themes, state.themeReports, state.themeLibrary,
     state.appearances, state.versions, state.workspaces, state.workspaceGrants, state.snapshots,
     state.snapshotGrants,
     state.organizationSuggestions, state.organizationStats].every(Array.isArray)) {
@@ -63,6 +65,13 @@ export async function openCatalog(path, persistence) {
     }
   }
   for (const theme of state.themes) theme.creatorName ??= 'Community member';
+  for (const appearance of state.appearances) {
+    if (appearance.sourceThemeId && !state.themeLibrary.some((entry) =>
+      entry.userId === appearance.userId && entry.themeId === appearance.sourceThemeId)) {
+      state.themeLibrary.push({ userId: appearance.userId, themeId: appearance.sourceThemeId,
+        installedAt: appearance.selectedAt ?? appearance.updatedAt ?? new Date().toISOString() });
+    }
+  }
   const takenNames = [];
   for (const user of state.users) {
     if (validCreatorName(user.displayName)) takenNames.push(user.displayName);
@@ -72,6 +81,26 @@ export async function openCatalog(path, persistence) {
     user.displayName = uniqueDisplayName(publicCreatorName(user.email), takenNames)
       ?? 'Community member';
     takenNames.push(user.displayName);
+  }
+  // Legacy and manually linked ZIP comments are labels, not repository proof.
+  for (const workspace of state.workspaces) {
+    if (workspace.git?.verification !== 'github-api' && workspace.git) {
+      workspace.git.commitVerified = false;
+    } else if (workspace.git?.verification === 'github-api') {
+      workspace.git.repositoryUrl ??= `https://github.com/${workspace.git.repositoryFullName}`;
+      workspace.git.sourceUrl ??= `${workspace.git.repositoryUrl}/tree/${workspace.git.commitSha}`;
+    }
+  }
+  for (const snapshot of state.snapshots) {
+    snapshot.createdById ??= snapshot.ownerId;
+    snapshot.createdByName ??= state.users.find((user) => user.id === snapshot.createdById)
+      ?.displayName ?? 'Community member';
+    if (snapshot.git?.verification !== 'github-api' && snapshot.git) {
+      snapshot.git.commitVerified = false;
+    } else if (snapshot.git?.verification === 'github-api') {
+      snapshot.git.repositoryUrl ??= `https://github.com/${snapshot.git.repositoryFullName}`;
+      snapshot.git.sourceUrl ??= `${snapshot.git.repositoryUrl}/tree/${snapshot.git.commitSha}`;
+    }
   }
 
   let pending = Promise.resolve();
@@ -210,19 +239,29 @@ export async function openCatalog(path, persistence) {
     },
     listThemes(offset = 0, limit = 20, query = '') {
       const needle = query.trim().toLowerCase();
+      const listed = state.themes.filter((theme) => !theme.unlistedAt && !theme.removedAt);
       const matched = needle
-        ? state.themes.filter((theme) => theme.name.toLowerCase().includes(needle)
+        ? listed.filter((theme) => theme.name.toLowerCase().includes(needle)
           || theme.creatorName.toLowerCase().includes(needle))
-        : state.themes;
+        : listed;
       const sorted = [...matched].sort((left, right) =>
         right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id));
       return { themes: sorted.slice(offset, offset + limit), total: sorted.length,
         nextOffset: offset + limit < sorted.length ? offset + limit : null };
     },
     getTheme(themeId) {
-      const theme = state.themes.find((item) => item.id === themeId);
+      const theme = state.themes.find((item) => item.id === themeId && !item.unlistedAt && !item.removedAt);
       if (!theme) throw new ApiError(404, 'THEME_NOT_FOUND', 'Theme was not found');
       return theme;
+    },
+    myThemes(userId) {
+      this.getUser(userId);
+      return {
+        installed: state.themeLibrary.filter((entry) => entry.userId === userId)
+          .map((entry) => state.themes.find((theme) => theme.id === entry.themeId
+            && !theme.removedAt)).filter(Boolean),
+        published: state.themes.filter((theme) => theme.creatorId === userId && !theme.removedAt),
+      };
     },
     async createTheme(creatorId, name, settings) {
       if (!validThemeName(name)) throw new ApiError(400, 'INVALID_THEME_NAME', 'Provide a valid theme name');
@@ -238,7 +277,8 @@ export async function openCatalog(path, persistence) {
         if (!validCreatorName(creatorName)) {
           throw new ApiError(400, 'INVALID_DISPLAY_NAME', 'Provide a public display name');
         }
-        if (next.themes.filter((theme) => theme.creatorId === creatorId).length
+        if (next.themes.filter((theme) => theme.creatorId === creatorId
+          && !theme.unlistedAt && !theme.removedAt).length
           >= MAX_THEMES_PER_ACCOUNT) {
           throw new ApiError(409, 'THEME_LIMIT_REACHED', 'Theme publishing limit reached');
         }
@@ -250,9 +290,46 @@ export async function openCatalog(path, persistence) {
     },
     async deleteTheme(themeId, creatorId) {
       return write((next) => {
-        const index = next.themes.findIndex((item) => item.id === themeId && item.creatorId === creatorId);
+        const index = next.themes.findIndex((item) => item.id === themeId && item.creatorId === creatorId
+          && !item.unlistedAt && !item.removedAt);
         if (index === -1) throw new ApiError(404, 'THEME_NOT_FOUND', 'Theme was not found');
-        next.themes.splice(index, 1);
+        next.themes[index].unlistedAt = new Date().toISOString();
+      });
+    },
+    async reportTheme(themeId, reporterId, reason) {
+      if (!['broken', 'misleading', 'unsafe'].includes(reason)) {
+        throw new ApiError(400, 'INVALID_REPORT_REASON', 'Choose broken, misleading, or unsafe');
+      }
+      return write((next) => {
+        const theme = next.themes.find((item) => item.id === themeId && !item.unlistedAt && !item.removedAt);
+        if (!theme) throw new ApiError(404, 'THEME_NOT_FOUND', 'Theme was not found');
+        if (theme.creatorId === reporterId) {
+          throw new ApiError(400, 'OWN_THEME_REPORT', 'Use unlist for your own theme');
+        }
+        let report = next.themeReports.find((item) => item.themeId === themeId && item.reporterId === reporterId);
+        if (report) {
+          report.reason = reason;
+          report.updatedAt = new Date().toISOString();
+        } else {
+          report = { id: randomUUID(), themeId, reporterId, reason,
+            createdAt: new Date().toISOString() };
+          next.themeReports.push(report);
+        }
+        return { id: report.id, reason: report.reason };
+      });
+    },
+    listThemeReports() {
+      return state.themeReports.map((report) => ({ ...report,
+        theme: state.themes.find((theme) => theme.id === report.themeId) ?? null }));
+    },
+    async safetyRemoveTheme(themeId) {
+      return write((next) => {
+        const theme = next.themes.find((item) => item.id === themeId);
+        if (!theme) throw new ApiError(404, 'THEME_NOT_FOUND', 'Theme was not found');
+        if (theme.removedAt) return;
+        theme.removedAt = new Date().toISOString();
+        next.appearances = next.appearances.filter((appearance) => appearance.sourceThemeId !== themeId);
+        next.themeLibrary = next.themeLibrary.filter((entry) => entry.themeId !== themeId);
       });
     },
     getAppearance(userId) {
@@ -264,13 +341,17 @@ export async function openCatalog(path, persistence) {
     },
     async installTheme(userId, themeId) {
       return write((next) => {
-        const theme = next.themes.find((item) => item.id === themeId);
+        const inLibrary = next.themeLibrary.some((entry) => entry.userId === userId && entry.themeId === themeId);
+        const theme = next.themes.find((item) => item.id === themeId && !item.removedAt
+          && (!item.unlistedAt || inLibrary || item.creatorId === userId));
         if (!theme) throw new ApiError(404, 'THEME_NOT_FOUND', 'Theme was not found');
         const selectedAt = new Date().toISOString();
         const appearance = { userId, sourceThemeId: theme.id, name: theme.name,
           settings: structuredClone(theme.settings), selectedAt, updatedAt: selectedAt };
         next.appearances = next.appearances.filter((item) => item.userId !== userId);
         next.appearances.push(appearance);
+        if (!inLibrary) next.themeLibrary.push({ userId, themeId,
+          installedAt: selectedAt });
         const { userId: _userId, ...publicAppearance } = appearance;
         return publicAppearance;
       });
@@ -392,8 +473,70 @@ export async function openCatalog(path, persistence) {
           throw new ApiError(409, 'GIT_ARCHIVE_CHANGED', 'Choose a current ZIP file in this workspace');
         }
         workspace.git = { archiveFileId: fileId, archiveVersionId: versionId,
-          commitSha, verification: 'zip-comment' };
+          commitSha, verification: 'zip-comment', commitVerified: false };
         return workspace.git;
+      });
+    },
+    async importGitHubArchive(workspaceId, userId, source, stored) {
+      return write((next) => {
+        const workspace = ownedWorkspace(next, workspaceId, userId);
+        if (workspace.git) throw new ApiError(409, 'GIT_ARCHIVE_ALREADY_LINKED',
+          'Remove the current code archive from the workspace before importing a repository');
+        const name = `${source.repo}-source.zip`;
+        if (next.files.some((file) => workspace.fileIds.includes(file.id) && file.name === name)) {
+          throw new ApiError(409, 'NAME_CONFLICT', 'A file with this name is already in the workspace');
+        }
+        const createdAt = new Date().toISOString();
+        const file = { id: randomUUID(), name, folderId: ROOT_FOLDER_ID,
+          ownerId: userId, mimeType: 'application/zip', size: stored.size,
+          createdAt, storageKey: stored.storageKey, currentVersionId: randomUUID() };
+        next.files.push(file);
+        next.versions.push({ id: file.currentVersionId, fileId: file.id, name,
+          storageKey: file.storageKey, mimeType: file.mimeType, size: file.size,
+          createdAt, kind: 'imported', actorId: userId, label: '' });
+        workspace.fileIds.push(file.id);
+        workspace.git = { archiveFileId: file.id, archiveVersionId: file.currentVersionId,
+          commitSha: source.commitSha, verification: 'github-api', commitVerified: true,
+          repositoryFullName: source.repositoryFullName, repositoryUrl: source.repositoryUrl
+            ?? `https://github.com/${source.repositoryFullName}`,
+          sourceUrl: source.sourceUrl
+            ?? `https://github.com/${source.repositoryFullName}/tree/${source.commitSha}`,
+          ref: source.ref, importedAt: createdAt };
+        return { file: publicFile(file), git: workspace.git, unchanged: false };
+      });
+    },
+    async refreshGitHubArchive(workspaceId, userId, source, expected, stored) {
+      return write((next) => {
+        const workspace = ownedWorkspace(next, workspaceId, userId);
+        if (workspace.git?.verification !== 'github-api'
+          || workspace.git.repositoryFullName.toLowerCase() !== source.repositoryFullName.toLowerCase()) {
+          throw new ApiError(409, 'GITHUB_IMPORT_CHANGED', 'The linked GitHub repository changed');
+        }
+        const file = next.files.find((item) => item.id === workspace.git.archiveFileId
+          && item.ownerId === userId);
+        if (!file || !workspace.fileIds.includes(file.id)
+          || file.currentVersionId !== expected.archiveVersionId
+          || workspace.git.archiveVersionId !== expected.archiveVersionId) {
+          throw new ApiError(409, 'GIT_ARCHIVE_CHANGED',
+            'The code archive changed while refreshing; try again');
+        }
+        if (workspace.git.commitSha === source.commitSha) {
+          return { file: publicFile(file), git: workspace.git, unchanged: true };
+        }
+        const createdAt = new Date().toISOString();
+        const version = { id: randomUUID(), fileId: file.id, name: file.name,
+          storageKey: stored.storageKey, mimeType: file.mimeType, size: stored.size,
+          createdAt, kind: 'imported', actorId: userId, label: '' };
+        next.versions.push(version);
+        file.storageKey = version.storageKey;
+        file.size = version.size;
+        file.currentVersionId = version.id;
+        workspace.git = { ...workspace.git, archiveVersionId: version.id,
+          commitSha: source.commitSha, ref: source.ref,
+          sourceUrl: source.sourceUrl
+            ?? `https://github.com/${source.repositoryFullName}/tree/${source.commitSha}`,
+          importedAt: createdAt };
+        return { file: publicFile(file), git: workspace.git, unchanged: false };
       });
     },
     async deleteWorkspace(workspaceId, userId) {
@@ -536,7 +679,10 @@ export async function openCatalog(path, persistence) {
             folderPath,
             mimeType: version.mimeType, size: version.size };
         });
-        const snapshot = { id: randomUUID(), workspaceId, ownerId: userId, name, note,
+        const snapshot = { id: randomUUID(), workspaceId, ownerId: userId,
+          createdById: userId,
+          createdByName: next.users.find((user) => user.id === userId)?.displayName
+            ?? 'Community member', name, note,
           items, git: workspace.git ? { ...workspace.git } : null,
           createdAt: new Date().toISOString() };
         next.snapshots.push(snapshot);
@@ -723,6 +869,11 @@ export async function openCatalog(path, persistence) {
       return write((next) => {
         const file = next.files.find((item) => item.id === fileId && item.ownerId === ownerId);
         if (!file) throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
+        if (next.workspaces.some((workspace) => workspace.ownerId === ownerId
+          && workspace.git?.verification === 'github-api' && workspace.git.archiveFileId === fileId)) {
+          throw new ApiError(409, 'GITHUB_ARCHIVE_MANAGED',
+            'Use Refresh from GitHub to update this code archive');
+        }
         const version = { id: randomUUID(), fileId, name: file.name,
           storageKey: stored.storageKey, mimeType: file.mimeType, size: stored.size,
           createdAt: new Date().toISOString(), kind: 'replaced', actorId, label: '' };
@@ -737,6 +888,11 @@ export async function openCatalog(path, persistence) {
       return write((next) => {
         const file = next.files.find((item) => item.id === fileId && item.ownerId === ownerId);
         if (!file) throw new ApiError(404, 'FILE_NOT_FOUND', 'File was not found');
+        if (next.workspaces.some((workspace) => workspace.ownerId === ownerId
+          && workspace.git?.verification === 'github-api' && workspace.git.archiveFileId === fileId)) {
+          throw new ApiError(409, 'GITHUB_ARCHIVE_MANAGED',
+            'Use Refresh from GitHub to update this code archive');
+        }
         const source = next.versions.find((item) => item.fileId === fileId && item.id === versionId);
         if (!source) throw new ApiError(404, 'VERSION_NOT_FOUND', 'File version was not found');
         const version = { id: randomUUID(), fileId, name: file.name,

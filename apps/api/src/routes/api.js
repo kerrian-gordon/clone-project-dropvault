@@ -44,7 +44,8 @@ async function readJson(request) {
 }
 
 export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BYTES,
-  storageLimitBytes, legacyClaimToken, publicBaseUrl, demoPlanSwitchEnabled = false }) {
+  storageLimitBytes, legacyClaimToken, publicBaseUrl, demoPlanSwitchEnabled = false,
+  moderatorToken, githubClient, secureSessionCookies = false }) {
   let pendingMutation = Promise.resolve();
   let activeMutations = 0;
   let activeUploads = 0;
@@ -150,6 +151,40 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
     if (current?.count) await new Promise((resolve) => current.waiters.push(resolve));
   }
 
+  async function saveGitHubArchive(workspaceId, userId, source, expected = null) {
+    const usage = catalog.usage(userId, storageLimitBytes);
+    const available = Math.max(0, usage.limitBytes - usage.usedBytes);
+    if (available === 0) throw new ApiError(507, 'STORAGE_CAP_EXCEEDED',
+      'Storage limit would be exceeded by the GitHub archive');
+    const downloaded = await githubClient.download(source);
+    if (downloaded.contentLength > maxUploadBytes || downloaded.contentLength > available) {
+      downloaded.stream.destroy();
+      throw downloaded.contentLength > maxUploadBytes
+        ? new ApiError(413, 'FILE_TOO_LARGE', 'GitHub archive exceeds the upload limit')
+        : new ApiError(507, 'STORAGE_CAP_EXCEEDED', 'Storage limit would be exceeded by the GitHub archive');
+    }
+    const stored = await storage.save(downloaded.stream, maxUploadBytes, available);
+    try {
+      await validateStoredFile('source.zip', await storage.sample(stored.storageKey),
+        () => storage.zipEntries(stored.storageKey));
+      await storage.zipEntries(stored.storageKey);
+      return await mutate(() => {
+        catalog.getWorkspace(workspaceId, userId, 'manage');
+        const current = catalog.usage(userId, storageLimitBytes);
+        if (stored.size > Math.max(0, current.limitBytes - current.usedBytes)) {
+          throw new ApiError(507, 'STORAGE_CAP_EXCEEDED',
+            'Storage limit would be exceeded by the GitHub archive');
+        }
+        return expected
+          ? catalog.refreshGitHubArchive(workspaceId, userId, source, expected, stored)
+          : catalog.importGitHubArchive(workspaceId, userId, source, stored);
+      });
+    } catch (error) {
+      await storage.remove(stored.storageKey);
+      throw error;
+    }
+  }
+
   return async (request, response) => {
     const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(request.method);
     const uploadPath = new URL(request.url, 'http://localhost').pathname;
@@ -176,6 +211,25 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       if (request.method === 'GET' && path === '/v1/capabilities') {
         return json(response, 200, { demoPlanSwitchEnabled });
       }
+      const moderationPath = path === '/v1/moderation/theme-reports'
+        || /^\/v1\/moderation\/themes\/[^/]+\/remove$/u.test(path);
+      if (moderationPath) {
+        const supplied = request.headers['x-dropvault-moderator-token'];
+        if (!moderatorToken || typeof supplied !== 'string'
+          || !timingSafeEqual(createHash('sha256').update(supplied).digest(),
+            createHash('sha256').update(moderatorToken).digest())) {
+          throw new ApiError(404, 'NOT_FOUND', 'Route was not found');
+        }
+        if (request.method === 'GET' && path === '/v1/moderation/theme-reports') {
+          return json(response, 200, { reports: catalog.listThemeReports() });
+        }
+        const removeMatch = /^\/v1\/moderation\/themes\/([^/]+)\/remove$/u.exec(path);
+        if (request.method === 'POST' && removeMatch) {
+          await mutate(() => catalog.safetyRemoveTheme(removeMatch[1]));
+          response.writeHead(204);
+          return response.end();
+        }
+      }
       if (request.method === 'POST' && path === '/v1/auth/register') {
         authLimiter.registration(request.socket.remoteAddress);
         const input = await readJson(request);
@@ -185,7 +239,8 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         const user = await catalog.createUser(input.email.trim().toLowerCase(),
           await hashPassword(input.password), input?.displayName);
         const token = await createSession(catalog, user.id);
-        return json(response, 201, user, { 'Set-Cookie': sessionCookie(token, !!request.socket.encrypted) });
+        return json(response, 201, user, { 'Set-Cookie': sessionCookie(token,
+          secureSessionCookies || !!request.socket.encrypted) });
       }
       if (request.method === 'POST' && path === '/v1/auth/login') {
         const input = await readJson(request);
@@ -201,7 +256,7 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         authLimiter.successfulLogin(ip, email);
         const token = await createSession(catalog, user.id);
         return json(response, 200, catalog.getUser(user.id),
-          { 'Set-Cookie': sessionCookie(token, !!request.socket.encrypted) });
+          { 'Set-Cookie': sessionCookie(token, secureSessionCookies || !!request.socket.encrypted) });
       }
       const shareMatch = /^\/v1\/shares\/([^/]+)$/u.exec(path);
       if (request.method === 'GET' && shareMatch) {
@@ -212,7 +267,8 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       const user = requireUser(request, catalog);
       if (request.method === 'POST' && path === '/v1/auth/logout') {
         await catalog.deleteSession(sessionToken(request));
-        response.writeHead(204, { 'Set-Cookie': clearSessionCookie(!!request.socket.encrypted) });
+        response.writeHead(204, { 'Set-Cookie': clearSessionCookie(
+          secureSessionCookies || !!request.socket.encrypted) });
         return response.end();
       }
       if (request.method === 'GET' && path === '/v1/account') {
@@ -220,6 +276,9 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
       }
       if (request.method === 'GET' && path === '/v1/account/appearance') {
         return json(response, 200, catalog.getAppearance(user.id));
+      }
+      if (request.method === 'GET' && path === '/v1/account/themes') {
+        return json(response, 200, catalog.myThemes(user.id));
       }
       if (request.method === 'PUT' && path === '/v1/account/appearance') {
         const input = await readJson(request);
@@ -255,6 +314,11 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
           input?.settings));
       }
       const themeMatch = /^\/v1\/themes\/([^/]+)$/u.exec(path);
+      const reportMatch = /^\/v1\/themes\/([^/]+)\/report$/u.exec(path);
+      if (request.method === 'POST' && reportMatch) {
+        const input = await readJson(request);
+        return json(response, 200, await mutate(() => catalog.reportTheme(reportMatch[1], user.id, input?.reason)));
+      }
       if (request.method === 'GET' && themeMatch) {
         return json(response, 200, catalog.getTheme(themeMatch[1]));
       }
@@ -349,6 +413,41 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         }
         return json(response, 200, await mutate(() => catalog.setWorkspaceGitArchive(
           workspace.id, user.id, file.id, file.currentVersionId, commit)));
+      }
+      if (request.method === 'POST' && path === '/v1/github/commits') {
+        const input = await readJson(request);
+        return json(response, 200, await githubClient.listCommits(input?.repository));
+      }
+      const githubImportMatch = /^\/v1\/workspaces\/([^/]+)\/github\/import$/u.exec(path);
+      if (request.method === 'POST' && githubImportMatch) {
+        const input = await readJson(request);
+        const workspace = catalog.getWorkspace(githubImportMatch[1], user.id, 'manage');
+        if (workspace.git) throw new ApiError(409, 'GIT_ARCHIVE_ALREADY_LINKED',
+          'Remove the current code archive from the workspace before importing a repository');
+        const source = await githubClient.resolve(input?.repository, input?.commitSha);
+        return json(response, 201, await saveGitHubArchive(workspace.id, user.id, source));
+      }
+      const githubRefreshMatch = /^\/v1\/workspaces\/([^/]+)\/github\/refresh$/u.exec(path);
+      if (request.method === 'POST' && githubRefreshMatch) {
+        const workspace = catalog.getWorkspace(githubRefreshMatch[1], user.id, 'manage');
+        if (workspace.git?.verification !== 'github-api') {
+          throw new ApiError(409, 'GITHUB_IMPORT_REQUIRED', 'Import a public GitHub repository first');
+        }
+        const expected = { ...workspace.git };
+        const source = await githubClient.resolve(expected.repositoryFullName);
+        if (source.commitSha === expected.commitSha) {
+          const current = catalog.getWorkspace(workspace.id, user.id, 'manage');
+          const file = catalog.getFile(expected.archiveFileId, user.id, 'manage');
+          if (current.git?.verification !== 'github-api'
+            || current.git.archiveVersionId !== expected.archiveVersionId
+            || file.currentVersionId !== expected.archiveVersionId) {
+            throw new ApiError(409, 'GIT_ARCHIVE_CHANGED',
+              'The code archive changed while refreshing; try again');
+          }
+          return json(response, 200, { git: current.git, unchanged: true });
+        }
+        return json(response, 200, await saveGitHubArchive(workspace.id, user.id, source,
+          expected));
       }
       const workspaceUploadMatch = /^\/v1\/workspaces\/([^/]+)\/uploads$/u.exec(path);
       if (request.method === 'POST' && workspaceUploadMatch) {
@@ -512,12 +611,13 @@ export function createHandler({ catalog, storage, maxUploadBytes = MAX_UPLOAD_BY
         const releases = [];
         try {
           for (const item of snapshot.items) releases.push(beginRead(item.fileId));
+          const archive = await snapshotArchive(snapshot, versions, storage);
           response.writeHead(200, {
             'Content-Type': 'application/x-tar',
             'Content-Disposition': `attachment; filename="snapshot-${snapshot.id}.tar"`,
             'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store',
           });
-          await pipeline(snapshotArchive(snapshot, versions, storage), response);
+          await pipeline(archive, response);
         } finally {
           for (const release of releases) release();
         }

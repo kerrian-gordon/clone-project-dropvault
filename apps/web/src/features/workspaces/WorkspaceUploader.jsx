@@ -25,11 +25,14 @@ function sendFile(path, file, onProgress) {
 export function WorkspaceUploader({ workspaceId, onDone }) {
   const [jobs, setJobs] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [notice, setNotice] = useState('');
   const input = useRef(null);
   async function submit(files) {
     const batch = Array.from(files).map((file, index) => ({ id: `${Date.now()}-${index}`,
       file, name: file.name, status: 'queued', progress: 0, error: validateUpload(file) }));
     if (!batch.length) return;
+    setNotice('');
     setJobs((previous) => [...batch, ...previous]);
     setBusy(true);
     for (const job of batch) {
@@ -56,14 +59,31 @@ export function WorkspaceUploader({ workspaceId, onDone }) {
     setBusy(false);
     if (input.current) input.current.value = '';
   }
-  return <section className="workspace-card">
-    <h2>Contribute files</h2>
-    <p className="muted">Uploaded files belong to the workspace owner and use their storage quota. Successful files stay here if another upload fails.</p>
-    <input ref={input} type="file" multiple disabled={busy} aria-label="Choose workspace files"
-      onChange={(event) => void submit(event.target.files)} />
-    {jobs.length > 0 && <ul>{jobs.map((job) => <li key={job.id}>{job.name}: {job.error || job.status}
-      {job.status === 'uploading' && <progress value={job.progress} max="100" aria-label={`${job.name} progress`} />}
-    </li>)}</ul>}
+  return <section className="workspace-card" id="workspace-upload">
+    <h2>Add project files</h2>
+    <p className="muted">Drop files here or choose several at once. Uploads belong to the workspace owner and use their storage quota.</p>
+    <div className={`drop-zone workspace-drop-zone${dragging ? ' dragging' : ''}`}
+      onDragEnter={(event) => { event.preventDefault(); if (!busy) setDragging(true); }}
+      onDragOver={(event) => event.preventDefault()}
+      onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDragging(false); }}
+      onDrop={(event) => { event.preventDefault(); setDragging(false);
+        if (busy) setNotice('Finish the current upload before adding more files.');
+        else void submit(event.dataTransfer.files); }}>
+      <strong>Drag files into this workspace</strong>
+      <span className="muted">or choose them from your device</span>
+      <label className="button-link">Choose files<input ref={input} className="visually-hidden"
+        type="file" multiple disabled={busy} aria-label="Choose workspace files"
+        onChange={(event) => void submit(event.target.files)} /></label>
+      {busy && <small className="muted">Uploading this batch…</small>}
+    </div>
+    {notice && <p className="error" role="status">{notice}</p>}
+    {jobs.length > 0 && <div className="workspace-upload-results" aria-live="polite"><h3>Upload activity</h3>
+      <ul>{jobs.map((job) => <li key={job.id}><strong>{job.name}:</strong>{' '}
+        <span className={job.status === 'failed' ? 'error' : job.status === 'success' ? 'success' : 'muted'}>
+          {job.error || job.status}</span>
+        {job.status === 'uploading' && <progress value={job.progress} max="100" aria-label={`${job.name} progress`} />}
+      </li>)}</ul>
+    </div>}
   </section>;
 }
 

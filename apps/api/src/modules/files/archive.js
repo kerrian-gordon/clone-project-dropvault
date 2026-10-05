@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream';
+import { createHash } from 'node:crypto';
 
 const BLOCK = 512;
 
@@ -49,13 +50,26 @@ function safeEntryName(item, index) {
   return path.length <= 255 && canSplit ? path : `files/${file}`;
 }
 
-export function snapshotArchive(snapshot, versions, storage) {
+export async function snapshotArchive(snapshot, versions, storage) {
   const entries = snapshot.items.map((item, index) => ({ item, version: versions[index],
     path: safeEntryName(item, index) }));
+  for (const entry of entries) {
+    const hash = createHash('sha256');
+    let size = 0;
+    for await (const chunk of storage.read(entry.version.storageKey)) {
+      size += chunk.length;
+      if (size > entry.item.size) throw new Error('Snapshot content size mismatch');
+      hash.update(chunk);
+    }
+    if (size !== entry.item.size) throw new Error('Snapshot content size mismatch');
+    entry.sha256 = hash.digest('hex');
+  }
   const manifest = Buffer.from(JSON.stringify({ format: 'dropvault-snapshot-v1',
-    snapshotId: snapshot.id, workspaceId: snapshot.workspaceId, name: snapshot.name,
+    snapshotId: snapshot.id, workspaceId: snapshot.workspaceId,
+    createdById: snapshot.createdById, createdByName: snapshot.createdByName,
+    name: snapshot.name,
     note: snapshot.note, createdAt: snapshot.createdAt, git: snapshot.git ?? null,
-    files: entries.map(({ item, path }) => ({ path, ...item })) }, null, 2));
+    files: entries.map(({ item, path, sha256 }) => ({ path, ...item, sha256 })) }, null, 2));
   return Readable.from((async function* () {
     yield header('manifest.json', manifest.length, snapshot.createdAt);
     yield manifest;

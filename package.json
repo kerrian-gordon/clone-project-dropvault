@@ -7,13 +7,17 @@
   },
   "scripts": {
     "start:api": "node apps/api/src/start.js",
+    "start:demo": "node apps/api/src/start-demo.js",
     "seed:demo": "node apps/api/src/seed-demo.js",
     "reset:demo": "node apps/api/src/seed-demo.js --reset",
     "dev:api": "node --watch apps/api/src/start.js",
     "dev:web": "npm --prefix apps/web run dev",
     "build:web": "npm --prefix apps/web run build",
+    "verify:snapshot": "node scripts/verify-snapshot.mjs",
+    "restore:snapshot": "node scripts/restore-snapshot.mjs",
+    "pilot:folders": "node scripts/evaluate-folder-suggestions.mjs",
     "smoke:production-storage": "node scripts/smoke-production-storage.mjs",
-    "test": "node --test apps/api/test/*.test.js && npm --prefix apps/web test"
+    "test": "node --test apps/api/test/*.test.js && node --test scripts/*.test.mjs && npm --prefix apps/web test"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1142.0",

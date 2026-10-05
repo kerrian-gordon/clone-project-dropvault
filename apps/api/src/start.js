@@ -15,6 +15,8 @@ export function apiListenOptions(overrides = {}) {
   const legacyClaimToken = Object.hasOwn(overrides, 'legacyClaimToken')
     ? overrides.legacyClaimToken
     : process.env.DROPVAULT_LEGACY_CLAIM_TOKEN;
+  const moderatorToken = Object.hasOwn(overrides, 'moderatorToken')
+    ? overrides.moderatorToken : process.env.DROPVAULT_MODERATOR_TOKEN;
   const publicBaseUrl = Object.hasOwn(overrides, 'publicBaseUrl')
     ? overrides.publicBaseUrl
     : process.env.DROPVAULT_PUBLIC_BASE_URL;
@@ -42,7 +44,7 @@ export function apiListenOptions(overrides = {}) {
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('PORT must be an integer from 1 to 65535');
   }
-  return { storageRoot, port, storageLimitBytes, legacyClaimToken, publicBaseUrl, host,
+  return { storageRoot, port, storageLimitBytes, legacyClaimToken, moderatorToken, publicBaseUrl, host,
     productionStorage, demoPlanSwitchEnabled };
 }
 
@@ -52,6 +54,7 @@ export async function listenApi(overrides = {}) {
     storageRoot: options.storageRoot,
     storageLimitBytes: options.storageLimitBytes,
     legacyClaimToken: options.legacyClaimToken,
+    moderatorToken: options.moderatorToken,
     publicBaseUrl: options.publicBaseUrl,
     productionStorage: options.productionStorage,
     demoPlanSwitchEnabled: options.demoPlanSwitchEnabled,

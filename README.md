@@ -2,7 +2,7 @@
 
 **Keep a project's files, collaborators, and exact milestones together.** DropVault is a two-person, Dropbox-style web app prototype. People can upload documents, data, images, media, and archives; share them with named accounts or temporary links; and collect related files in a workspace. A snapshot records the exact versions used for a milestone, so later edits do not change that record.
 
-The app runs locally today. There is **no public hosted demo** yet; the [local demo](#try-it-locally) takes a few minutes.
+The app runs locally today. A [containerized, invite-only freemium demo](docs/hosted-demo.md) is ready to deploy with a persistent volume; no public instance is running from this repository. The [local demo](#try-it-locally) takes a few minutes.
 
 ## See it
 
@@ -19,10 +19,13 @@ These screenshots were captured from the running app with an isolated fake accou
 - **Files:** Browse folders, drag and drop multiple files, track each upload, preview browser-supported formats, and download the originals. The API validates the declared type and file structure for selected formats. Supported extensions include PDF, DOCX, PPTX, XLSX, TXT, CSV, JSON, PNG, JPG, GIF, WebP, MP3, MP4, ZIP, and GZ. The default per-file limit is 100 MiB.
 - **Ownership and sharing:** Register and sign in; grant a named account access to a file; create and revoke seven-day bearer links; delete owned files; and see used storage against an account limit.
 - **Version history:** Upload a replacement, label versions, compare text revisions, preview or download older bytes, and restore an earlier version as a new current revision. Retained versions count toward storage.
-- **Project workspaces:** Group selected files, invite viewers or contributors, and save snapshots of exact file versions. Members can download a snapshot as a TAR archive; an authorized account can copy it into a new workspace under its own quota. A manually uploaded Git archive ZIP can carry a commit label alongside the data snapshot.
-- **Themes:** Browse community themes, install one, customize your saved appearance, and publish a theme with a public creator name.
+- **Project workspaces:** Group selected files, invite viewers or contributors, and save snapshots of exact file versions. Members can download a snapshot as a TAR archive; an authorized account can copy it into a new workspace under its own quota. Choose a commit from a public GitHub repository to import as a code ZIP, then save its source URL with the snapshot. A manual refresh can bring in a newer default-branch commit. A manually uploaded Git archive remains an option.
 
-Workspaces currently list files without a nested folder tree. Snapshots record each selected file's existing folder path, and copying a snapshot recreates those paths in **My files**. The Git archive label is uploader supplied; DropVault does not connect to GitHub or verify that commit.
+Downloaded snapshots include per-file SHA-256 checksums. Run `npm run verify:snapshot -- snapshot.tar` to check a handoff before using its files.
+Run `npm run restore:snapshot -- snapshot.tar ./restored-handoff` to verify and unpack its code ZIP and project files into a new local directory.
+- **Themes:** Browse community themes, install one, customize your saved appearance, and publish a theme with a public creator name. My themes lists designs you installed or published. You can return to default anytime, and report a listed theme. Creators can unlist a theme without interrupting existing copies; a platform safety removal resets installed copies.
+
+Workspaces currently list files without a nested folder tree. Snapshots record each selected file's existing folder path, and copying a snapshot recreates those paths in **My files**. GitHub imports are tied to a commit returned by GitHub's API; manually uploaded Git archive labels are uploader supplied and unverified.
 
 ## Try it locally
 
@@ -74,9 +77,10 @@ The web and API apps share route helpers, upload types, and limits in [`packages
 | --- | --- |
 | Web and API flows | Working locally; automated API, web, and browser checks cover key paths. A complete browser check of every flow remains to be built. |
 | Storage | Local disk and JSON catalog are the tested development path. S3 and PostgreSQL code and an isolated smoke script exist, but the repository has not recorded a live AWS smoke run or production load test. |
-| Upgrades | The unpaid Demo tier switch is a **local-only test flow**. Public billing and entitlement are not implemented. |
-| GitHub | A Git archive ZIP can be linked manually. Repository sync, GitHub sign-in, and automatic README import are not implemented. |
-| File recognition ML | A supervised random-forest pilot and content detector were evaluated **offline**. Neither runs in the upload API; [the pilot report](docs/ml/pilot-report.md) explains why it is not ready as a product feature. |
+| Upgrades | The unpaid Demo tier switch is available in local testing and the separately gated hosted demo. Public billing and entitlement are not implemented. |
+| GitHub | Public repository import lets the owner choose a recent commit or enter a full commit SHA. Manual refresh checks the default branch. Private repositories, GitHub sign-in, automatic sync, Git history, and editing or pushing code are not implemented. |
+| File recognition | The web uploader checks up to 8 MiB of local file content and shows a conservative format hint. A clear mismatch pauses that file for a choice. Unknown formats continue through the usual upload checks. The supervised random-forest pilot remains offline; see [feature behavior and evidence](docs/file-recognition.md). |
+| Folder suggestions | The live uploader uses user-confirmed rules. An [offline model experiment](docs/ml/folder-suggestion-experiment.md) compares those rules with a per-account learner on later reviewed examples; the included fixture is synthetic and the model does not serve users. |
 
 The API has session cookies, ownership checks, per-account quotas, rate limits, and upload validation. These are prototype safeguards; see the [API contract](docs/api.md) for their boundaries. Do not put real credentials or private files in the repository.
 
@@ -87,11 +91,18 @@ DropVault is a collaboration between [@umerbashir-del](https://github.com/umerba
 ## More detail
 
 - [Local setup, configuration, and checks](docs/local-development.md)
+- [Invite-only hosted freemium demo](docs/hosted-demo.md)
 - [Manual Git archive and data snapshot walkthrough](docs/git-workspace-walkthrough.md)
+- [Public GitHub import and refresh](docs/github-import.md)
+- [Offline snapshot restore](docs/offline-snapshot-restore.md)
+- [Two-account handoff rehearsal and its limits](docs/handoff-rehearsal.md)
 - [API, data model, and permissions](docs/api.md)
 - [Multi-user MVP plan](docs/multi-user-freemium-mvp.md)
 - [Offline file-recognition pilot and results](docs/ml/pilot-report.md)
+- [Upload file-recognition behavior and evidence](docs/file-recognition.md)
+- [Folder suggestion experiment](docs/ml/folder-suggestion-experiment.md)
 - [Theme storefront requirements](docs/community-theme-storefront-section-3.md)
+- [Theme gallery pilot and safety operations](docs/theme-pilot.md)
 
 To run checks after installing dependencies:
 

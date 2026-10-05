@@ -4,11 +4,14 @@ import { once } from 'node:events';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
+import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { chromium } from 'playwright-core';
 import { createServer as createViteServer } from 'vite';
 import { createApiServer } from '../../api/src/server.js';
+import { verifySnapshotArchive } from '../../../scripts/verify-snapshot.mjs';
+import { restoreSnapshotArchive } from '../../../scripts/restore-snapshot.mjs';
 
 function tarEntries(bytes) {
   const entries = new Map();
@@ -33,7 +36,6 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
     const repo = join(tempRoot, 'sample-repo');
     const storageRoot = join(tempRoot, 'storage');
     const archivePath = join(tempRoot, 'code.zip');
-    const dataPath = join(tempRoot, 'results.csv');
     const readme = '# Trial project\n\nRun `python analysis.py` with results.csv.\n';
     const csv = 'trial,score\n1,82\n2,91\n';
     const revisedCsv = 'trial,score\n1,83\n2,93\n';
@@ -45,7 +47,6 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
       await mkdir(repo);
       await writeFile(join(repo, 'README.md'), readme);
       await writeFile(join(repo, 'analysis.py'), 'print("trial analysis")\n');
-      await writeFile(dataPath, csv);
       execFileSync('git', ['-C', repo, 'init', '-q']);
       execFileSync('git', ['-C', repo, 'config', 'core.autocrlf', 'false']);
       execFileSync('git', ['-C', repo, 'add', '.']);
@@ -54,18 +55,50 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
       const commit = execFileSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
       execFileSync('git', ['-C', repo, 'archive', '--format=zip', `--output=${archivePath}`, 'HEAD']);
       const zip = await readFile(archivePath);
+      await writeFile(join(repo, 'analysis.py'), 'print("revised trial analysis")\n');
+      execFileSync('git', ['-C', repo, 'add', '.']);
+      execFileSync('git', ['-C', repo, '-c', 'user.name=DropVault Test',
+        '-c', 'user.email=dropvault@example.test', 'commit', '-qm', 'Revise trial code']);
+      const nextCommit = execFileSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+      const nextArchivePath = join(tempRoot, 'next-code.zip');
+      execFileSync('git', ['-C', repo, 'archive', '--format=zip', `--output=${nextArchivePath}`, 'HEAD']);
+      const nextZip = await readFile(nextArchivePath);
+      let githubSha = commit;
 
-      api = await createApiServer({ storageRoot });
+      api = await createApiServer({ storageRoot, githubClient: {
+        async listCommits(repository) {
+          assert.equal(repository, 'sample/project');
+          return { repositoryFullName: repository, defaultBranch: 'main',
+            commits: [{ sha: githubSha, message: 'Save trial code', date: null }] };
+        },
+        async resolve(repository, selectedSha) {
+          assert.equal(repository, 'sample/project');
+          return { owner: 'sample', repo: 'project', repositoryFullName: 'sample/project',
+            ref: selectedSha ?? 'main', commitSha: selectedSha ?? githubSha };
+        },
+        async download(source) {
+          assert.ok([commit, nextCommit].includes(source.commitSha));
+          const bytes = source.commitSha === nextCommit ? nextZip : zip;
+          return { stream: Readable.from([bytes]), contentLength: bytes.length };
+        },
+      } });
       api.listen(0, '127.0.0.1');
       await once(api, 'listening');
       const apiOrigin = `http://127.0.0.1:${api.address().port}`;
       const credentials = { email: 'git-flow@example.test', password: 'correct horse battery staple' };
+      const recipient = { email: 'recipient@example.test', password: credentials.password };
       const registration = await fetch(`${apiOrigin}/v1/auth/register`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials),
       });
       assert.equal(registration.status, 201);
       const cookie = registration.headers.get('set-cookie').split(';', 1)[0];
+      const recipientRegistration = await fetch(`${apiOrigin}/v1/auth/register`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(recipient),
+      });
+      assert.equal(recipientRegistration.status, 201);
+      const recipientCookie = recipientRegistration.headers.get('set-cookie').split(';', 1)[0];
       vite = await createViteServer({
         configFile: false, root: webRoot, esbuild: { jsx: 'automatic' },
         server: { host: '127.0.0.1', port: 0, strictPort: false,
@@ -87,12 +120,21 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
       await page.getByRole('button', { name: 'Create workspace' }).click();
       await page.getByRole('heading', { name: 'Trial project' }).waitFor();
       await page.locator('input[aria-label="Choose workspace files"]')
-        .setInputFiles([archivePath, dataPath]);
+        .setInputFiles(archivePath);
       await page.getByText('code.zip: success').waitFor();
+      const dataTransfer = await page.evaluateHandle((content) => {
+        const transfer = new DataTransfer();
+        transfer.items.add(new File([content], 'results.csv', { type: 'text/csv' }));
+        return transfer;
+      }, csv);
+      await page.locator('.workspace-drop-zone').dispatchEvent('drop', { dataTransfer });
       await page.getByText('results.csv: success').waitFor();
       await page.getByRole('combobox', { name: 'Git code archive' }).selectOption({ label: 'code.zip' });
       await page.getByRole('button', { name: 'Link archive' }).click();
-      await page.getByText(new RegExp(`Linked commit ${commit} from a ZIP comment`, 'u')).waitFor();
+      await page.getByText(new RegExp(`Claimed commit ${commit} from its ZIP comment. Not verified against GitHub`, 'u')).waitFor();
+      await page.setViewportSize({ width: 390, height: 844 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+      await page.setViewportSize({ width: 1280, height: 720 });
       const checks = page.locator('.workspace-files input[type="checkbox"]');
       assert.equal(await checks.count(), 2);
       const codeCheck = page.locator('.workspace-files li').filter({ hasText: 'code.zip' })
@@ -101,6 +143,15 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
         .locator('input[type="checkbox"]');
       assert.equal(await codeCheck.isChecked(), true);
       assert.equal(await codeCheck.isDisabled(), true);
+      const search = page.getByRole('searchbox', { name: 'Search project files' });
+      await search.fill('results');
+      assert.equal(await page.locator('.workspace-files li').count(), 1);
+      await page.getByRole('button', { name: 'Select all' }).click();
+      await search.fill('');
+      assert.equal(await dataCheck.isChecked(), true);
+      await page.getByRole('button', { name: 'Clear other files' }).click();
+      assert.equal(await codeCheck.isChecked(), true);
+      assert.equal(await dataCheck.isChecked(), false);
       await dataCheck.check();
       await page.getByRole('textbox', { name: 'Snapshot name' }).fill('Trial one');
       await page.getByRole('button', { name: 'Review snapshot' }).click();
@@ -119,15 +170,21 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
       await page.getByRole('button', { name: 'Create fixed snapshot' }).click();
       await page.getByRole('heading', { name: 'Trial one' }).waitFor();
       assert.match(await page.locator('.workspace-page').innerText(), new RegExp(commit, 'u'));
+      await page.getByText('Not verified against GitHub.', { exact: false }).waitFor();
+      await page.getByText('Code archive · version', { exact: false }).waitFor();
 
       const downloadPromise = page.waitForEvent('download');
       await page.getByRole('link', { name: 'Download all (.tar)' }).click();
       const download = await downloadPromise;
       const tarPath = join(tempRoot, 'snapshot.tar');
       await download.saveAs(tarPath);
+      assert.equal((await verifySnapshotArchive(tarPath)).gitCommit, commit);
       const entries = tarEntries(await readFile(tarPath));
       const manifest = JSON.parse(entries.get('manifest.json').toString('utf8'));
       assert.equal(manifest.git.commitSha, commit);
+      assert.equal(manifest.git.commitVerified, false);
+      assert.equal(typeof manifest.createdById, 'string');
+      assert.equal(typeof manifest.createdByName, 'string');
       assert.deepEqual(manifest.files.map((file) => file.name).sort(), ['code.zip', 'results.csv']);
       const code = manifest.files.find((file) => file.name === 'code.zip');
       const data = manifest.files.find((file) => file.name === 'results.csv');
@@ -151,6 +208,80 @@ test('real Git archive and dataset survive workspace snapshot export and copy',
         const bytes = Buffer.from(await response.arrayBuffer());
         assert.deepEqual(bytes, file.name === 'code.zip' ? zip : Buffer.from(revisedCsv));
       }
+      await page.getByRole('link', { name: 'Workspaces', exact: true }).click();
+      await page.getByRole('textbox', { name: 'Name' }).fill('GitHub import');
+      await page.getByRole('button', { name: 'Create workspace' }).click();
+      await page.getByRole('textbox', { name: 'Public GitHub repository' }).fill('sample/project');
+      await page.getByRole('button', { name: 'Load commits' }).click();
+      await page.getByRole('combobox', { name: 'GitHub commit' }).selectOption(commit);
+      await page.getByRole('button', { name: 'Import selected commit' }).click();
+      await page.getByText(`Imported from sample/project at ${commit}`, { exact: false }).waitFor();
+      assert.equal(await page.getByRole('link', { name: 'View source at this commit' })
+        .getAttribute('href'), `https://github.com/sample/project/tree/${commit}`);
+      await page.getByRole('button', { name: 'Refresh from GitHub' }).click();
+      await page.getByText('Already at the latest commit on the default branch.').waitFor();
+      githubSha = nextCommit;
+      await page.getByRole('button', { name: 'Refresh from GitHub' }).click();
+      await page.getByText('Earlier snapshots keep their saved code version.', { exact: false }).waitFor();
+      await page.getByText(`Imported from sample/project at ${githubSha}`, { exact: false }).waitFor();
+      await page.locator('input[aria-label="Choose workspace files"]').setInputFiles({
+        name: 'dataset.csv', mimeType: 'text/csv', buffer: Buffer.from(csv),
+      });
+      await page.getByText('dataset.csv: success').waitFor();
+      await page.locator('.workspace-files li').filter({ hasText: 'dataset.csv' })
+        .locator('input[type="checkbox"]').check();
+      await page.getByRole('textbox', { name: 'Snapshot name' }).fill('Imported code');
+      await page.getByRole('button', { name: 'Review snapshot' }).click();
+      await page.getByRole('button', { name: 'Create fixed snapshot' }).click();
+      await page.getByText(`Imported from sample/project at GitHub commit ${githubSha}`,
+        { exact: false }).waitFor();
+      assert.equal(await page.getByRole('link', { name: 'View source at this commit' })
+        .getAttribute('href'), `https://github.com/sample/project/tree/${githubSha}`);
+      const importedSnapshotId = new URL(page.url()).pathname.split('/').at(-1);
+      await page.locator('.workspace-page').getByRole('link', { name: /Workspaces/u }).click();
+      await page.getByRole('textbox', { name: 'Team member email' }).fill(recipient.email);
+      await page.getByRole('button', { name: 'Invite or update' }).click();
+      await page.getByText(recipient.email, { exact: false }).waitFor();
+
+      const recipientPage = await browser.newPage({ acceptDownloads: true });
+      recipientPage.setDefaultTimeout(10_000);
+      recipientPage.on('pageerror', (error) => pageErrors.push(error.message));
+      await recipientPage.goto(webOrigin, { waitUntil: 'domcontentloaded', timeout: 20_000 });
+      await recipientPage.getByRole('textbox', { name: 'Email' }).fill(recipient.email);
+      await recipientPage.getByRole('textbox', { name: 'Password' }).fill(recipient.password);
+      await recipientPage.getByRole('button', { name: 'Log in' }).click();
+      await recipientPage.getByRole('link', { name: 'Workspaces', exact: true }).click();
+      await recipientPage.getByRole('link', { name: 'GitHub import' }).click();
+      await recipientPage.getByRole('link', { name: 'Imported code' }).click();
+      assert.equal(new URL(recipientPage.url()).pathname.split('/').at(-1), importedSnapshotId);
+      const recipientDownloadPromise = recipientPage.waitForEvent('download');
+      await recipientPage.getByRole('link', { name: 'Download all (.tar)' }).click();
+      const recipientDownload = await recipientDownloadPromise;
+      const recipientDir = join(tempRoot, 'recipient-clean-machine');
+      await mkdir(recipientDir);
+      const recipientTarPath = join(recipientDir, 'snapshot.tar');
+      await recipientDownload.saveAs(recipientTarPath);
+      assert.deepEqual(await verifySnapshotArchive(recipientTarPath), {
+        snapshotId: importedSnapshotId, files: 2, gitCommit: nextCommit,
+      });
+      const recipientEntries = tarEntries(await readFile(recipientTarPath));
+      const recipientManifest = JSON.parse(recipientEntries.get('manifest.json').toString('utf8'));
+      assert.deepEqual(recipientManifest.files.map((file) => file.name).sort(),
+        ['dataset.csv', 'project-source.zip']);
+      assert.deepEqual(recipientEntries.get(recipientManifest.files.find((file) =>
+        file.name.endsWith('.zip')).path), nextZip);
+      assert.equal(recipientEntries.get(recipientManifest.files.find((file) =>
+        file.name === 'dataset.csv').path).toString('utf8'), csv);
+      const localRestore = join(recipientDir, 'restored');
+      await restoreSnapshotArchive(recipientTarPath, localRestore);
+      assert.deepEqual(await readFile(join(localRestore, 'code', 'code.zip')), nextZip);
+      assert.equal(await readFile(join(localRestore, 'assets', 'dataset.csv'), 'utf8'), csv);
+      const deniedChange = await fetch(`${apiOrigin}/v1/workspaces/${recipientManifest.workspaceId}/github/refresh`, {
+        method: 'POST', headers: { Cookie: recipientCookie },
+      });
+      assert.equal(deniedChange.status, 404);
+      await recipientPage.getByRole('button', { name: 'Restore as new workspace' }).click();
+      await recipientPage.getByRole('heading', { name: 'Imported code (copy)' }).waitFor();
       assert.deepEqual(pageErrors, []);
     } finally {
       if (browser) await browser.close();

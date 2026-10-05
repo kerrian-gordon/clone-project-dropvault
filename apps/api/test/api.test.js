@@ -4,11 +4,13 @@ import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:f
 import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Transform } from 'node:stream';
+import { Readable, Transform } from 'node:stream';
 import test from 'node:test';
+import { openCatalog } from '../src/db/catalog.js';
 import { createApiServer } from '../src/server.js';
 import { apiListenOptions } from '../src/start.js';
 import { openLocalStorage } from '../src/services/storage/local.js';
+import { verifySnapshotArchive } from '../../../scripts/verify-snapshot.mjs';
 
 const nativeFetch = globalThis.fetch;
 let activeCookie;
@@ -63,7 +65,7 @@ test('workspace snapshots bind a Git archive version and preserve its commit lab
   let running;
   try {
     running = await start(storageRoot, 1000);
-    await register(running.base);
+    const owner = await register(running.base);
     const commit = 'a'.repeat(40);
     const zip = emptyZip(['README.md'], commit);
     const uploaded = await fetch(`${running.base}/v1/files?name=code.zip`, {
@@ -90,19 +92,40 @@ test('workspace snapshots bind a Git archive version and preserve its commit lab
       { fileId: file.id })).status, 200);
     const linked = await jsonRequest(`/v1/workspaces/${workspace.id}/git`, 'PUT', { fileId: file.id });
     assert.equal(linked.status, 200);
-    assert.equal((await linked.json()).commitSha, commit);
+    assert.deepEqual(await linked.json(), { archiveFileId: file.id,
+      archiveVersionId: file.currentVersionId, commitSha: commit,
+      verification: 'zip-comment', commitVerified: false });
     const snapshot = await jsonRequest(`/v1/workspaces/${workspace.id}/snapshots`, 'POST',
       { name: 'Run one', note: '', fileIds: [file.id] });
     assert.equal(snapshot.status, 201);
     const saved = await snapshot.json();
     assert.equal(saved.git.archiveVersionId, file.currentVersionId);
     assert.equal(saved.git.commitSha, commit);
+    assert.equal(saved.git.commitVerified, false);
+    assert.equal(saved.createdById, owner.id);
+    assert.equal(saved.createdByName, owner.displayName);
+    assert.equal(saved.items[0].versionId, file.currentVersionId);
     assert.deepEqual(saved.items[0].folderPath, ['Code']);
     const archive = await fetch(`${running.base}/v1/snapshots/${saved.id}/archive`);
     const tar = Buffer.from(await archive.arrayBuffer());
     const manifestLength = Number.parseInt(tar.subarray(124, 136).toString('ascii').trim(), 8);
     const manifest = JSON.parse(tar.subarray(512, 512 + manifestLength).toString('utf8'));
     assert.equal(manifest.git.commitSha, commit);
+    assert.equal(manifest.git.commitVerified, false);
+    assert.equal(manifest.createdById, owner.id);
+    assert.equal(manifest.createdByName, owner.displayName);
+    assert.equal(manifest.files[0].versionId, file.currentVersionId);
+    assert.match(manifest.files[0].sha256, /^[a-f0-9]{64}$/u);
+    const tarPath = join(storageRoot, 'snapshot.tar');
+    await writeFile(tarPath, tar);
+    assert.deepEqual(await verifySnapshotArchive(tarPath), {
+      snapshotId: saved.id, files: 1, gitCommit: commit,
+    });
+    const changed = Buffer.from(tar);
+    const contentOffset = 512 + Math.ceil(manifestLength / 512) * 512 + 512;
+    changed[contentOffset + 10] ^= 1;
+    await writeFile(tarPath, changed);
+    await assert.rejects(verifySnapshotArchive(tarPath), /Checksum mismatch/u);
     assert.match(manifest.files[0].path, /^files\/Code\//u);
     const replacement = await fetch(`${running.base}/v1/files/${file.id}/versions`, {
       method: 'POST', headers: { 'Content-Type': 'application/zip' },
@@ -117,6 +140,7 @@ test('workspace snapshots bind a Git archive version and preserve its commit lab
     assert.equal(copied.status, 201);
     const copy = await copied.json();
     assert.equal(copy.git.commitSha, commit);
+    assert.equal(copy.git.commitVerified, false);
     assert.notEqual(copy.git.archiveFileId, file.id);
     const copiedFiles = await (await fetch(`${running.base}/v1/workspaces/${copy.id}/files`)).json();
     const allFolders = await (await fetch(`${running.base}/v1/folders`)).json();
@@ -128,6 +152,30 @@ test('workspace snapshots bind a Git archive version and preserve its commit lab
   }
 });
 
+test('older snapshot catalogs get creator provenance without trusting ZIP comments', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-snapshot-legacy-test-'));
+  const catalogPath = join(storageRoot, 'catalog.json');
+  const git = { archiveFileId: 'zip-file', archiveVersionId: 'zip-version',
+    commitSha: 'a'.repeat(40), verification: 'zip-comment', commitVerified: true };
+  try {
+    await writeFile(catalogPath, JSON.stringify({ schemaVersion: 1, folders: [], files: [],
+      users: [{ id: 'owner', email: 'owner@example.test', displayName: 'Researcher' }],
+      workspaces: [{ id: 'project', ownerId: 'owner', fileIds: [], git }],
+      snapshots: [{ id: 'snapshot', workspaceId: 'project', ownerId: 'owner',
+        name: 'First run', note: '', items: [], git }],
+    }));
+    const catalog = await openCatalog(catalogPath);
+    assert.equal(catalog.getWorkspace('project', 'owner').git.commitVerified, false);
+    const snapshot = catalog.getSnapshot('snapshot', 'owner');
+    assert.equal(snapshot.createdById, 'owner');
+    assert.equal(snapshot.createdByName, 'Researcher');
+    assert.equal(snapshot.git.commitVerified, false);
+    await catalog.close();
+  } finally {
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
 async function start(storageRoot, maxUploadBytes, storageLimitBytes, options = {}) {
   const server = await createApiServer({ storageRoot, maxUploadBytes, storageLimitBytes,
     demoPlanSwitchEnabled: true, ...options });
@@ -135,6 +183,139 @@ async function start(storageRoot, maxUploadBytes, storageLimitBytes, options = {
   await once(server, 'listening');
   return { server, base: `http://127.0.0.1:${server.address().port}` };
 }
+
+test('public GitHub import refreshes the current archive and preserves saved snapshots', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-github-test-'));
+  const first = 'a'.repeat(40);
+  const second = 'b'.repeat(40);
+  let sha = first;
+  let downloads = 0;
+  const archives = new Map([[first, emptyZip(['first/README.md'])],
+    [second, emptyZip(['second/README.md'])]]);
+  const githubClient = {
+    async listCommits(repository) {
+      assert.equal(repository, 'sample/project');
+      return { repositoryFullName: 'sample/project', defaultBranch: 'main',
+        commits: [{ sha: first, message: 'First run', date: '2026-01-01T00:00:00Z' }] };
+    },
+    async resolve(repository, selectedSha) {
+      assert.equal(repository, 'sample/project');
+      return { owner: 'sample', repo: 'project', repositoryFullName: 'sample/project',
+        ref: selectedSha ?? 'main', commitSha: selectedSha ?? sha };
+    },
+    async download(source) {
+      downloads += 1;
+      const bytes = archives.get(source.commitSha);
+      return { stream: Readable.from([bytes]), contentLength: bytes.length };
+    },
+  };
+  let running;
+  try {
+    running = await start(storageRoot, 1000, 5000, { githubClient });
+    await register(running.base);
+    const ownerCookie = activeCookie;
+    const workspace = await (await fetch(`${running.base}/v1/workspaces`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Research', description: '' }),
+    })).json();
+    const base = `${running.base}/v1/workspaces/${workspace.id}`;
+    const choices = await fetch(`${running.base}/v1/github/commits`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repository: 'sample/project' }),
+    });
+    assert.equal(choices.status, 200);
+    assert.equal((await choices.json()).commits[0].sha, first);
+    const imported = await fetch(`${base}/github/import`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repository: 'sample/project', commitSha: first }),
+    });
+    assert.equal(imported.status, 201);
+    const initial = await imported.json();
+    assert.equal(initial.git.commitSha, first);
+    assert.equal(initial.git.commitVerified, true);
+    assert.equal(initial.git.repositoryFullName, 'sample/project');
+    assert.equal(initial.git.sourceUrl, `https://github.com/sample/project/tree/${first}`);
+    const directReplace = await fetch(`${base}/files/${initial.file.id}/versions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: archives.get(second),
+    });
+    assert.equal(directReplace.status, 409);
+    assert.equal((await directReplace.json()).error.code, 'GITHUB_ARCHIVE_MANAGED');
+    const snapshot = await fetch(`${base}/snapshots`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'First run', note: '', fileIds: [initial.file.id] }),
+    });
+    assert.equal(snapshot.status, 201);
+    const saved = await snapshot.json();
+    assert.equal(saved.git.archiveVersionId, initial.file.currentVersionId);
+    assert.equal(saved.git.commitVerified, true);
+    assert.equal(saved.git.sourceUrl, initial.git.sourceUrl);
+    const tar = Buffer.from(await (await fetch(`${running.base}/v1/snapshots/${saved.id}/archive`))
+      .arrayBuffer());
+    const manifestLength = Number.parseInt(tar.subarray(124, 136).toString('ascii').trim(), 8);
+    const manifest = JSON.parse(tar.subarray(512, 512 + manifestLength).toString('utf8'));
+    assert.equal(manifest.git.sourceUrl, initial.git.sourceUrl);
+    const unchanged = await fetch(`${base}/github/refresh`, { method: 'POST' });
+    assert.equal(unchanged.status, 200);
+    assert.equal((await unchanged.json()).unchanged, true);
+    assert.equal(downloads, 1);
+    sha = second;
+    const refreshed = await fetch(`${base}/github/refresh`, { method: 'POST' });
+    assert.equal(refreshed.status, 200);
+    const current = await refreshed.json();
+    assert.equal(current.git.commitSha, second);
+    assert.equal(current.git.sourceUrl, `https://github.com/sample/project/tree/${second}`);
+    assert.notEqual(current.file.currentVersionId, initial.file.currentVersionId);
+    assert.deepEqual(Buffer.from(await (await fetch(`${base}/files/${initial.file.id}/content`)).arrayBuffer()),
+      archives.get(second));
+    assert.deepEqual(Buffer.from(await (await fetch(`${running.base}/v1/snapshots/${saved.id}`
+      + `/files/${initial.file.id}/content`)).arrayBuffer()), archives.get(first));
+    await stop(running.server);
+    running = await start(storageRoot, 1000, 5000, { githubClient });
+    activeCookie = null;
+    await register(running.base, 'other@example.test');
+    assert.equal((await fetch(`${running.base}/v1/workspaces/${workspace.id}/github/refresh`,
+      { method: 'POST' })).status, 404);
+    activeCookie = ownerCookie;
+    const persisted = await (await fetch(`${running.base}/v1/workspaces/${workspace.id}`)).json();
+    assert.equal(persisted.git.commitVerified, true);
+    assert.equal(persisted.git.commitSha, second);
+    const savedAgain = await (await fetch(`${running.base}/v1/snapshots/${saved.id}`)).json();
+    assert.equal(savedAgain.git.commitVerified, true);
+    assert.equal(savedAgain.git.commitSha, first);
+    assert.equal(savedAgain.git.sourceUrl, initial.git.sourceUrl);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('GitHub imports obey the workspace owner quota without creating a file', async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-github-quota-test-'));
+  const bytes = emptyZip(['source/README.md']);
+  let running;
+  try {
+    running = await start(storageRoot, 1000, bytes.length - 1, { githubClient: {
+      async resolve() { return { owner: 'sample', repo: 'project',
+        repositoryFullName: 'sample/project', ref: 'main', commitSha: 'a'.repeat(40) }; },
+      async download() { return { stream: Readable.from([bytes]), contentLength: null }; },
+    } });
+    await register(running.base);
+    const workspace = await (await fetch(`${running.base}/v1/workspaces`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Research', description: '' }),
+    })).json();
+    const blocked = await fetch(`${running.base}/v1/workspaces/${workspace.id}/github/import`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repository: 'sample/project' }),
+    });
+    assert.equal(blocked.status, 507);
+    assert.equal((await blocked.json()).error.code, 'STORAGE_CAP_EXCEEDED');
+    assert.deepEqual((await (await fetch(`${running.base}/v1/workspaces/${workspace.id}/files`)).json()).files, []);
+  } finally {
+    if (running) await stop(running.server);
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
 
 test('unpaid plan changes are disabled unless the local demo opts in', async () => {
   const storageRoot = await mkdtemp(join(tmpdir(), 'dropvault-plan-gate-test-'));
